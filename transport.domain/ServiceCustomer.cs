@@ -1,0 +1,10 @@
+﻿namespace transport.domain;
+
+public class ServiceCustomer
+{
+    public int ServiceId { get; set; }
+    public int CustomerId { get; set; }
+
+    public Service Service { get; set; } = null!;
+    public Customer Customer { get; set; } = null!;
+}
