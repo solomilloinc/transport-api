@@ -22,8 +22,8 @@
 
 	<ItemGroup>
 	  <ProjectReference Include="..\transport.application\Transport.Business.csproj" />
-	  <ProjectReference Include="..\transport.common\transport.common.csproj" />
-	  <ProjectReference Include="..\transport.domain\transport.domain.csproj" />
+	  <ProjectReference Include="..\transport.common\Transport.Common.csproj" />
+	  <ProjectReference Include="..\transport.domain\Transport.Domain.csproj" />
 	</ItemGroup>
 
 	<ItemGroup>

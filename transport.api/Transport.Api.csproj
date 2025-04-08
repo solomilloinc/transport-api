@@ -23,8 +23,8 @@
 	</ItemGroup>
 	<ItemGroup>
 		<ProjectReference Include="..\transport.application\Transport.Business.csproj" />
-		<ProjectReference Include="..\transport.common\transport.common.csproj" />
-		<ProjectReference Include="..\transport.infraestructure\transport.infraestructure.csproj" />
+		<ProjectReference Include="..\transport.common\Transport.Common.csproj" />
+		<ProjectReference Include="..\transport.infraestructure\Transport.Infraestructure.csproj" />
 	</ItemGroup>
 	<ItemGroup>
 		<None Update="host.json">

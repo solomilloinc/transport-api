@@ -3,15 +3,15 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.13.35919.96
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "transport-api", "transport-api\transport-api.csproj", "{2BD25854-6BF5-485D-B52F-91D74001CF43}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Transport.Domain", "transport.domain\Transport.Domain.csproj", "{7D8F64F6-5FF1-4D42-8600-6CB5ECB76C4E}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "transport.domain", "transport.domain\transport.domain.csproj", "{7D8F64F6-5FF1-4D42-8600-6CB5ECB76C4E}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Transport.Common", "transport.common\Transport.Common.csproj", "{F487964A-9CCF-410C-902B-0D48DD3CDE60}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "transport.common", "transport.common\transport.common.csproj", "{F487964A-9CCF-410C-902B-0D48DD3CDE60}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "transport.infraestructure", "transport.infraestructure\transport.infraestructure.csproj", "{479B6464-5610-49FB-B121-0776BD54ECB3}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Transport.Infraestructure", "transport.infraestructure\Transport.Infraestructure.csproj", "{479B6464-5610-49FB-B121-0776BD54ECB3}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Transport.Business", "transport.application\Transport.Business.csproj", "{3FA8C8ED-5FF2-42B2-AF73-B81140FC9A05}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Transport.Api", "transport.api\Transport.Api.csproj", "{49DE7AEA-29E9-59E5-C69E-E495DB60B8F6}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -19,10 +19,6 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{2BD25854-6BF5-485D-B52F-91D74001CF43}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{2BD25854-6BF5-485D-B52F-91D74001CF43}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{2BD25854-6BF5-485D-B52F-91D74001CF43}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{2BD25854-6BF5-485D-B52F-91D74001CF43}.Release|Any CPU.Build.0 = Release|Any CPU
 		{7D8F64F6-5FF1-4D42-8600-6CB5ECB76C4E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{7D8F64F6-5FF1-4D42-8600-6CB5ECB76C4E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{7D8F64F6-5FF1-4D42-8600-6CB5ECB76C4E}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -39,6 +35,10 @@ Global
 		{3FA8C8ED-5FF2-42B2-AF73-B81140FC9A05}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{3FA8C8ED-5FF2-42B2-AF73-B81140FC9A05}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{3FA8C8ED-5FF2-42B2-AF73-B81140FC9A05}.Release|Any CPU.Build.0 = Release|Any CPU
+		{49DE7AEA-29E9-59E5-C69E-E495DB60B8F6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{49DE7AEA-29E9-59E5-C69E-E495DB60B8F6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{49DE7AEA-29E9-59E5-C69E-E495DB60B8F6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{49DE7AEA-29E9-59E5-C69E-E495DB60B8F6}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
