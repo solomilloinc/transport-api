@@ -9,4 +9,8 @@ public static class DriverError
     public static readonly Error EmailInBlackList = Error.Validation(
         "Driver.DocumentInvalid",
         "Este Documento no está permitido");
+
+    public static readonly Error DriverAlreadyExist = Error.Validation(
+        "Driver.Document",
+        "Hay un chofer que ya éxiste con este documento");
 }

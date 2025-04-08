@@ -13,6 +13,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Transport.Business", "trans
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Transport.Api", "transport.api\Transport.Api.csproj", "{49DE7AEA-29E9-59E5-C69E-E495DB60B8F6}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Transport.Tests", "Transport.Tests\Transport.Tests.csproj", "{F9BBAEF1-FA67-4B27-A7A5-5CFAA8BA6DD8}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -39,6 +41,10 @@ Global
 		{49DE7AEA-29E9-59E5-C69E-E495DB60B8F6}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{49DE7AEA-29E9-59E5-C69E-E495DB60B8F6}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{49DE7AEA-29E9-59E5-C69E-E495DB60B8F6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F9BBAEF1-FA67-4B27-A7A5-5CFAA8BA6DD8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F9BBAEF1-FA67-4B27-A7A5-5CFAA8BA6DD8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F9BBAEF1-FA67-4B27-A7A5-5CFAA8BA6DD8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F9BBAEF1-FA67-4B27-A7A5-5CFAA8BA6DD8}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using transport.common;
 using transport.domain;
+using transport.domain.Drivers;
 using Transport.Business.Data;
 
 namespace transport.infraestructure.Database;
@@ -9,8 +10,15 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
 {
     public DbSet<OutboxMessage> OutboxMessages { get; set; }
     public DbSet<User> Users { get; set; }
+    public DbSet<Driver> Drivers { get; set; }
 
     public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options) { }
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(ApplicationDbContext).Assembly);
+        base.OnModelCreating(modelBuilder);
+    }
 
     public async Task<int> SaveChangesWithOutboxAsync(CancellationToken cancellationToken = default)
     {
