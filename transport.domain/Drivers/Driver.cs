@@ -1,6 +1,8 @@
-﻿namespace transport.domain.Drivers;
+﻿using transport.common;
 
-public class Driver
+namespace transport.domain.Drivers;
+
+public class Driver: Entity
 {
     public int DriverId { get; set; }
     public string FirstName { get; set; } = null!;
