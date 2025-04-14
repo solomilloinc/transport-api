@@ -1,16 +1,13 @@
 ﻿using Microsoft.Azure.Functions.Worker.Http;
-using Microsoft.Azure.Functions.Worker;
 using System.Net;
-using transport.application.Authentication;
-using transport.application.Authorization;
-using transport.common;
-using transport_api.Infrastructure;
-using transport_api.Extensions;
+using Transport.SharedKernel;
+using Transport_Api.Infrastructure;
+using Transport_Api.Extensions;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Http.HttpResults;
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
+
+namespace Transport_Api.Functions.Base;
 
 public abstract class FunctionBase
 {

@@ -1,16 +1,25 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using transport.common;
-using transport.domain;
-using transport.domain.Drivers;
+using Transport.SharedKernel;
+using Transport.Domain;
+using Transport.Domain.Drivers;
 using Transport.Business.Data;
+using Transport.Domain.Customers;
+using Transport.Domain.Reserves;
+using Transport.Domain.Users;
 
-namespace transport.infraestructure.Database;
+namespace Transport.Infraestructure.Database;
 
 public class ApplicationDbContext : DbContext, IApplicationDbContext
 {
     public DbSet<OutboxMessage> OutboxMessages { get; set; }
     public DbSet<User> Users { get; set; }
     public DbSet<Driver> Drivers { get; set; }
+
+    public DbSet<Customer> Customers { get; set; }
+
+    public DbSet<Reserve> Reserves { get; set; }
+
+    public DbSet<Direction> Directions { get; set; }
 
     public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options) { }
 

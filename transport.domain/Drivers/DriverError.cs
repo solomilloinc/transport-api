@@ -1,10 +1,13 @@
-﻿using transport.common;
+﻿using Transport.SharedKernel;
 
-namespace transport.domain.Drivers;
+namespace Transport.Domain.Drivers;
 
 public static class DriverError
 {
     //TODO. Acá podrías poner NotFound, Problem, Failure, Conflict etc.
+    public static readonly Error DriverNotFound = Error.Validation(
+       "Driver.DriverId",
+       "El chofer no existe");
 
     public static readonly Error EmailInBlackList = Error.Validation(
         "Driver.DocumentInvalid",

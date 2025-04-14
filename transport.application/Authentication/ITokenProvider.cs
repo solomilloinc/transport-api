@@ -1,6 +1,6 @@
-﻿using transport.domain;
+﻿using Transport.Domain.Users;
 
-namespace transport.application.Authentication;
+namespace Transport.Business.Authentication;
 
 public interface ITokenProvider
 {

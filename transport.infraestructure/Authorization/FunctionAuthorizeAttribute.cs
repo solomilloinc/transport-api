@@ -1,4 +1,4 @@
-﻿namespace transport.infraestructure.Authorization;
+﻿namespace Transport.Infraestructure.Authorization;
 
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method | AttributeTargets.Parameter, AllowMultiple = true)]
 public class AuthorizeAttribute : Attribute

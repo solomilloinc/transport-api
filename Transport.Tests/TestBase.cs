@@ -1,7 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Moq;
 using System.Linq.Expressions;
-using transport.common;
+using Transport.SharedKernel;
 using Transport.Business.Data;
 
 namespace Transport.Tests;

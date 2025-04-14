@@ -1,7 +1,7 @@
 ﻿using System.Security.Claims;
 using Microsoft.Azure.Functions.Worker;
 
-namespace transport.common.Extensions;
+namespace Transport.SharedKernel.Extensions;
 
 public static class FunctionContextExtensions
 {

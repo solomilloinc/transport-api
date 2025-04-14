@@ -1,4 +1,6 @@
-﻿namespace transport.domain;
+﻿using Transport.Domain.Reserves;
+
+namespace Transport.Domain;
 
 public class Service
 {

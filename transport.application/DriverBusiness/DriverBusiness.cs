@@ -1,15 +1,13 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using transport.common;
-using transport.domain.Drivers;
-using Transport.Business.Data;
+using Transport.SharedKernel;
 using Transport.Domain.Drivers;
+using Transport.Business.Data;
+using Transport.Domain.Drivers.Abstraction;
+using Transport.SharedKernel.Contracts.Driver;
+using Transport.SharedKernel.Contracts;
+using System.Linq.Expressions;
 
 namespace Transport.Business.DriverBusiness;
-
-public interface IDriverBusiness
-{
-    Task<Result<int>> Create(DriverCreateRequestDto dto);
-}
 
 public class DriverBusiness : IDriverBusiness
 {
@@ -49,5 +47,99 @@ public class DriverBusiness : IDriverBusiness
         await _context.SaveChangesWithOutboxAsync();
 
         return driver.DriverId;
+    }
+
+    public async Task<Result<bool>> Delete(int driverId)
+    {
+        var driver = _context.Drivers
+            .SingleOrDefault(x => x.DriverId == driverId);
+
+        if (driver is null)
+        {
+            return Result.Failure<bool>(DriverError.DriverNotFound);
+        }
+
+        driver.Status = EntityStatusEnum.Deleted;
+
+        await _context.SaveChangesWithOutboxAsync();
+        return Result.Success(true);
+    }
+
+    public async Task<Result<SharedKernel.PagedReportResponseDto<DriverReportResponseDto>>>
+    GetDriverReport(PagedReportRequestDto<DriverReportFilterRequestDto> requestDto)
+    {
+        var query = _context.Drivers
+        .AsNoTracking()
+        .Include(d => d.Reserves)
+        .AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(requestDto.Filters?.FirstName))
+            query = query.Where(x => x.FirstName.Contains(requestDto.Filters.FirstName));
+
+        if (!string.IsNullOrWhiteSpace(requestDto.Filters?.LastName))
+            query = query.Where(x => x.LastName.Contains(requestDto.Filters.LastName));
+
+        if (!string.IsNullOrWhiteSpace(requestDto.Filters?.DocumentNumber))
+            query = query.Where(x => x.DocumentNumber.Contains(requestDto.Filters.DocumentNumber));
+
+        var sortMappings = new Dictionary<string, Expression<Func<Driver, object>>>
+        {
+            ["firstname"] = d => d.FirstName,
+            ["lastname"] = d => d.LastName,
+            ["documentnumber"] = d => d.DocumentNumber
+        };
+
+        var pagedResult = await query.ToPagedReportAsync<DriverReportResponseDto, Driver, DriverReportFilterRequestDto>(
+            requestDto,
+            selector: d => new DriverReportResponseDto
+            {
+                DriverId = d.DriverId,
+                FirstName = d.FirstName,
+                LastName = d.LastName,
+                DocumentNumber = d.DocumentNumber,
+                Reserves = d.Reserves.Select(r => new DriverReserveReportResponseDto
+                {
+                    ReserveDate = r.ReserveDate,
+                    Status = nameof(r.Status),
+                    VehicleInternalNumber = r.Vehicle != null ? r.Vehicle.InternalNumber : null,
+                }).ToList()
+            },
+            sortMappings: sortMappings
+        );
+
+        return Result.Success(pagedResult);
+    }
+
+    public async Task<Result<bool>> Update(int driverId, DriverUpdateRequestDto dto)
+    {
+        var driver = _context.Drivers
+            .SingleOrDefault(x => x.DriverId == driverId);
+
+        if (driver is null)
+        {
+            return Result.Failure<bool>(DriverError.DriverNotFound);
+        }
+
+        driver.FirstName = dto.FirstName;
+        driver.LastName = dto.LastName;
+
+        await _context.SaveChangesWithOutboxAsync();
+        return Result.Success(true);
+    }
+
+    public async Task<Result<bool>> UpdateStatus(int driverId, EntityStatusEnum status)
+    {
+        var driver = _context.Drivers
+            .SingleOrDefault(x => x.DriverId == driverId);
+
+        if (driver is null)
+        {
+            return Result.Failure<bool>(DriverError.DriverNotFound);
+        }
+
+        driver.Status = status;
+
+        await _context.SaveChangesWithOutboxAsync();
+        return Result.Success(true);
     }
 }

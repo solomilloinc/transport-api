@@ -1,6 +1,6 @@
-﻿using transport.common;
+﻿using Transport.SharedKernel;
 
-namespace transport_api.Extensions;
+namespace Transport_Api.Extensions;
 
 public static class ResultExtensions
 {

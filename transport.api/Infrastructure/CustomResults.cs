@@ -1,8 +1,8 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using transport.common;
+using Transport.SharedKernel;
 
-namespace transport_api.Infrastructure;
+namespace Transport_Api.Infrastructure;
 
 public static class CustomResults
 {

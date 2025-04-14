@@ -1,19 +1,20 @@
 ﻿using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Microsoft.EntityFrameworkCore;
-using transport.domain;
+using Transport.Domain;
 
-namespace transport.infraestructure.Database.EntityTypesConfigurations;
+namespace Transport.Infraestructure.Database.EntityTypesConfigurations;
 
 public class DirectionConfiguration : IEntityTypeConfiguration<Direction>
 {
     public void Configure(EntityTypeBuilder<Direction> builder)
     {
-        builder.ToTable("Directions");
+        builder.ToTable("Direction");
         builder.HasKey(d => d.DirectionId);
         builder.Property(d => d.Name).HasMaxLength(250).IsRequired();
+
         builder.HasOne(d => d.City)
-               .WithMany()
+               .WithMany(c => c.Directions)
                .HasForeignKey(d => d.CityId)
-               .IsRequired();
+               .OnDelete(DeleteBehavior.Cascade);
     }
 }

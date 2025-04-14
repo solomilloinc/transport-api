@@ -1,6 +1,6 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 
-namespace transport.common;
+namespace Transport.SharedKernel;
 
 public class Result
 {

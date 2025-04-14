@@ -1,4 +1,6 @@
-﻿namespace transport.domain;
+﻿using Transport.Domain.Reserves;
+
+namespace Transport.Domain.Customers;
 public class CustomerReserve
 {
     public int CustomerReserveId { get; set; }

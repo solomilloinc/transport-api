@@ -1,9 +1,9 @@
 ﻿using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using transport.infraestructure.Database;
+using Transport.Infraestructure.Database;
 
-namespace transport_api.Extensions;
+namespace Transport_Api.Extensions;
 
 public static class MigrationExtensions
 {

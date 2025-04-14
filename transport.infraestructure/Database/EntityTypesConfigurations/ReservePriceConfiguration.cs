@@ -1,8 +1,8 @@
 ﻿using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Microsoft.EntityFrameworkCore;
-using transport.domain;
+using Transport.Domain.Reserves;
 
-namespace transport.infraestructure.Database.EntityTypesConfigurations;
+namespace Transport.Infraestructure.Database.EntityTypesConfigurations;
 
 public class ReservePriceConfiguration : IEntityTypeConfiguration<ReservePrice>
 {
@@ -12,6 +12,9 @@ public class ReservePriceConfiguration : IEntityTypeConfiguration<ReservePrice>
         builder.HasKey(rp => rp.ReservePriceId);
         builder.Property(rp => rp.Price).HasColumnType("decimal(10,2)").IsRequired();
         builder.Property(rp => rp.ReserveTypeId).HasMaxLength(50).IsRequired();
-        builder.HasOne(rp => rp.Service).WithMany().HasForeignKey(rp => rp.ServiceId);
+
+        builder.HasOne(rp => rp.Service)
+       .WithMany(s => s.ReservePrices)
+       .HasForeignKey(rp => rp.ServiceId);
     }
 }

@@ -1,9 +1,9 @@
 ﻿using System.Reflection;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Middleware;
-using transport.infraestructure.Authorization;
+using Transport.Infraestructure.Authorization;
 
-namespace transport_api.Middleware;
+namespace Transport_Api.Middleware;
 
 public class AuthorizationMiddleware : IFunctionsWorkerMiddleware
 {

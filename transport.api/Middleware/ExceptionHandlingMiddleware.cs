@@ -6,10 +6,10 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.IdentityModel.Tokens;
-using transport.common;
+using Transport.SharedKernel;
 using Microsoft.AspNetCore.Http;
 
-namespace transport_api.Middleware;
+namespace Transport_Api.Middleware;
 
 public class ExceptionHandlingMiddleware : IFunctionsWorkerMiddleware
 {

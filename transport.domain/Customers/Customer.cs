@@ -1,4 +1,6 @@
-﻿namespace transport.domain;
+﻿using Transport.Domain.Users;
+
+namespace Transport.Domain.Customers;
 
 public class Customer
 {
@@ -10,7 +12,7 @@ public class Customer
     public string Phone1 { get; set; } = null!;
     public string? Phone2 { get; set; }
 
-    public ICollection<User> Users { get; set; } = new List<User>();
+    public User? User { get; set; }
     public ICollection<ServiceCustomer> Services { get; set; } = new List<ServiceCustomer>();
     public ICollection<CustomerReserve> CustomerReserves { get; set; } = new List<CustomerReserve>();
 }

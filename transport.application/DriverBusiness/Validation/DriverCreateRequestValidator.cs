@@ -1,6 +1,7 @@
 ﻿using FluentValidation;
+using Transport.SharedKernel.Contracts.Driver;
 
-namespace Transport.Business.DriverBusiness;
+namespace Transport.Business.DriverBusiness.Validation;
 
 public class DriverCreateRequestValidator : AbstractValidator<DriverCreateRequestDto>
 {

@@ -1,6 +1,6 @@
 ﻿using System.Security.Claims;
 
-namespace transport_api.Extensions;
+namespace Transport_Api.Extensions;
 
 public static class ClaimsPrincipalExtensions
 {

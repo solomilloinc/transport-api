@@ -1,6 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Microsoft.EntityFrameworkCore;
-using transport.common;
+using Transport.SharedKernel;
 
 namespace Transport.Infraestructure.Database.EntityTypesConfigurations;
 
@@ -8,7 +8,7 @@ public class OutboxMessageConfiguration : IEntityTypeConfiguration<OutboxMessage
 {
     public void Configure(EntityTypeBuilder<OutboxMessage> builder)
     {
-        builder.ToTable("OutboxMessages");
+        builder.ToTable("OutboxMessage");
 
         builder.HasKey(x => x.Id);
 
