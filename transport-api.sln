@@ -5,7 +5,7 @@ VisualStudioVersion = 17.13.35919.96
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Transport.Domain", "transport.domain\Transport.Domain.csproj", "{7D8F64F6-5FF1-4D42-8600-6CB5ECB76C4E}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Transport.Common", "transport.common\Transport.Common.csproj", "{F487964A-9CCF-410C-902B-0D48DD3CDE60}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Transport.SharedKernel", "transport.common\Transport.SharedKernel.csproj", "{F487964A-9CCF-410C-902B-0D48DD3CDE60}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Transport.Infraestructure", "transport.infraestructure\Transport.Infraestructure.csproj", "{479B6464-5610-49FB-B121-0776BD54ECB3}"
 EndProject

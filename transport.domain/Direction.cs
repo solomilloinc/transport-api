@@ -1,4 +1,6 @@
-﻿namespace transport.domain;
+﻿using Transport.Domain.Customers;
+
+namespace Transport.Domain;
 
 public class Direction
 {

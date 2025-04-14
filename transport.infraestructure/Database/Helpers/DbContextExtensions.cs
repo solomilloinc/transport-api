@@ -1,7 +1,7 @@
 ﻿using System.Data;
 using Microsoft.EntityFrameworkCore;
 
-namespace transport.infraestructure.Database.Helpers;
+namespace Transport.Infraestructure.Database.Helpers;
 
 public static class DbContextExtensions
 {

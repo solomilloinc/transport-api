@@ -1,5 +1,4 @@
 ﻿using System.Data;
-using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore.Storage;
 
 namespace Transport.Business.Data;

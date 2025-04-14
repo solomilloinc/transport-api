@@ -1,6 +1,7 @@
 ﻿using FluentValidation;
+using Transport.SharedKernel.Contracts.User;
 
-namespace Transport.Business.UserBusiness;
+namespace Transport.Business.UserBusiness.Validation;
 
 public class LoginDtoValidator : AbstractValidator<LoginDto>
 {

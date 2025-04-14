@@ -3,10 +3,10 @@ using System.Text;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
-using transport.application.Authentication;
-using transport.domain;
+using Transport.Business.Authentication;
+using Transport.Domain.Users;
 
-namespace transport.infraestructure.Authentication;
+namespace Transport.Infraestructure.Authentication;
 
 internal sealed class TokenProvider(IConfiguration configuration) : ITokenProvider
 {

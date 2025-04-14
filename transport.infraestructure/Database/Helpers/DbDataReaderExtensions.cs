@@ -1,7 +1,7 @@
 ﻿using System.Data.Common;
 using System.Reflection;
 
-namespace transport.infraestructure.Database.Helpers;
+namespace Transport.Infraestructure.Database.Helpers;
 public static class DbDataReaderExtensions
 {
     public static List<T> MapToList<T>(this DbDataReader dr)

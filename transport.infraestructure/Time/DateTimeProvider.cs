@@ -1,6 +1,6 @@
-﻿using transport.common;
+﻿using Transport.SharedKernel;
 
-namespace transport.infraestructure.Time;
+namespace Transport.Infraestructure.Time;
 
 internal sealed class DateTimeProvider : IDateTimeProvider
 {

@@ -1,8 +1,7 @@
 ﻿using System.Security.Claims;
 using Microsoft.Azure.Functions.Worker;
-using transport.application.Authentication;
 
-namespace transport_api.Extensions;
+namespace Transport_Api.Extensions;
 
 public static class FunctionContextExtensions
 {

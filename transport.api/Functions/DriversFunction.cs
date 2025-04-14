@@ -1,16 +1,15 @@
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Azure.Functions.Worker;
-using transport.common;
-using transport.infraestructure.Authorization;
+using Transport.Infraestructure.Authorization;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Attributes;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Enums;
 using System.Net;
-using Transport.Business.UserBusiness;
-using FluentValidation;
-using Transport.Business.DriverBusiness;
-using transport_api.Extensions;
+using Transport_Api.Extensions;
+using Transport.Domain.Drivers.Abstraction;
+using Transport.SharedKernel.Contracts.Driver;
+using Transport_Api.Functions.Base;
 
-namespace transport_api.Functions;
+namespace Transport_Api.Functions;
 public sealed class DriversFunction : FunctionBase
 {
     private readonly IDriverBusiness _driverBusiness;

@@ -2,9 +2,9 @@
 using System.Security.Claims;
 using System.Text;
 using Microsoft.IdentityModel.Tokens;
-using transport.common.Configuration;
+using Transport.SharedKernel.Configuration;
 
-namespace transport.infraestructure.Authorization
+namespace Transport.Infraestructure.Authorization
 {
     public interface IAuthorizationService
     {

@@ -1,7 +1,7 @@
 ﻿using System.Security.Cryptography;
-using transport.application.Authentication;
+using Transport.Business.Authentication;
 
-namespace transport.infraestructure.Authentication;
+namespace Transport.Infraestructure.Authentication;
 
 internal sealed class PasswordHasher : IPasswordHasher
 {

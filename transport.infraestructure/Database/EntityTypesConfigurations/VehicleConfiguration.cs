@@ -1,8 +1,8 @@
 ﻿using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Microsoft.EntityFrameworkCore;
-using transport.domain;
+using Transport.Domain;
 
-namespace transport.infraestructure.Database.EntityTypesConfigurations;
+namespace Transport.Infraestructure.Database.EntityTypesConfigurations;
 
 public class VehicleConfiguration : IEntityTypeConfiguration<Vehicle>
 {
@@ -12,8 +12,8 @@ public class VehicleConfiguration : IEntityTypeConfiguration<Vehicle>
         builder.HasKey(v => v.VehicleId);
         builder.Property(v => v.InternalNumber).HasMaxLength(50).IsRequired();
         builder.HasOne(v => v.VehicleType)
-               .WithMany()
-               .HasForeignKey(v => v.VehicleTypeId)
-               .IsRequired();
+       .WithMany(vt => vt.Vehicles)
+       .HasForeignKey(v => v.VehicleTypeId)
+       .IsRequired();
     }
 }

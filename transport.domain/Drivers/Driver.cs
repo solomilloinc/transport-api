@@ -1,6 +1,7 @@
-﻿using transport.common;
+﻿using Transport.Domain.Reserves;
+using Transport.SharedKernel;
 
-namespace transport.domain.Drivers;
+namespace Transport.Domain.Drivers;
 
 public class Driver: Entity
 {
@@ -8,6 +9,6 @@ public class Driver: Entity
     public string FirstName { get; set; } = null!;
     public string LastName { get; set; } = null!;
     public string DocumentNumber { get; set; } = null!;
-
+    public EntityStatusEnum Status { get; set; } = EntityStatusEnum.Active;
     public ICollection<Reserve> Reserves { get; set; } = new List<Reserve>();
 }

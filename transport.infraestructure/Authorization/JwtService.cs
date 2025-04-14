@@ -2,10 +2,10 @@
 using System.Security.Claims;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
-using transport.application.Authorization;
-using transport.common.Configuration;
+using Transport.SharedKernel.Configuration;
+using Transport.Business.Authorization;
 
-namespace transport.infraestructure.Authorization;
+namespace Transport.Infraestructure.Authorization;
 public class JwtService : IJwtService
 {
     private readonly IJwtOption option;

@@ -1,16 +1,16 @@
 ﻿using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Azure.Functions.Worker;
-using transport.common;
-using Transport.Business.UserBusiness;
-using System.ComponentModel.DataAnnotations;
 using FluentValidation;
-using transport_api.Extensions;
+using Transport_Api.Extensions;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Attributes;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Enums;
 using System.Net;
-using transport.infraestructure.Authorization;
+using Transport.Infraestructure.Authorization;
+using Transport.SharedKernel.Contracts.User;
+using Transport.Domain.Users.Abstraction;
+using Transport_Api.Functions.Base;
 
-namespace transport_api.Functions;
+namespace Transport_Api.Functions;
 
 public class UserFunction : FunctionBase
 {

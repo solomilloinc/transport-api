@@ -1,4 +1,4 @@
-﻿namespace transport.domain;
+﻿namespace Transport.Domain.Users;
 
 public class Role
 {

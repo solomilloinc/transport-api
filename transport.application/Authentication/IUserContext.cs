@@ -1,4 +1,4 @@
-﻿namespace transport.application.Authentication;
+﻿namespace Transport.Business.Authentication;
 
 public interface IUserContext
 {

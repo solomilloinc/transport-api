@@ -1,6 +1,6 @@
 ﻿using System.Security.Claims;
 
-namespace transport.application.Authorization;
+namespace Transport.Business.Authorization;
 
 public class ClaimBuilder
 {

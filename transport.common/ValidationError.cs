@@ -1,4 +1,4 @@
-﻿namespace transport.common;
+﻿namespace Transport.SharedKernel;
 
 public sealed record ValidationError : Error
 {

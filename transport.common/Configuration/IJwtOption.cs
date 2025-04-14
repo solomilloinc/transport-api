@@ -1,4 +1,4 @@
-﻿namespace transport.common.Configuration;
+﻿namespace Transport.SharedKernel.Configuration;
 
 public interface IJwtOption
 {

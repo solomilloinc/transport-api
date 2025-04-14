@@ -1,36 +1,43 @@
-﻿using transport.application.Authorization;
-using transport.common;
-using transport.domain;
+﻿using Transport.SharedKernel;
+using Transport.SharedKernel.Contracts.User;
+using Transport.Domain.Users;
+using Transport.Domain.Users.Abstraction;
+using Transport.Business.Authorization;
+using Transport.Business.Data;
+using Microsoft.EntityFrameworkCore;
+using Transport.Business.Authentication;
 
 namespace Transport.Business.UserBusiness;
-
-public interface ILoginBusiness
-{
-    Task<Result<LoginResponseDto>> Login(LoginDto login);
-}
 
 public class LoginBusiness : ILoginBusiness
 {
     private readonly IJwtService jwtService;
+    private readonly IApplicationDbContext dbContext;
+    private readonly IPasswordHasher passwordHasher;
 
-    public LoginBusiness(IJwtService jwtService)
+    public LoginBusiness(IJwtService jwtService, IApplicationDbContext dbContext, IPasswordHasher passwordHasher)
     {
         this.jwtService = jwtService;
+        this.dbContext = dbContext;
+        this.passwordHasher = passwordHasher;
     }
 
     public async Task<Result<LoginResponseDto>> Login(LoginDto login)
     {
-        User user = new User
+        var hasPass = passwordHasher.Hash(login.Password);
+
+        var user = await dbContext.Users
+           .Include(u => u.Role)
+           .SingleOrDefaultAsync(u => u.Email == login.Email);
+
+        if (user is null || !passwordHasher.Verify(login.Password, user.Password))
         {
-            UserId = 1,
-            Email = "agustinyuse@gmail.com",
-            Password = "123456",
-            RoleId = (int)RoleEnum.Admin
-        };
+            throw new UnauthorizedAccessException("Invalid credentials");
+        }
 
         var tokens = ClaimBuilder.Create()
             .SetEmail(user.Email)
-            .SetRole("Admin")
+            .SetRole(((RoleEnum)user.Role.RoleId).ToString())
             .SetId(user.UserId.ToString())
             .Build();
 
