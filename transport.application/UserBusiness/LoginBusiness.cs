@@ -24,8 +24,6 @@ public class LoginBusiness : ILoginBusiness
 
     public async Task<Result<LoginResponseDto>> Login(LoginDto login)
     {
-        var hasPass = passwordHasher.Hash(login.Password);
-
         var user = await dbContext.Users
            .Include(u => u.Role)
            .SingleOrDefaultAsync(u => u.Email == login.Email);
