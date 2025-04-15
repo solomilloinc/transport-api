@@ -1,6 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Microsoft.EntityFrameworkCore;
-using Transport.Domain;
+using Transport.Domain.Vehicles;
 
 namespace Transport.Infraestructure.Database.EntityTypesConfigurations;
 

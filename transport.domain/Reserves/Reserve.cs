@@ -1,5 +1,6 @@
 ﻿using Transport.Domain.Customers;
 using Transport.Domain.Drivers;
+using Transport.Domain.Vehicles;
 
 namespace Transport.Domain.Reserves;
 public class Reserve

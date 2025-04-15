@@ -12,7 +12,7 @@ using Transport.Infraestructure.Database;
 namespace Transport.Infraestructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20250414000444_InitialMigration")]
+    [Migration("20250415035110_InitialMigration")]
     partial class InitialMigration
     {
         /// <inheritdoc />
@@ -82,6 +82,9 @@ namespace Transport.Infraestructure.Migrations
                     b.Property<string>("Phone2")
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
 
                     b.HasKey("CustomerId");
 
@@ -224,32 +227,6 @@ namespace Transport.Infraestructure.Migrations
                     b.ToTable("Holiday", (string)null);
                 });
 
-            modelBuilder.Entity("Transport.Domain.ReservePrice", b =>
-                {
-                    b.Property<int>("ReservePriceId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ReservePriceId"));
-
-                    b.Property<decimal>("Price")
-                        .HasColumnType("decimal(10,2)");
-
-                    b.Property<string>("ReserveTypeId")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<int>("ServiceId")
-                        .HasColumnType("int");
-
-                    b.HasKey("ReservePriceId");
-
-                    b.HasIndex("ServiceId");
-
-                    b.ToTable("ReservePrice", (string)null);
-                });
-
             modelBuilder.Entity("Transport.Domain.Reserves.Reserve", b =>
                 {
                     b.Property<int>("ReserveId")
@@ -283,6 +260,32 @@ namespace Transport.Infraestructure.Migrations
                     b.HasIndex("VehicleId");
 
                     b.ToTable("Reserve", (string)null);
+                });
+
+            modelBuilder.Entity("Transport.Domain.Reserves.ReservePrice", b =>
+                {
+                    b.Property<int>("ReservePriceId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ReservePriceId"));
+
+                    b.Property<decimal>("Price")
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<string>("ReserveTypeId")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<int>("ServiceId")
+                        .HasColumnType("int");
+
+                    b.HasKey("ReservePriceId");
+
+                    b.HasIndex("ServiceId");
+
+                    b.ToTable("ReservePrice", (string)null);
                 });
 
             modelBuilder.Entity("Transport.Domain.Service", b =>
@@ -420,7 +423,7 @@ namespace Transport.Infraestructure.Migrations
                     b.ToTable("User", (string)null);
                 });
 
-            modelBuilder.Entity("Transport.Domain.Vehicle", b =>
+            modelBuilder.Entity("Transport.Domain.Vehicles.Vehicle", b =>
                 {
                     b.Property<int>("VehicleId")
                         .ValueGeneratedOnAdd()
@@ -433,6 +436,9 @@ namespace Transport.Infraestructure.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
                     b.Property<int>("VehicleTypeId")
                         .HasColumnType("int");
 
@@ -443,7 +449,7 @@ namespace Transport.Infraestructure.Migrations
                     b.ToTable("Vehicle", (string)null);
                 });
 
-            modelBuilder.Entity("Transport.Domain.VehicleType", b =>
+            modelBuilder.Entity("Transport.Domain.Vehicles.VehicleType", b =>
                 {
                     b.Property<int>("VehicleTypeId")
                         .ValueGeneratedOnAdd()
@@ -460,6 +466,9 @@ namespace Transport.Infraestructure.Migrations
                         .HasColumnType("nvarchar(100)");
 
                     b.Property<int>("Quantity")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Status")
                         .HasColumnType("int");
 
                     b.HasKey("VehicleTypeId");
@@ -549,17 +558,6 @@ namespace Transport.Infraestructure.Migrations
                     b.Navigation("City");
                 });
 
-            modelBuilder.Entity("Transport.Domain.ReservePrice", b =>
-                {
-                    b.HasOne("Transport.Domain.Service", "Service")
-                        .WithMany("ReservePrices")
-                        .HasForeignKey("ServiceId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Service");
-                });
-
             modelBuilder.Entity("Transport.Domain.Reserves.Reserve", b =>
                 {
                     b.HasOne("Transport.Domain.Drivers.Driver", "Driver")
@@ -572,7 +570,7 @@ namespace Transport.Infraestructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Transport.Domain.Vehicle", "Vehicle")
+                    b.HasOne("Transport.Domain.Vehicles.Vehicle", "Vehicle")
                         .WithMany()
                         .HasForeignKey("VehicleId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -583,6 +581,17 @@ namespace Transport.Infraestructure.Migrations
                     b.Navigation("Service");
 
                     b.Navigation("Vehicle");
+                });
+
+            modelBuilder.Entity("Transport.Domain.Reserves.ReservePrice", b =>
+                {
+                    b.HasOne("Transport.Domain.Service", "Service")
+                        .WithMany("ReservePrices")
+                        .HasForeignKey("ServiceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Service");
                 });
 
             modelBuilder.Entity("Transport.Domain.Service", b =>
@@ -640,9 +649,9 @@ namespace Transport.Infraestructure.Migrations
                     b.Navigation("Role");
                 });
 
-            modelBuilder.Entity("Transport.Domain.Vehicle", b =>
+            modelBuilder.Entity("Transport.Domain.Vehicles.Vehicle", b =>
                 {
-                    b.HasOne("Transport.Domain.VehicleType", "VehicleType")
+                    b.HasOne("Transport.Domain.Vehicles.VehicleType", "VehicleType")
                         .WithMany("Vehicles")
                         .HasForeignKey("VehicleTypeId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -700,7 +709,7 @@ namespace Transport.Infraestructure.Migrations
                     b.Navigation("Users");
                 });
 
-            modelBuilder.Entity("Transport.Domain.VehicleType", b =>
+            modelBuilder.Entity("Transport.Domain.Vehicles.VehicleType", b =>
                 {
                     b.Navigation("Vehicles");
                 });
