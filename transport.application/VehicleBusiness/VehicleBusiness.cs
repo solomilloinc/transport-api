@@ -101,10 +101,14 @@ public class VehicleBusiness : IVehicleBusiness
         if (requestDto.Filters.VehicleTypeId is not null && requestDto.Filters.VehicleTypeId > 0)
             query = query.Where(v => v.VehicleTypeId == requestDto.Filters.VehicleTypeId);
 
+        if (requestDto.Filters.status is not null)
+            query = query.Where(v => v.Status == requestDto.Filters.status);
+
         var sortMappings = new Dictionary<string, Expression<Func<Vehicle, object>>>
         {
             ["internalnumber"] = v => v.InternalNumber,
-            ["vehicletypeid"] = v => v.VehicleTypeId
+            ["vehicletypeid"] = v => v.VehicleTypeId,
+            ["status"] = v => v.Status
         };
 
         var pagedResult = await query.ToPagedReportAsync<VehicleReportResponseDto, Vehicle, VehicleReportFilterRequestDto>(

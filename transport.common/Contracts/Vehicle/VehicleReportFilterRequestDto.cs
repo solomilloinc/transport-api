@@ -2,5 +2,6 @@
 
 public record VehicleReportFilterRequestDto(
     int? VehicleTypeId,
-    string? InternalNumber
+    string? InternalNumber,
+    EntityStatusEnum? status
 );
