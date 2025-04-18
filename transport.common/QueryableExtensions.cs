@@ -1,5 +1,4 @@
 ﻿using System.Linq.Expressions;
-using Transport.SharedKernel.Contracts;
 using System.Linq;
 using Microsoft.EntityFrameworkCore;
 namespace Transport.SharedKernel;

@@ -37,7 +37,8 @@ namespace Transport.Infraestructure.Migrations
                     Email = table.Column<string>(type: "nvarchar(150)", maxLength: 150, nullable: false),
                     DocumentNumber = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
                     Phone1 = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: false),
-                    Phone2 = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: true)
+                    Phone2 = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: true),
+                    Status = table.Column<int>(type: "int", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -112,7 +113,8 @@ namespace Transport.Infraestructure.Migrations
                         .Annotation("SqlServer:Identity", "1, 1"),
                     Name = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
                     Quantity = table.Column<int>(type: "int", nullable: false),
-                    ImageBase64 = table.Column<string>(type: "text", nullable: true)
+                    ImageBase64 = table.Column<string>(type: "text", nullable: true),
+                    Status = table.Column<int>(type: "int", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -207,7 +209,8 @@ namespace Transport.Infraestructure.Migrations
                     VehicleId = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
                     VehicleTypeId = table.Column<int>(type: "int", nullable: false),
-                    InternalNumber = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false)
+                    InternalNumber = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
+                    Status = table.Column<int>(type: "int", nullable: false)
                 },
                 constraints: table =>
                 {

@@ -1,5 +1,4 @@
 ﻿using Transport.SharedKernel;
-using Transport.SharedKernel.Contracts;
 using Transport.SharedKernel.Contracts.Driver;
 
 namespace Transport.Domain.Drivers.Abstraction;

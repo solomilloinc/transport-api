@@ -1,4 +1,4 @@
-﻿namespace Transport.SharedKernel.Contracts;
+﻿namespace Transport.SharedKernel;
 
 public class PagedReportRequestDto<TFilter>
 {

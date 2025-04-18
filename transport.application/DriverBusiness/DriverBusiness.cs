@@ -4,7 +4,6 @@ using Transport.Domain.Drivers;
 using Transport.Business.Data;
 using Transport.Domain.Drivers.Abstraction;
 using Transport.SharedKernel.Contracts.Driver;
-using Transport.SharedKernel.Contracts;
 using System.Linq.Expressions;
 
 namespace Transport.Business.DriverBusiness;

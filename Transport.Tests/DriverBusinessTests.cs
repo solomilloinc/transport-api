@@ -10,6 +10,7 @@ using Transport.SharedKernel;
 using Transport.SharedKernel.Contracts;
 using Transport.SharedKernel.Contracts.Driver;
 using Xunit;
+using Transport.Domain.Vehicles;
 
 namespace Transport.Tests.DriverBusinessTests;
 

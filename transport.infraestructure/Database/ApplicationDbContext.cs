@@ -6,6 +6,7 @@ using Transport.Business.Data;
 using Transport.Domain.Customers;
 using Transport.Domain.Reserves;
 using Transport.Domain.Users;
+using Transport.Domain.Vehicles;
 
 namespace Transport.Infraestructure.Database;
 
@@ -20,6 +21,8 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<Reserve> Reserves { get; set; }
 
     public DbSet<Direction> Directions { get; set; }
+
+    public DbSet<Vehicle> Vehicles { get; set; }
 
     public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options) { }
 
