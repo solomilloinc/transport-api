@@ -113,7 +113,7 @@ public class VehicleBusiness : IVehicleBusiness
 
         var pagedResult = await query.ToPagedReportAsync<VehicleReportResponseDto, Vehicle, VehicleReportFilterRequestDto>(
             requestDto,
-            selector: v => new VehicleReportResponseDto(v.VehicleTypeId, v.VehicleTypeId, v.InternalNumber, v.VehicleType.Name, v.VehicleType.Quantity, v.VehicleType.ImageBase64),
+            selector: v => new VehicleReportResponseDto(v.VehicleId, v.VehicleTypeId, v.InternalNumber, v.VehicleType.Name, v.VehicleType.Quantity, v.VehicleType.ImageBase64),
             sortMappings: sortMappings
         );
 
