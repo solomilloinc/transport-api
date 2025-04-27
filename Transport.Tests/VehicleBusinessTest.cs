@@ -7,6 +7,8 @@ using Transport.Business.VehicleBusiness;
 using Transport.Domain.Vehicles.Abstraction;
 using Transport.Business.Data;
 using Xunit;
+using Transport.Business.VehicleTypeBusiness;
+using Transport.SharedKernel.Contracts.VehicleType;
 
 namespace Transport.Tests.VehicleBusinessTests;
 
