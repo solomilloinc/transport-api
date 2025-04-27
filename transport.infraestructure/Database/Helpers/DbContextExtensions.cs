@@ -1,5 +1,6 @@
 ﻿using System.Data;
 using Microsoft.EntityFrameworkCore;
+using Transport.SharedKernel;
 
 namespace Transport.Infraestructure.Database.Helpers;
 
@@ -101,7 +102,6 @@ public static class DbContextExtensions
                 throw;
             }
         });
-    }
-
+    }  
 
 }

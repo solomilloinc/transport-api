@@ -42,7 +42,8 @@ public static class DependencyInjection
         services.AddDbContext<ApplicationDbContext>(options =>
             options.UseSqlServer(connectionString, sqlOptions =>
                 sqlOptions.MigrationsHistoryTable(HistoryRepository.DefaultTableName)
-                          .EnableRetryOnFailure(5, TimeSpan.FromSeconds(30), null)));
+                          .EnableRetryOnFailure(5, TimeSpan.FromSeconds(30), null))
+                          .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking));
 
         services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<ApplicationDbContext>());
 

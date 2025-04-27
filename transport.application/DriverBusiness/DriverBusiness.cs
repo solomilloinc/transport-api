@@ -5,6 +5,8 @@ using Transport.Business.Data;
 using Transport.Domain.Drivers.Abstraction;
 using Transport.SharedKernel.Contracts.Driver;
 using System.Linq.Expressions;
+using Transport.SharedKernel.Contracts.City;
+using Transport.Domain.Vehicles;
 
 namespace Transport.Business.DriverBusiness;
 
@@ -50,8 +52,7 @@ public class DriverBusiness : IDriverBusiness
 
     public async Task<Result<bool>> Delete(int driverId)
     {
-        var driver = _context.Drivers
-            .SingleOrDefault(x => x.DriverId == driverId);
+        var driver = await _context.Drivers.FindAsync(driverId);
 
         if (driver is null)
         {
@@ -111,8 +112,7 @@ public class DriverBusiness : IDriverBusiness
 
     public async Task<Result<bool>> Update(int driverId, DriverUpdateRequestDto dto)
     {
-        var driver = _context.Drivers
-            .SingleOrDefault(x => x.DriverId == driverId);
+        var driver = await _context.Drivers.FindAsync(driverId);
 
         if (driver is null)
         {
@@ -128,8 +128,7 @@ public class DriverBusiness : IDriverBusiness
 
     public async Task<Result<bool>> UpdateStatus(int driverId, EntityStatusEnum status)
     {
-        var driver = _context.Drivers
-            .SingleOrDefault(x => x.DriverId == driverId);
+        var driver = await _context.Drivers.FindAsync(driverId);
 
         if (driver is null)
         {
