@@ -25,6 +25,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<Direction> Directions { get; set; }
 
     public DbSet<Vehicle> Vehicles { get; set; }
+    public DbSet<VehicleType> VehicleTypes { get; set; }
     public DbSet<City> Cities { get; set; }
 
     public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options) { }

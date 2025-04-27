@@ -18,6 +18,7 @@ public interface IApplicationDbContext
     DbSet<Reserve> Reserves { get; }
     DbSet<Direction> Directions { get; }
     DbSet<Vehicle> Vehicles { get; }
+    DbSet<VehicleType> VehicleTypes { get; }
     DbSet<City> Cities { get; }
     Task<int> SaveChangesWithOutboxAsync(CancellationToken cancellationToken = default);
 }
