@@ -7,6 +7,8 @@ using Transport.Domain.Customers;
 using Transport.Domain.Reserves;
 using Transport.Domain.Users;
 using Transport.Domain.Vehicles;
+using Transport.Domain.Cities;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 
 namespace Transport.Infraestructure.Database;
 
@@ -23,6 +25,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<Direction> Directions { get; set; }
 
     public DbSet<Vehicle> Vehicles { get; set; }
+    public DbSet<City> Cities { get; set; }
 
     public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options) { }
 
@@ -52,5 +55,4 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
 
         return result;
     }
-
 }

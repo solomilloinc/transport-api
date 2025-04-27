@@ -1,4 +1,5 @@
-﻿using Transport.Domain.Reserves;
+﻿using Transport.Domain.Cities;
+using Transport.Domain.Reserves;
 
 namespace Transport.Domain;
 

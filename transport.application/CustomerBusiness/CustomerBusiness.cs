@@ -18,32 +18,28 @@ public class CustomerBusiness : ICustomerBusiness
 
     public async Task<Result<int>> CreateReserve(CustomerReserveCreateRequestDto dto)
     {
-        var customer = _context.Customers
-            .SingleOrDefaultAsync(x => x.CustomerId == dto.CustomerId);
+        var customer = await _context.Customers.FindAsync(dto.CustomerId);
 
         if (customer is null)
         {
             return Result.Failure<int>(CustomerReserveError.CustomerNotFound);
         }
 
-        var reserve = _context.Reserves
-            .SingleOrDefaultAsync(x => x.ReserveId == dto.ReserveId);
+        var reserve = await _context.Reserves.FindAsync(dto.ReserveId);
 
         if (reserve is null)
         {
             return Result.Failure<int>(CustomerReserveError.CustomerNotFound);
         }
 
-        var pickUpLocation = _context.Directions
-            .SingleOrDefaultAsync(x => x.DirectionId == dto.PickupLocationId);
+        var pickUpLocation = await _context.Directions.FindAsync(dto.PickupLocationId);
 
         if (pickUpLocation is null)
         {
             return Result.Failure<int>(CustomerReserveError.PickupLocationNotFound);
         }
 
-        var dropOffLocation = _context.Directions
-            .SingleOrDefaultAsync(x => x.DirectionId == dto.DropoffLocationId);
+        var dropOffLocation = await _context.Directions.FindAsync(dto.DropoffLocationId);
 
         if (dropOffLocation is null)
         {

@@ -1,4 +1,5 @@
-﻿using Transport.Domain.Customers;
+﻿using Transport.Domain.Cities;
+using Transport.Domain.Customers;
 
 namespace Transport.Domain;
 

@@ -5,6 +5,8 @@ using Transport.Domain.Customers;
 using Transport.Domain.Reserves;
 using Transport.Domain.Users;
 using Transport.Domain.Vehicles;
+using Transport.Domain.Cities;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 
 namespace Transport.Business.Data;
 
@@ -16,5 +18,6 @@ public interface IApplicationDbContext
     DbSet<Reserve> Reserves { get; }
     DbSet<Direction> Directions { get; }
     DbSet<Vehicle> Vehicles { get; }
+    DbSet<City> Cities { get; }
     Task<int> SaveChangesWithOutboxAsync(CancellationToken cancellationToken = default);
 }
