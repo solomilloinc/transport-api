@@ -14,4 +14,10 @@ public static class VehicleError
         "The vehicle with the same internal number already exists.",
         ErrorType.Validation
     );
+
+    public static readonly Error VehicleNotAvailable = new(
+        "VehicleNotAvailable",
+        "El Véhiculo no se encuentra Activo",
+        ErrorType.Validation
+    );
 }

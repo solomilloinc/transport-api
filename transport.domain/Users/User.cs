@@ -1,4 +1,5 @@
 ﻿using Transport.Domain.Customers;
+using Transport.SharedKernel;
 
 namespace Transport.Domain.Users;
 
@@ -11,4 +12,5 @@ public class User
     public string Password { get; set; }
     public Role Role { get; set; } = null!;
     public Customer? Customer { get; set; }
+    public EntityStatusEnum Status { get; set; } = EntityStatusEnum.Active;
 }

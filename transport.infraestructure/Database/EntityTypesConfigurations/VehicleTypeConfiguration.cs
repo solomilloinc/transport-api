@@ -14,5 +14,6 @@ public class VehicleTypeConfiguration : IEntityTypeConfiguration<VehicleType>
         builder.HasIndex(vt => vt.Name).IsUnique();
         builder.Property(vt => vt.Quantity).IsRequired();
         builder.Property(vt => vt.ImageBase64).HasColumnType("text");
+        builder.Property(vt => vt.Status).IsRequired();
     }
 }

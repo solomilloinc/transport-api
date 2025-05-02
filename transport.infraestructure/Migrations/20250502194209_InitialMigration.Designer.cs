@@ -12,7 +12,7 @@ using Transport.Infraestructure.Database;
 namespace Transport.Infraestructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20250415035110_InitialMigration")]
+    [Migration("20250502194209_InitialMigration")]
     partial class InitialMigration
     {
         /// <inheritdoc />
@@ -25,7 +25,7 @@ namespace Transport.Infraestructure.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
-            modelBuilder.Entity("Transport.Domain.City", b =>
+            modelBuilder.Entity("Transport.Domain.Cities.City", b =>
                 {
                     b.Property<int>("CityId")
                         .ValueGeneratedOnAdd()
@@ -33,14 +33,22 @@ namespace Transport.Infraestructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("CityId"));
 
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasMaxLength(250)
-                        .HasColumnType("nvarchar(250)");
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
 
                     b.HasKey("CityId");
 
-                    b.HasIndex("Name")
+                    b.HasIndex("Code")
                         .IsUnique();
 
                     b.ToTable("City", (string)null);
@@ -128,10 +136,9 @@ namespace Transport.Infraestructure.Migrations
                     b.Property<int>("ReserveId")
                         .HasColumnType("int");
 
-                    b.Property<string>("StatusPayment")
-                        .IsRequired()
+                    b.Property<int>("StatusPayment")
                         .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
+                        .HasColumnType("int");
 
                     b.HasKey("CustomerReserveId");
 
@@ -273,10 +280,9 @@ namespace Transport.Infraestructure.Migrations
                     b.Property<decimal>("Price")
                         .HasColumnType("decimal(10,2)");
 
-                    b.Property<string>("ReserveTypeId")
-                        .IsRequired()
+                    b.Property<int>("ReserveTypeId")
                         .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
+                        .HasColumnType("int");
 
                     b.Property<int>("ServiceId")
                         .HasColumnType("int");
@@ -288,7 +294,7 @@ namespace Transport.Infraestructure.Migrations
                     b.ToTable("ReservePrice", (string)null);
                 });
 
-            modelBuilder.Entity("Transport.Domain.Service", b =>
+            modelBuilder.Entity("Transport.Domain.Services.Service", b =>
                 {
                     b.Property<int>("ServiceId")
                         .ValueGeneratedOnAdd()
@@ -296,16 +302,13 @@ namespace Transport.Infraestructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ServiceId"));
 
-                    b.Property<byte>("DayEnd")
-                        .HasColumnType("tinyint");
-
-                    b.Property<byte>("DayStart")
-                        .HasColumnType("tinyint");
-
                     b.Property<TimeSpan>("DepartureHour")
                         .HasColumnType("time");
 
                     b.Property<int>("DestinationId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("EndDay")
                         .HasColumnType("int");
 
                     b.Property<TimeSpan>("EstimatedDuration")
@@ -322,8 +325,11 @@ namespace Transport.Infraestructure.Migrations
                     b.Property<int>("OriginId")
                         .HasColumnType("int");
 
-                    b.Property<bool>("Status")
-                        .HasColumnType("bit");
+                    b.Property<int>("StartDay")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
 
                     b.Property<int>("VehicleId")
                         .HasColumnType("int");
@@ -334,10 +340,12 @@ namespace Transport.Infraestructure.Migrations
 
                     b.HasIndex("OriginId");
 
+                    b.HasIndex("VehicleId");
+
                     b.ToTable("Service", (string)null);
                 });
 
-            modelBuilder.Entity("Transport.Domain.ServiceCustomer", b =>
+            modelBuilder.Entity("Transport.Domain.Services.ServiceCustomer", b =>
                 {
                     b.Property<int>("ServiceCustomerId")
                         .ValueGeneratedOnAdd()
@@ -412,6 +420,9 @@ namespace Transport.Infraestructure.Migrations
                     b.Property<int>("RoleId")
                         .HasColumnType("int");
 
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
                     b.HasKey("UserId");
 
                     b.HasIndex("CustomerId")
@@ -430,6 +441,9 @@ namespace Transport.Infraestructure.Migrations
                         .HasColumnType("int");
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("VehicleId"));
+
+                    b.Property<int>("AvailableQuantity")
+                        .HasColumnType("int");
 
                     b.Property<string>("InternalNumber")
                         .IsRequired()
@@ -549,7 +563,7 @@ namespace Transport.Infraestructure.Migrations
 
             modelBuilder.Entity("Transport.Domain.Direction", b =>
                 {
-                    b.HasOne("Transport.Domain.City", "City")
+                    b.HasOne("Transport.Domain.Cities.City", "City")
                         .WithMany("Directions")
                         .HasForeignKey("CityId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -564,7 +578,7 @@ namespace Transport.Infraestructure.Migrations
                         .WithMany("Reserves")
                         .HasForeignKey("DriverId");
 
-                    b.HasOne("Transport.Domain.Service", "Service")
+                    b.HasOne("Transport.Domain.Services.Service", "Service")
                         .WithMany("Reserves")
                         .HasForeignKey("ServiceId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -573,7 +587,7 @@ namespace Transport.Infraestructure.Migrations
                     b.HasOne("Transport.Domain.Vehicles.Vehicle", "Vehicle")
                         .WithMany()
                         .HasForeignKey("VehicleId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("Driver");
@@ -585,7 +599,7 @@ namespace Transport.Infraestructure.Migrations
 
             modelBuilder.Entity("Transport.Domain.Reserves.ReservePrice", b =>
                 {
-                    b.HasOne("Transport.Domain.Service", "Service")
+                    b.HasOne("Transport.Domain.Services.Service", "Service")
                         .WithMany("ReservePrices")
                         .HasForeignKey("ServiceId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -594,26 +608,34 @@ namespace Transport.Infraestructure.Migrations
                     b.Navigation("Service");
                 });
 
-            modelBuilder.Entity("Transport.Domain.Service", b =>
+            modelBuilder.Entity("Transport.Domain.Services.Service", b =>
                 {
-                    b.HasOne("Transport.Domain.City", "Destination")
+                    b.HasOne("Transport.Domain.Cities.City", "Destination")
                         .WithMany("DestinationServices")
                         .HasForeignKey("DestinationId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("Transport.Domain.City", "Origin")
+                    b.HasOne("Transport.Domain.Cities.City", "Origin")
                         .WithMany("OriginServices")
                         .HasForeignKey("OriginId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("Transport.Domain.Vehicles.Vehicle", "Vehicle")
+                        .WithMany()
+                        .HasForeignKey("VehicleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.Navigation("Destination");
 
                     b.Navigation("Origin");
+
+                    b.Navigation("Vehicle");
                 });
 
-            modelBuilder.Entity("Transport.Domain.ServiceCustomer", b =>
+            modelBuilder.Entity("Transport.Domain.Services.ServiceCustomer", b =>
                 {
                     b.HasOne("Transport.Domain.Customers.Customer", "Customer")
                         .WithMany("Services")
@@ -621,7 +643,7 @@ namespace Transport.Infraestructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Transport.Domain.Service", "Service")
+                    b.HasOne("Transport.Domain.Services.Service", "Service")
                         .WithMany("Customers")
                         .HasForeignKey("ServiceId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -660,7 +682,7 @@ namespace Transport.Infraestructure.Migrations
                     b.Navigation("VehicleType");
                 });
 
-            modelBuilder.Entity("Transport.Domain.City", b =>
+            modelBuilder.Entity("Transport.Domain.Cities.City", b =>
                 {
                     b.Navigation("DestinationServices");
 
@@ -695,7 +717,7 @@ namespace Transport.Infraestructure.Migrations
                     b.Navigation("CustomerReserves");
                 });
 
-            modelBuilder.Entity("Transport.Domain.Service", b =>
+            modelBuilder.Entity("Transport.Domain.Services.Service", b =>
                 {
                     b.Navigation("Customers");
 
