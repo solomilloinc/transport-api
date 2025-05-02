@@ -1,6 +1,6 @@
 ﻿using Transport.Domain.Customers;
 
-namespace Transport.Domain;
+namespace Transport.Domain.Services;
 
 public class ServiceCustomer
 {

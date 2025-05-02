@@ -18,5 +18,6 @@ public class CustomerConfiguration : IEntityTypeConfiguration<Customer>
         builder.HasIndex(c => c.DocumentNumber).IsUnique();
         builder.Property(c => c.Phone1).HasMaxLength(20).IsRequired();
         builder.Property(c => c.Phone2).HasMaxLength(20);
+        builder.Property(r => r.Status).IsRequired();
     }
 }

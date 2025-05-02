@@ -11,6 +11,7 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.ToTable("User");
         builder.HasKey(u => u.UserId);
         builder.HasIndex(u => u.CustomerId).IsUnique();
+        builder.Property(u => u.Status).IsRequired();
 
         builder.HasOne(u => u.Customer)
                .WithOne(c => c.User)

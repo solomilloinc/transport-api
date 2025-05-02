@@ -7,7 +7,7 @@ public class CustomerReserve
     public int CustomerId { get; set; }
     public int ReserveId { get; set; }
     public bool IsPayment { get; set; }
-    public string StatusPayment { get; set; } = null!;
+    public StatusPaymentEnum StatusPayment { get; set; }
     public decimal Price { get; set; }
     public int PickupLocationId { get; set; }
     public int DropoffLocationId { get; set; }

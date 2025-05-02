@@ -1,24 +1,27 @@
 ﻿using Transport.Domain.Cities;
 using Transport.Domain.Reserves;
+using Transport.Domain.Vehicles;
+using Transport.SharedKernel;
 
-namespace Transport.Domain;
+namespace Transport.Domain.Services;
 
 public class Service
 {
     public int ServiceId { get; set; }
     public string Name { get; set; } = null!;
-    public byte DayStart { get; set; }
-    public byte DayEnd { get; set; }
+    public DayOfWeek StartDay { get; set; }
+    public DayOfWeek EndDay { get; set; }
     public int OriginId { get; set; }
     public int DestinationId { get; set; }
     public TimeSpan EstimatedDuration { get; set; }
     public TimeSpan DepartureHour { get; set; }
     public bool IsHoliday { get; set; }
     public int VehicleId { get; set; }
-    public bool Status { get; set; }
+    public EntityStatusEnum Status { get; set; } = EntityStatusEnum.Active;
 
     public City Origin { get; set; } = null!;
     public City Destination { get; set; } = null!;
+    public Vehicle Vehicle { get; set; } = null!;
     public ICollection<ServiceCustomer> Customers { get; set; } = new List<ServiceCustomer>();
     public ICollection<Reserve> Reserves { get; set; } = new List<Reserve>();
     public ICollection<ReservePrice> ReservePrices { get; set; } = new List<ReservePrice>();

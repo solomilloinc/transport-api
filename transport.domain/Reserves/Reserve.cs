@@ -1,5 +1,6 @@
 ﻿using Transport.Domain.Customers;
 using Transport.Domain.Drivers;
+using Transport.Domain.Services;
 using Transport.Domain.Vehicles;
 
 namespace Transport.Domain.Reserves;
@@ -10,7 +11,7 @@ public class Reserve
     public ReserveStatusEnum Status { get; set; }
     public int VehicleId { get; set; }
     public int? DriverId { get; set; }
-    public int ServiceId { get; set; }
+    public int ServiceId { get; set;}
 
     public Vehicle Vehicle { get; set; } = null!;
     public Driver? Driver { get; set; }

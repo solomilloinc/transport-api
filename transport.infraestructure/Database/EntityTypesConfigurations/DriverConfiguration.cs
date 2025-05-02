@@ -14,5 +14,6 @@ public class DriverConfiguration : IEntityTypeConfiguration<Driver>
         builder.Property(d => d.LastName).HasMaxLength(100).IsRequired();
         builder.Property(d => d.DocumentNumber).HasMaxLength(50).IsRequired();
         builder.HasIndex(d => d.DocumentNumber).IsUnique();
+        builder.Property(r => r.Status).IsRequired();
     }
 }
