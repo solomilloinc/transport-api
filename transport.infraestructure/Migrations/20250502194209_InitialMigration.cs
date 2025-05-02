@@ -19,7 +19,9 @@ namespace Transport.Infraestructure.Migrations
                 {
                     CityId = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
-                    Name = table.Column<string>(type: "nvarchar(250)", maxLength: 250, nullable: false)
+                    Code = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
+                    Name = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
+                    Status = table.Column<int>(type: "int", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -142,40 +144,6 @@ namespace Transport.Infraestructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "Service",
-                columns: table => new
-                {
-                    ServiceId = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    Name = table.Column<string>(type: "nvarchar(250)", maxLength: 250, nullable: false),
-                    DayStart = table.Column<byte>(type: "tinyint", nullable: false),
-                    DayEnd = table.Column<byte>(type: "tinyint", nullable: false),
-                    OriginId = table.Column<int>(type: "int", nullable: false),
-                    DestinationId = table.Column<int>(type: "int", nullable: false),
-                    EstimatedDuration = table.Column<TimeSpan>(type: "time", nullable: false),
-                    DepartureHour = table.Column<TimeSpan>(type: "time", nullable: false),
-                    IsHoliday = table.Column<bool>(type: "bit", nullable: false),
-                    VehicleId = table.Column<int>(type: "int", nullable: false),
-                    Status = table.Column<bool>(type: "bit", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_Service", x => x.ServiceId);
-                    table.ForeignKey(
-                        name: "FK_Service_City_DestinationId",
-                        column: x => x.DestinationId,
-                        principalTable: "City",
-                        principalColumn: "CityId",
-                        onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
-                        name: "FK_Service_City_OriginId",
-                        column: x => x.OriginId,
-                        principalTable: "City",
-                        principalColumn: "CityId",
-                        onDelete: ReferentialAction.Restrict);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "User",
                 columns: table => new
                 {
@@ -184,7 +152,8 @@ namespace Transport.Infraestructure.Migrations
                     CustomerId = table.Column<int>(type: "int", nullable: true),
                     RoleId = table.Column<int>(type: "int", nullable: false),
                     Email = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    Password = table.Column<string>(type: "nvarchar(max)", nullable: false)
+                    Password = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Status = table.Column<int>(type: "int", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -210,7 +179,8 @@ namespace Transport.Infraestructure.Migrations
                         .Annotation("SqlServer:Identity", "1, 1"),
                     VehicleTypeId = table.Column<int>(type: "int", nullable: false),
                     InternalNumber = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
-                    Status = table.Column<int>(type: "int", nullable: false)
+                    Status = table.Column<int>(type: "int", nullable: false),
+                    AvailableQuantity = table.Column<int>(type: "int", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -224,6 +194,80 @@ namespace Transport.Infraestructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "Service",
+                columns: table => new
+                {
+                    ServiceId = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    Name = table.Column<string>(type: "nvarchar(250)", maxLength: 250, nullable: false),
+                    StartDay = table.Column<int>(type: "int", nullable: false),
+                    EndDay = table.Column<int>(type: "int", nullable: false),
+                    OriginId = table.Column<int>(type: "int", nullable: false),
+                    DestinationId = table.Column<int>(type: "int", nullable: false),
+                    EstimatedDuration = table.Column<TimeSpan>(type: "time", nullable: false),
+                    DepartureHour = table.Column<TimeSpan>(type: "time", nullable: false),
+                    IsHoliday = table.Column<bool>(type: "bit", nullable: false),
+                    VehicleId = table.Column<int>(type: "int", nullable: false),
+                    Status = table.Column<int>(type: "int", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Service", x => x.ServiceId);
+                    table.ForeignKey(
+                        name: "FK_Service_City_DestinationId",
+                        column: x => x.DestinationId,
+                        principalTable: "City",
+                        principalColumn: "CityId",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_Service_City_OriginId",
+                        column: x => x.OriginId,
+                        principalTable: "City",
+                        principalColumn: "CityId",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_Service_Vehicle_VehicleId",
+                        column: x => x.VehicleId,
+                        principalTable: "Vehicle",
+                        principalColumn: "VehicleId",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Reserve",
+                columns: table => new
+                {
+                    ReserveId = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    ReserveDate = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    Status = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    VehicleId = table.Column<int>(type: "int", nullable: false),
+                    DriverId = table.Column<int>(type: "int", nullable: true),
+                    ServiceId = table.Column<int>(type: "int", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Reserve", x => x.ReserveId);
+                    table.ForeignKey(
+                        name: "FK_Reserve_Driver_DriverId",
+                        column: x => x.DriverId,
+                        principalTable: "Driver",
+                        principalColumn: "DriverId");
+                    table.ForeignKey(
+                        name: "FK_Reserve_Service_ServiceId",
+                        column: x => x.ServiceId,
+                        principalTable: "Service",
+                        principalColumn: "ServiceId",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_Reserve_Vehicle_VehicleId",
+                        column: x => x.VehicleId,
+                        principalTable: "Vehicle",
+                        principalColumn: "VehicleId",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "ReservePrice",
                 columns: table => new
                 {
@@ -231,7 +275,7 @@ namespace Transport.Infraestructure.Migrations
                         .Annotation("SqlServer:Identity", "1, 1"),
                     ServiceId = table.Column<int>(type: "int", nullable: false),
                     Price = table.Column<decimal>(type: "decimal(10,2)", nullable: false),
-                    ReserveTypeId = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false)
+                    ReserveTypeId = table.Column<int>(type: "int", maxLength: 50, nullable: false)
                 },
                 constraints: table =>
                 {
@@ -271,40 +315,6 @@ namespace Transport.Infraestructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "Reserve",
-                columns: table => new
-                {
-                    ReserveId = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    ReserveDate = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    Status = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    VehicleId = table.Column<int>(type: "int", nullable: false),
-                    DriverId = table.Column<int>(type: "int", nullable: true),
-                    ServiceId = table.Column<int>(type: "int", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_Reserve", x => x.ReserveId);
-                    table.ForeignKey(
-                        name: "FK_Reserve_Driver_DriverId",
-                        column: x => x.DriverId,
-                        principalTable: "Driver",
-                        principalColumn: "DriverId");
-                    table.ForeignKey(
-                        name: "FK_Reserve_Service_ServiceId",
-                        column: x => x.ServiceId,
-                        principalTable: "Service",
-                        principalColumn: "ServiceId",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_Reserve_Vehicle_VehicleId",
-                        column: x => x.VehicleId,
-                        principalTable: "Vehicle",
-                        principalColumn: "VehicleId",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "CustomerReserve",
                 columns: table => new
                 {
@@ -313,7 +323,7 @@ namespace Transport.Infraestructure.Migrations
                     CustomerId = table.Column<int>(type: "int", nullable: false),
                     ReserveId = table.Column<int>(type: "int", nullable: false),
                     IsPayment = table.Column<bool>(type: "bit", nullable: false),
-                    StatusPayment = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
+                    StatusPayment = table.Column<int>(type: "int", maxLength: 50, nullable: false),
                     Price = table.Column<decimal>(type: "decimal(10,2)", nullable: false),
                     PickupLocationId = table.Column<int>(type: "int", nullable: false),
                     DropoffLocationId = table.Column<int>(type: "int", nullable: false),
@@ -356,9 +366,9 @@ namespace Transport.Infraestructure.Migrations
                 });
 
             migrationBuilder.CreateIndex(
-                name: "IX_City_Name",
+                name: "IX_City_Code",
                 table: "City",
-                column: "Name",
+                column: "Code",
                 unique: true);
 
             migrationBuilder.CreateIndex(
@@ -441,6 +451,11 @@ namespace Transport.Infraestructure.Migrations
                 column: "OriginId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_Service_VehicleId",
+                table: "Service",
+                column: "VehicleId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_ServiceCustomer_CustomerId",
                 table: "ServiceCustomer",
                 column: "CustomerId");
@@ -514,10 +529,10 @@ namespace Transport.Infraestructure.Migrations
                 name: "Service");
 
             migrationBuilder.DropTable(
-                name: "Vehicle");
+                name: "City");
 
             migrationBuilder.DropTable(
-                name: "City");
+                name: "Vehicle");
 
             migrationBuilder.DropTable(
                 name: "VehicleType");

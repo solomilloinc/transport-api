@@ -27,6 +27,11 @@ public class ReserveConfiguration : IEntityTypeConfiguration<Reserve>
                  .HasForeignKey(r => r.ServiceId)
                  .IsRequired();
 
+        builder.HasOne(r => r.Vehicle)
+            .WithMany() 
+            .HasForeignKey(r => r.VehicleId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.Property(r => r.Status)
                .HasConversion<string>()
                .IsRequired();
