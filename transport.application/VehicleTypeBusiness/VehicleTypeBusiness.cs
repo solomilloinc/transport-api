@@ -39,9 +39,9 @@ public class VehicleTypeBusiness : IVehicleTypeBusiness
         if (dto.Vehicles is not null && dto.Vehicles.Any())
         {
             vehicleType.Vehicles = dto.Vehicles.Select(p => new Vehicle()
-            { 
-                VehicleTypeId = vehicleType.VehicleTypeId, 
-                InternalNumber = p.InternalNumber,                
+            {
+                VehicleTypeId = vehicleType.VehicleTypeId,
+                InternalNumber = p.InternalNumber,
             }).ToList();
         }
 
@@ -85,7 +85,7 @@ public class VehicleTypeBusiness : IVehicleTypeBusiness
 
         var pagedResult = await query.ToPagedReportAsync<VehicleTypeReportResponseDto, VehicleType, VehicleTypeReportFilterRequestDto>(
             requestDto,
-            selector: v => new VehicleTypeReportResponseDto(v.VehicleTypeId, v.Name, v.ImageBase64, v.Quantity),
+            selector: v => new VehicleTypeReportResponseDto(v.VehicleTypeId, v.Name, v.ImageBase64, v.Quantity, v.Status.ToString()),
             sortMappings: sortMappings
         );
 

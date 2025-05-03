@@ -7,6 +7,7 @@ public class DriverReportResponseDto
     public string LastName { get; set; } = null!;
     public string DocumentNumber { get; set; } = null!;
     public int VehicleInternalNumber { get; set; }
+    public string Status { get; set; }
 
     public List<DriverReserveReportResponseDto> Reserves { get; set; } = new();
 }

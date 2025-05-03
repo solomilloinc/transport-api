@@ -4,5 +4,6 @@ public record VehicleTypeReportResponseDto(
     int VehicleTypeId,
     string Name,
     string? ImageBase64,
-    int Quantity
+    int Quantity,
+    string status
 );
