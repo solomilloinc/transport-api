@@ -128,7 +128,7 @@ public class ServiceBusiness : IServiceBusiness
                     s.Vehicle.VehicleType.Quantity, 
                     s.Vehicle.VehicleType.Name, 
                     s.Vehicle.VehicleType.ImageBase64),
-                s.Status
+                s.Status.ToString()
             ),
             sortMappings: sortMappings
         );

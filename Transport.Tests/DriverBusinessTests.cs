@@ -14,7 +14,7 @@ using Transport.Domain.Vehicles;
 
 namespace Transport.Tests.DriverBusinessTests;
 
-public class DriverBusinessTests: TestBase
+public class DriverBusinessTests : TestBase
 {
     private readonly Mock<IApplicationDbContext> _contextMock;
     private readonly Mock<IUnitOfWork> _unitOfWorkMock;
@@ -211,6 +211,7 @@ public class DriverBusinessTests: TestBase
             FirstName = "Juan",
             LastName = "Pérez",
             DocumentNumber = "1234",
+            Status = EntityStatusEnum.Active,
             Reserves = new List<Reserve>
             {
                 new Reserve
@@ -227,6 +228,7 @@ public class DriverBusinessTests: TestBase
             FirstName = "Ana",
             LastName = "Gomez",
             DocumentNumber = "5678",
+            Status = EntityStatusEnum.Active,
             Reserves = new List<Reserve>()
         }
     };
@@ -249,6 +251,8 @@ public class DriverBusinessTests: TestBase
         result.IsSuccess.Should().BeTrue();
         result.Value.Items.Should().HaveCount(1);
         result.Value.Items.First().FirstName.Should().Be("Juan");
+        result.Value.Items.First().Status.Should().Be("Active");
+
         result.Value.Items.First().Reserves.Should().HaveCount(1);
     }
 

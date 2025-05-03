@@ -1,4 +1,4 @@
 ﻿
 namespace Transport.SharedKernel.Contracts.City;
 
-public record CityReportResponseDto(string Name, string Code);
+public record CityReportResponseDto(int Id, string Name, string Code);

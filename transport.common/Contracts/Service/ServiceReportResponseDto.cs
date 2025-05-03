@@ -9,6 +9,6 @@ public record ServiceReportResponseDto(
     TimeSpan DepartureHour,
     bool IsHoliday,
     ServiceVehicleResponseDto Vehicle,
-    EntityStatusEnum Status);
+    string Status);
 
 public record ServiceVehicleResponseDto(string InternalNumber, int AvailableQuantity, int FullQuantity, string VehicleTypeName, string? Image);

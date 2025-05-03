@@ -97,6 +97,7 @@ public class DriverBusiness : IDriverBusiness
                 FirstName = d.FirstName,
                 LastName = d.LastName,
                 DocumentNumber = d.DocumentNumber,
+                Status = d.Status.ToString(),
                 Reserves = d.Reserves.Select(r => new DriverReserveReportResponseDto
                 {
                     ReserveDate = r.ReserveDate,
