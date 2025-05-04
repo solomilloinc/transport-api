@@ -269,3 +269,19 @@ GO
 COMMIT;
 GO
 
+BEGIN TRANSACTION;
+GO
+
+ALTER TABLE [Direction] ADD [Lat] float NULL;
+GO
+
+ALTER TABLE [Direction] ADD [Lng] float NULL;
+GO
+
+INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+VALUES (N'20250504002738_InitialMigration-pt2', N'8.0.14');
+GO
+
+COMMIT;
+GO
+
