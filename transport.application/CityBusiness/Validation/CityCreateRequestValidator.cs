@@ -22,5 +22,7 @@ internal class CityCreateRequestValidator : AbstractValidator<CityCreateRequestD
             .WithMessage("Name must be at least 2 characters long")
             .MaximumLength(100)
             .WithMessage("Name must not exceed 100 characters");
+
+        RuleForEach(p => p.Directions).SetValidator(new DirectionCreateRequestValidator());
     }
 }

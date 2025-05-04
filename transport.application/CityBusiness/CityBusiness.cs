@@ -6,6 +6,7 @@ using Transport.Domain.Cities;
 using Transport.Domain.Cities.Abstraction;
 using Transport.SharedKernel;
 using Transport.SharedKernel.Contracts.City;
+using Transport.Domain;
 
 namespace Transport.Business.CityBusiness;
 
@@ -29,7 +30,14 @@ public class CityBusiness : ICityBusiness
         City city = new City
         {
             Code = dto.Code,
-            Name = dto.Name
+            Name = dto.Name,
+            Directions = dto.Directions?
+            .Select(d => new Direction
+            {
+                Name = d.Name,
+                Lat = d.Lat.GetValueOrDefault(),
+                Lng = d.Lng.GetValueOrDefault()
+            }).ToList() ?? new List<Direction>()
         };
 
         _context.Cities.Add(city);
@@ -61,11 +69,16 @@ public class CityBusiness : ICityBusiness
             .AsNoTracking()
             .AsQueryable();
 
+        if (requestDto.Filters.WithDirections)
+        {
+            query = query.Include(c => c.Directions.Any());
+        }
+
         if (!string.IsNullOrWhiteSpace(requestDto.Filters?.Code))
             query = query.Where(v => v.Code.Contains(requestDto.Filters.Code));
 
         if (!string.IsNullOrWhiteSpace(requestDto.Filters?.Name))
-            query = query.Where(v => v.Code.Contains(requestDto.Filters.Name));
+            query = query.Where(v => v.Name.Contains(requestDto.Filters.Name));
 
         if (requestDto.Filters.Status is not null)
             query = query.Where(v => v.Status == requestDto.Filters.Status);
@@ -79,7 +92,12 @@ public class CityBusiness : ICityBusiness
 
         var pagedResult = await query.ToPagedReportAsync<CityReportResponseDto, City, CityReportFilterRequestDto>(
             requestDto,
-            selector: v => new CityReportResponseDto(v.CityId, v.Name, v.Code),
+            selector: v => new CityReportResponseDto(v.CityId, v.Name, v.Code, v.Directions.Select(d => new DirectionsReportDto(
+                        d.DirectionId,
+                        d.Name,
+                        d.Lat,
+                        d.Lng
+                    )).ToList()),
             sortMappings: sortMappings
         );
 
@@ -89,7 +107,8 @@ public class CityBusiness : ICityBusiness
     public async Task<Result<bool>> Update(int cityId, CityUpdateRequestDto dto)
     {
         var city = await _context.Cities
-            .FindAsync(cityId);
+            .Include(c => c.Directions)
+            .FirstOrDefaultAsync(c => c.CityId == cityId);
 
         if (city is null)
         {
@@ -99,9 +118,28 @@ public class CityBusiness : ICityBusiness
         city.Code = dto.Code;
         city.Name = dto.Name;
 
+        if (dto.Directions is not null)
+        {
+            city.Directions.Clear();
+
+            foreach (var d in dto.Directions)
+            {
+                if (d.Lat.HasValue && d.Lng.HasValue)
+                {
+                    city.Directions.Add(new Direction
+                    {
+                        Name = d.Name,
+                        Lat = d.Lat.Value,
+                        Lng = d.Lng.Value
+                    });
+                }
+            }
+        }
+
         await _context.SaveChangesWithOutboxAsync();
         return Result.Success(true);
     }
+
 
     public async Task<Result<bool>> UpdateStatus(int cityId, EntityStatusEnum status)
     {
