@@ -9,5 +9,5 @@ public interface IServiceBusiness
     Task<Result<PagedReportResponseDto<ServiceReportResponseDto>>> GetServiceReport(PagedReportRequestDto<ServiceReportFilterRequestDto> requestDto);
     Task<Result<bool>> UpdateStatus(int serviceId, EntityStatusEnum status);
     Task<Result<bool>> Delete(int serviceId);
-    Task<Result<bool>> Update(int serviceId, ServiceUpdateRequestDto dto);
+    Task<Result<bool>> Update(int serviceId, ServiceCreateRequestDto dto);
 }
