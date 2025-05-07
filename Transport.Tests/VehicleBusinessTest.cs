@@ -32,7 +32,7 @@ public class VehicleBusinessTests : TestBase
         _contextMock.Setup(x => x.Vehicles)
             .Returns(GetQueryableMockDbSet(new List<Vehicle> { existing }).Object);
 
-        var dto = new VehicleCreateRequestDto(1, "123");
+        var dto = new VehicleCreateRequestDto(1, "123", null);
 
         var result = await _vehicleBusiness.Create(dto);
 
@@ -43,11 +43,19 @@ public class VehicleBusinessTests : TestBase
     [Fact]
     public async Task Create_ShouldSucceed_WhenDataIsValid()
     {
+        var vehicleTypes = new List<VehicleType>
+        {
+            new VehicleType { VehicleTypeId = 1, Name = "Car", Quantity = 20 }
+        };
+
+        _contextMock.Setup(x => x.VehicleTypes)
+            .Returns(GetQueryableMockDbSet(vehicleTypes).Object);
+
         var vehicles = new List<Vehicle>();
         _contextMock.Setup(x => x.Vehicles).Returns(GetMockDbSetWithIdentity(vehicles).Object);
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
-        var dto = new VehicleCreateRequestDto(1, "ABC");
+        var dto = new VehicleCreateRequestDto(1, "ABC", 1);
 
         var result = await _vehicleBusiness.Create(dto);
 
@@ -87,7 +95,7 @@ public class VehicleBusinessTests : TestBase
         _contextMock.Setup(x => x.Vehicles)
             .Returns(GetQueryableMockDbSet(new List<Vehicle>()).Object);
 
-        var dto = new VehicleUpdateRequestDto(999, "222");
+        var dto = new VehicleUpdateRequestDto(999, "222", 1);
         var result = await _vehicleBusiness.Update(1, dto);
 
         result.IsSuccess.Should().BeFalse();
@@ -97,12 +105,20 @@ public class VehicleBusinessTests : TestBase
     [Fact]
     public async Task Update_ShouldSucceed_WhenFound()
     {
+        var vehicleTypes = new List<VehicleType>
+        {
+            new VehicleType { VehicleTypeId = 1, Name = "Car", Quantity = 20 }
+        };
+
+        _contextMock.Setup(x => x.VehicleTypes)
+            .Returns(GetQueryableMockDbSet(vehicleTypes).Object);
+
         var vehicle = new Vehicle { VehicleId = 1, InternalNumber = "111", VehicleTypeId = 1 };
         _contextMock.Setup(x => x.Vehicles)
             .Returns(GetQueryableMockDbSet(new List<Vehicle> { vehicle }).Object);
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
-        var dto = new VehicleUpdateRequestDto(1, "222");
+        var dto = new VehicleUpdateRequestDto(1, "222", 1);
         var result = await _vehicleBusiness.Update(1, dto);
 
         result.IsSuccess.Should().BeTrue();

@@ -7,6 +7,7 @@ using Transport.SharedKernel.Contracts.Driver;
 using System.Linq.Expressions;
 using Transport.SharedKernel.Contracts.City;
 using Transport.Domain.Vehicles;
+using Transport.Domain.Cities;
 
 namespace Transport.Business.DriverBusiness;
 
@@ -60,6 +61,8 @@ public class DriverBusiness : IDriverBusiness
         }
 
         driver.Status = EntityStatusEnum.Deleted;
+
+        _context.Drivers.Update(driver);
 
         await _context.SaveChangesWithOutboxAsync();
         return Result.Success(true);
@@ -122,6 +125,8 @@ public class DriverBusiness : IDriverBusiness
 
         driver.FirstName = dto.FirstName;
         driver.LastName = dto.LastName;
+
+        _context.Drivers.Update(driver);
 
         await _context.SaveChangesWithOutboxAsync();
         return Result.Success(true);

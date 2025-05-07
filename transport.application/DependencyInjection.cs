@@ -5,6 +5,7 @@ using Transport.Domain.Drivers.Abstraction;
 using Transport.Domain.Users.Abstraction;
 using Transport.Domain.Vehicles.Abstraction;
 using Transport.Domain.Cities.Abstraction;
+using Transport.Domain.Services.Abstraction;
 
 namespace Transport.Business;
 
@@ -18,6 +19,9 @@ public static class DependencyInjection
         services.AddScoped<IDriverBusiness, DriverBusiness.DriverBusiness>();
         services.AddScoped<IVehicleBusiness, VehicleBusiness.VehicleBusiness>();
         services.AddScoped<ICityBusiness, CityBusiness.CityBusiness>();
+        services.AddScoped<IVehicleTypeBusiness, VehicleTypeBusiness.VehicleTypeBusiness>();
+        services.AddScoped<IServiceBusiness, ServiceBusiness.ServiceBusiness>();
+
 
         return services;
     }

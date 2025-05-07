@@ -2,5 +2,6 @@
 
 public record VehicleUpdateRequestDto(
     int VehicleTypeId,
-    string InternalNumber
+    string InternalNumber,
+    int AvailableQuantity
 );

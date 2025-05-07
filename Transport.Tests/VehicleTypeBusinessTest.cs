@@ -73,8 +73,8 @@ public class VehicleTypeBusinessTests : TestBase
 
         var vehicles = new List<VehicleCreateRequestDto>
        {
-           new VehicleCreateRequestDto(0, "123"),
-           new VehicleCreateRequestDto(0, "456")
+           new VehicleCreateRequestDto(0, "123", null),
+           new VehicleCreateRequestDto(0, "456", null)
        };
 
         var dto = new VehicleTypeCreateRequestDto("SUV", null, 10, vehicles);

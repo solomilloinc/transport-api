@@ -40,7 +40,7 @@ public class VehicleTypeBusiness : IVehicleTypeBusiness
         {
             vehicleType.Vehicles = dto.Vehicles.Select(p => new Vehicle()
             {
-                VehicleTypeId = vehicleType.VehicleTypeId,
+                AvailableQuantity = p.AvailableQuantity,
                 InternalNumber = p.InternalNumber,
             }).ToList();
         }
@@ -102,6 +102,10 @@ public class VehicleTypeBusiness : IVehicleTypeBusiness
         }
 
         vehicleType.Name = dto.Name;
+        vehicleType.Quantity = dto.Quantity;
+        vehicleType.ImageBase64 = dto.ImageBase64;
+
+        _context.VehicleTypes.Update(vehicleType);
 
         await _context.SaveChangesWithOutboxAsync();
         return Result.Success(true);
@@ -117,6 +121,10 @@ public class VehicleTypeBusiness : IVehicleTypeBusiness
         }
 
         vehicleType.Status = status;
+
+
+        _context.VehicleTypes.Update(vehicleType);
+
         await _context.SaveChangesWithOutboxAsync();
 
         return Result.Success(true);
