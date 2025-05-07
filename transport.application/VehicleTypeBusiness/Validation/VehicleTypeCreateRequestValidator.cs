@@ -4,7 +4,7 @@ using Transport.SharedKernel.Contracts.VehicleType;
 
 namespace Transport.Business.VehicleTypeBusiness.Validation;
 
-internal class VehicleTypeCreateRequestValidator: AbstractValidator<VehicleTypeCreateRequestDto>
+internal class VehicleTypeCreateRequestValidator : AbstractValidator<VehicleTypeCreateRequestDto>
 {
     public VehicleTypeCreateRequestValidator()
     {
@@ -14,15 +14,13 @@ internal class VehicleTypeCreateRequestValidator: AbstractValidator<VehicleTypeC
             .MaximumLength(50)
             .WithMessage("Name must not exceed 50 characters.");
 
-        RuleFor(x => x.Quantity).Empty()
+        RuleFor(x => x.Quantity).NotEmpty()
             .WithMessage("Quantity is required.")
             .GreaterThan(0)
             .WithMessage("Quantity must be greater than 0.");
 
-        RuleFor(x => x.Vehicles)
-            .NotEmpty()
-            .WithMessage("At least one vehicle is required.")
-            .ForEach(vehicle => vehicle.SetValidator(new VehicleCreateRequestValidator()))
-            .WithMessage("Each vehicle must be valid.");
+        RuleForEach(x => x.Vehicles)
+            .SetValidator(new VehicleCreateRequestValidator())
+            .When(x => x.Vehicles != null && x.Vehicles.Any());
     }
 }

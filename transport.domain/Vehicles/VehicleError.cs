@@ -20,4 +20,10 @@ public static class VehicleError
         "El Véhiculo no se encuentra Activo",
         ErrorType.Validation
     );
+
+    public static readonly Error VehicleAvailableQuantityNotValid = new(
+      "Vehicle.AvailableQuantity",
+      "La cantidad de asientos disponibles no puede ser mayor a la cantidad del tipo de vehiculo",
+      ErrorType.Validation
+  );
 }

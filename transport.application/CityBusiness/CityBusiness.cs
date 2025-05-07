@@ -7,6 +7,7 @@ using Transport.Domain.Cities.Abstraction;
 using Transport.SharedKernel;
 using Transport.SharedKernel.Contracts.City;
 using Transport.Domain;
+using Transport.Domain.Vehicles;
 
 namespace Transport.Business.CityBusiness;
 
@@ -136,6 +137,8 @@ public class CityBusiness : ICityBusiness
             }
         }
 
+        _context.Cities.Update(city);
+
         await _context.SaveChangesWithOutboxAsync();
         return Result.Success(true);
     }
@@ -150,6 +153,8 @@ public class CityBusiness : ICityBusiness
         }
 
         city.Status = status;
+
+        _context.Cities.Update(city);
 
         await _context.SaveChangesWithOutboxAsync();
 

@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using Transport.Business.Data;
 using Transport.Domain.Cities;
+using Transport.Domain.Drivers;
 using Transport.Domain.Reserves;
 using Transport.Domain.Services;
 using Transport.Domain.Services.Abstraction;
@@ -165,6 +166,8 @@ public class ServiceBusiness : IServiceBusiness
             });
         }
 
+        _context.Services.Update(service);
+
         await _context.SaveChangesWithOutboxAsync();
         return Result.Success(true);
     }
@@ -178,6 +181,8 @@ public class ServiceBusiness : IServiceBusiness
 
         service.Status = EntityStatusEnum.Deleted;
 
+        _context.Services.Update(service);
+
         await _context.SaveChangesWithOutboxAsync();
         return Result.Success(true);
     }
@@ -190,6 +195,8 @@ public class ServiceBusiness : IServiceBusiness
             return Result.Failure<bool>(ServiceError.ServiceNotFound);
 
         service.Status = status;
+
+        _context.Services.Update(service);
 
         await _context.SaveChangesWithOutboxAsync();
         return Result.Success(true);

@@ -13,7 +13,7 @@ public class VehicleTypeUpdateRequestValidator: AbstractValidator<VehicleTypeUpd
             .MaximumLength(50)
             .WithMessage("Name must not exceed 50 characters.");
 
-        RuleFor(x => x.Quantity).Empty()
+        RuleFor(x => x.Quantity).NotEmpty()
            .WithMessage("Quantity is required.")
            .GreaterThan(0)
            .WithMessage("Quantity must be greater than 0.");

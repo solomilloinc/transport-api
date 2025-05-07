@@ -1,6 +1,7 @@
 ﻿namespace Transport.SharedKernel.Contracts.Vehicle;
 
 public record VehicleCreateRequestDto(
-    int VehicleTypeId,
-    string InternalNumber
+    int AvailableQuantity,
+    string InternalNumber,
+    int? VehicleTypeId
 );

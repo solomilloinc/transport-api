@@ -5,6 +5,7 @@ using Transport.Domain.Vehicles.Abstraction;
 using Transport.SharedKernel.Contracts.Vehicle;
 using Transport.SharedKernel;
 using Microsoft.EntityFrameworkCore;
+using Transport.Domain.Services;
 
 namespace Transport.Business.VehicleBusiness;
 
@@ -27,10 +28,27 @@ public class VehicleBusiness : IVehicleBusiness
             return Result.Failure<int>(VehicleError.VehicleAlreadyExists);
         }
 
+        if (dto.VehicleTypeId is null)
+        {
+            return Result.Failure<int>(VehicleTypeError.VehicleTypeNotFound);
+        }
+
+        var vehicleType = await _context.VehicleTypes.SingleOrDefaultAsync(x => x.VehicleTypeId == dto.VehicleTypeId);
+
+        if (vehicleType is null)
+        {
+            return Result.Failure<int>(VehicleTypeError.VehicleTypeNotFound);
+        }
+
+        if (vehicleType.Quantity < dto.AvailableQuantity)
+        {
+            return Result.Failure<int>(VehicleError.VehicleAvailableQuantityNotValid);
+        }
+
         vehicle = new Vehicle
         {
             InternalNumber = dto.InternalNumber,
-            VehicleTypeId = dto.VehicleTypeId,
+            VehicleTypeId = dto.VehicleTypeId.Value,
         };
 
         _context.Vehicles.Add(vehicle);
@@ -49,6 +67,9 @@ public class VehicleBusiness : IVehicleBusiness
         }
 
         vehicle.Status = EntityStatusEnum.Deleted;
+
+        _context.Vehicles.Update(vehicle);
+
         await _context.SaveChangesWithOutboxAsync();
 
         return Result.Success(true);
@@ -63,8 +84,23 @@ public class VehicleBusiness : IVehicleBusiness
             return Result.Failure<bool>(VehicleError.VehicleNotFound);
         }
 
+        var vehicleType = await _context.VehicleTypes.FindAsync(dto.VehicleTypeId);
+
+        if (vehicleType is null)
+        {
+            return Result.Failure<bool>(VehicleTypeError.VehicleTypeNotFound);
+        }
+
+        if (vehicleType.Quantity < dto.AvailableQuantity)
+        {
+            return Result.Failure<bool>(VehicleError.VehicleAvailableQuantityNotValid);
+        }
+
         vehicle.InternalNumber = dto.InternalNumber;
         vehicle.VehicleTypeId = dto.VehicleTypeId;
+        vehicle.AvailableQuantity = dto.AvailableQuantity;
+
+        _context.Vehicles.Update(vehicle);
 
         await _context.SaveChangesWithOutboxAsync();
         return Result.Success(true);
@@ -80,6 +116,9 @@ public class VehicleBusiness : IVehicleBusiness
         }
 
         vehicle.Status = status;
+
+        _context.Vehicles.Update(vehicle);
+
         await _context.SaveChangesWithOutboxAsync();
 
         return Result.Success(true);
@@ -110,7 +149,7 @@ public class VehicleBusiness : IVehicleBusiness
 
         var pagedResult = await query.ToPagedReportAsync<VehicleReportResponseDto, Vehicle, VehicleReportFilterRequestDto>(
             requestDto,
-            selector: v => new VehicleReportResponseDto(v.VehicleId, v.VehicleTypeId, v.InternalNumber, v.VehicleType.Name, v.VehicleType.Quantity, v.VehicleType.ImageBase64, v.Status.ToString()),
+            selector: v => new VehicleReportResponseDto(v.VehicleId, v.VehicleTypeId, v.InternalNumber, v.VehicleType.Name, v.VehicleType.Quantity, v.VehicleType.ImageBase64, v.Status.ToString(), v.AvailableQuantity),
             sortMappings: sortMappings
         );
 
