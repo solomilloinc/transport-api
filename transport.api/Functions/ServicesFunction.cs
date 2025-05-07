@@ -24,7 +24,9 @@ public sealed class ServicesFunction : FunctionBase
     }
 
     [Function("CreateService")]
-    [Authorize("Admin")]
+
+    //[Authorize("Admin")]
+    [AllowAnonymous]
     [OpenApiOperation(operationId: "service-create", tags: new[] { "Service" }, Summary = "Create Service", Description = "Creates a new service", Visibility = OpenApiVisibilityType.Important)]
     [OpenApiRequestBody("application/json", typeof(ServiceCreateRequestDto), Required = true)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(int), Summary = "Service Created")]
@@ -52,7 +54,8 @@ public sealed class ServicesFunction : FunctionBase
     }
 
     [Function("UpdateService")]
-    [Authorize("Admin")]
+    //[Authorize("Admin")]
+    [AllowAnonymous]
     [OpenApiOperation(operationId: "service-update", tags: new[] { "Service" }, Summary = "Update Service", Description = "Updates an existing service", Visibility = OpenApiVisibilityType.Important)]
     [OpenApiParameter("serviceId", In = ParameterLocation.Path, Required = true, Type = typeof(int), Description = "Service ID")]
     [OpenApiRequestBody("application/json", typeof(ServiceUpdateRequestDto), Required = true)]
@@ -61,15 +64,16 @@ public sealed class ServicesFunction : FunctionBase
         [HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "service-update/{serviceId:int}")] HttpRequestData req,
         int serviceId)
     {
-        var dto = await req.ReadFromJsonAsync<ServiceUpdateRequestDto>();
-        var result = await ValidateAndMatchAsync(req, dto, GetValidator<ServiceUpdateRequestDto>())
+        var dto = await req.ReadFromJsonAsync<ServiceCreateRequestDto>();
+        var result = await ValidateAndMatchAsync(req, dto, GetValidator<ServiceCreateRequestDto>())
                           .BindAsync(x => _serviceBusiness.Update(serviceId, x));
 
         return await MatchResultAsync(req, result);
     }
 
     [Function("GetServiceReport")]
-    [Authorize("Admin")]
+    //[Authorize("Admin")]
+    [AllowAnonymous]
     [OpenApiOperation(operationId: "service-report", tags: new[] { "Service" }, Summary = "Get Service Report", Description = "Returns paginated list of services", Visibility = OpenApiVisibilityType.Important)]
     [OpenApiRequestBody("application/json", typeof(PagedReportRequestDto<ServiceReportFilterRequestDto>), Required = true)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(PagedReportResponseDto<ServiceReportResponseDto>), Summary = "Service Report")]

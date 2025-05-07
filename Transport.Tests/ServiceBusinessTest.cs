@@ -257,7 +257,7 @@ public class ServiceBusinessTests : TestBase
 
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
-        var result = await _serviceBusiness.Update(1, new ServiceUpdateRequestDto(
+        var result = await _serviceBusiness.Update(1, new ServiceCreateRequestDto(
             Name: "Updated",
             OriginId: 1,
             DestinationId: 2,
@@ -267,7 +267,7 @@ public class ServiceBusinessTests : TestBase
             VehicleId: 1,
             StartDay: 1,
             EndDay: 5,
-            Prices: new List<ServiceReservePriceDto>()
+            Prices: new List<ReservePriceCreateRequestDto>()
         ));
 
         result.IsSuccess.Should().BeFalse();
@@ -287,7 +287,7 @@ public class ServiceBusinessTests : TestBase
 
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
-        var dto = new ServiceUpdateRequestDto(
+        var dto = new ServiceCreateRequestDto(
             Name: "Updated",
             OriginId: 1,
             DestinationId: 2,
@@ -297,9 +297,9 @@ public class ServiceBusinessTests : TestBase
             VehicleId: 1,
             StartDay: 1,
             EndDay: 5,
-            Prices: new List<ServiceReservePriceDto>
+            Prices: new List<ReservePriceCreateRequestDto>()
             {
-            new ServiceReservePriceDto(ReserveTypeId: 1, Price: 150)
+             new ReservePriceCreateRequestDto(ReserveTypeId: 1, Price: 150)
             }
         );
 
@@ -325,7 +325,7 @@ public class ServiceBusinessTests : TestBase
 
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
-        var dto = new ServiceUpdateRequestDto(
+        var dto = new ServiceCreateRequestDto(
             Name: "Updated",
             OriginId: 1,
             DestinationId: 2,
@@ -335,11 +335,11 @@ public class ServiceBusinessTests : TestBase
             VehicleId: 1,
             StartDay: 1,
             EndDay: 5,
-            Prices: new List<ServiceReservePriceDto>
+            Prices: new List<ReservePriceCreateRequestDto>
             {
-            new ServiceReservePriceDto((int)ReserveTypeIdEnum.Ida, 150),
-            new ServiceReservePriceDto((int)ReserveTypeIdEnum.IdaVuelta, 250),
-            new ServiceReservePriceDto((int)ReserveTypeIdEnum.Bonificado, 50)
+            new ReservePriceCreateRequestDto((int)ReserveTypeIdEnum.Ida, 150),
+            new ReservePriceCreateRequestDto((int)ReserveTypeIdEnum.IdaVuelta, 250),
+            new ReservePriceCreateRequestDto((int)ReserveTypeIdEnum.Bonificado, 50)
             }
         );
 

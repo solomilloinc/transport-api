@@ -73,10 +73,11 @@ public class ServiceBusiness : IServiceBusiness
 
         _context.Services.Add(service);
         await _context.SaveChangesWithOutboxAsync();
+
         return service.ServiceId;
     }
 
-    public async Task<Result<PagedReportResponseDto<ServiceReportResponseDto>>> 
+    public async Task<Result<PagedReportResponseDto<ServiceReportResponseDto>>>
         GetServiceReport(PagedReportRequestDto<ServiceReportFilterRequestDto> requestDto)
     {
         var query = _context.Services
@@ -124,10 +125,10 @@ public class ServiceBusiness : IServiceBusiness
                 s.EstimatedDuration,
                 s.DepartureHour,
                 s.IsHoliday,
-                new ServiceVehicleResponseDto(s.Vehicle.InternalNumber, 
-                    s.Vehicle.AvailableQuantity, 
-                    s.Vehicle.VehicleType.Quantity, 
-                    s.Vehicle.VehicleType.Name, 
+                new ServiceVehicleResponseDto(s.Vehicle.InternalNumber,
+                    s.Vehicle.AvailableQuantity,
+                    s.Vehicle.VehicleType.Quantity,
+                    s.Vehicle.VehicleType.Name,
                     s.Vehicle.VehicleType.ImageBase64),
                 s.Status.ToString()
             ),
@@ -137,7 +138,7 @@ public class ServiceBusiness : IServiceBusiness
         return Result.Success(pagedResult);
     }
 
-    public async Task<Result<bool>> Update(int serviceId, ServiceUpdateRequestDto dto)
+    public async Task<Result<bool>> Update(int serviceId, ServiceCreateRequestDto dto)
     {
         var service = await _context.Services
             .Include(s => s.ReservePrices)
@@ -156,7 +157,11 @@ public class ServiceBusiness : IServiceBusiness
         service.IsHoliday = dto.IsHoliday;
         service.VehicleId = dto.VehicleId;
 
-        service.ReservePrices.Clear();
+        foreach (var price in service.ReservePrices)
+        {
+            price.Status = EntityStatusEnum.Inactive;
+        }
+
         foreach (var price in dto.Prices)
         {
             service.ReservePrices.Add(new ReservePrice
@@ -169,6 +174,7 @@ public class ServiceBusiness : IServiceBusiness
         _context.Services.Update(service);
 
         await _context.SaveChangesWithOutboxAsync();
+
         return Result.Success(true);
     }
 

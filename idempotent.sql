@@ -285,3 +285,16 @@ GO
 COMMIT;
 GO
 
+BEGIN TRANSACTION;
+GO
+
+ALTER TABLE [ReservePrice] ADD [Status] int NOT NULL DEFAULT 1;
+GO
+
+INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+VALUES (N'20250507224207_InitialMigration-pt3', N'8.0.14');
+GO
+
+COMMIT;
+GO
+
