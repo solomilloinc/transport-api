@@ -3,7 +3,8 @@ using Transport.SharedKernel;
 
 namespace Transport.Domain.Users.Abstraction;
 
-public interface ILoginBusiness
+public interface IUserBusiness
 {
     Task<Result<LoginResponseDto>> Login(LoginDto login);
+    Task<Result<RefreshTokenResponseDto>> RenewTokenAsync(string token, string ipAddress);
 }

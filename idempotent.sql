@@ -298,3 +298,31 @@ GO
 COMMIT;
 GO
 
+BEGIN TRANSACTION;
+GO
+
+CREATE TABLE [RefreshToken] (
+    [Id] int NOT NULL IDENTITY,
+    [Token] nvarchar(100) NOT NULL,
+    [UserId] int NOT NULL,
+    [CreatedAt] datetime2 NOT NULL,
+    [CreatedByIp] nvarchar(45) NOT NULL,
+    [ExpiresAt] datetime2 NOT NULL,
+    [RevokedAt] datetime2 NULL,
+    [RevokedByIp] nvarchar(45) NULL,
+    [ReplacedByToken] nvarchar(100) NULL,
+    CONSTRAINT [PK_RefreshToken] PRIMARY KEY ([Id]),
+    CONSTRAINT [FK_RefreshToken_User_UserId] FOREIGN KEY ([UserId]) REFERENCES [User] ([UserId]) ON DELETE CASCADE
+);
+GO
+
+CREATE INDEX [IX_RefreshToken_UserId] ON [RefreshToken] ([UserId]);
+GO
+
+INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+VALUES (N'20250510200933_InitialMigration-pt4', N'8.0.14');
+GO
+
+COMMIT;
+GO
+

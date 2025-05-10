@@ -337,9 +337,9 @@ public class ServiceBusinessTests : TestBase
             EndDay: 5,
             Prices: new List<ReservePriceCreateRequestDto>
             {
-            new ReservePriceCreateRequestDto((int)ReserveTypeIdEnum.Ida, 150),
-            new ReservePriceCreateRequestDto((int)ReserveTypeIdEnum.IdaVuelta, 250),
-            new ReservePriceCreateRequestDto((int)ReserveTypeIdEnum.Bonificado, 50)
+            new ReservePriceCreateRequestDto(150, (int)ReserveTypeIdEnum.Ida),
+            new ReservePriceCreateRequestDto(250, (int)ReserveTypeIdEnum.IdaVuelta),
+            new ReservePriceCreateRequestDto(50, (int)ReserveTypeIdEnum.Bonificado)
             }
         );
 

@@ -15,7 +15,7 @@ public static class DependencyInjection
     {
         services.AddValidatorsFromAssembly(typeof(DependencyInjection).Assembly, includeInternalTypes: true);
 
-        services.AddScoped<ILoginBusiness, LoginBusiness>();
+        services.AddScoped<IUserBusiness, UserBusiness.UserBusiness>();
         services.AddScoped<IDriverBusiness, DriverBusiness.DriverBusiness>();
         services.AddScoped<IVehicleBusiness, VehicleBusiness.VehicleBusiness>();
         services.AddScoped<ICityBusiness, CityBusiness.CityBusiness>();
