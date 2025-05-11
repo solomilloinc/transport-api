@@ -13,12 +13,10 @@ namespace Transport.Business.DriverBusiness;
 
 public class DriverBusiness : IDriverBusiness
 {
-    private readonly IUnitOfWork _unitOfWork;
     private readonly IApplicationDbContext _context;
 
-    public DriverBusiness(IUnitOfWork unitOfWork, IApplicationDbContext context)
+    public DriverBusiness(IApplicationDbContext context)
     {
-        _unitOfWork = unitOfWork;
         _context = context;
     }
 
