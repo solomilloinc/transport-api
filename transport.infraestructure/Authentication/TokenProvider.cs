@@ -70,13 +70,13 @@ internal sealed class TokenProvider(IConfiguration configuration, IApplicationDb
     {
         var refreshToken = await GetRefreshTokenAsync(token);
 
-        if (token == null) return;
+        if (refreshToken == null) return;
 
 
         refreshToken.RevokedAt = DateTime.UtcNow;
         refreshToken.RevokedByIp = ipAddress;
 
-        dbContext.RefreshTokens.Update(refreshToken);
+        //dbContext.RefreshTokens.Update(refreshToken);
         await dbContext.SaveChangesWithOutboxAsync();
     }
 

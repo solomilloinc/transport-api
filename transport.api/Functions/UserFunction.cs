@@ -26,6 +26,10 @@ public class UserFunction : FunctionBase
     }
 
     [Function("login")]
+    [OpenApiOperation(operationId: "Login", tags: new[] { "Auth" }, Summary = "Login user", Description = "Performs login and returns JWT + refresh token")]
+    [OpenApiRequestBody("application/json", typeof(LoginDto), Description = "User login credentials", Required = true)]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(object), Description = "Access token issued")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Invalid credentials")]
     [AllowAnonymous]
     public async Task<HttpResponseData> Login(
     [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "login")] HttpRequestData req)
@@ -40,7 +44,7 @@ public class UserFunction : FunctionBase
             return await MatchResultAsync(req, result);
 
         var response = req.CreateResponse(HttpStatusCode.OK);
-        await response.WriteAsJsonAsync(new { token = result.Value.AccessToken });
+        await response.WriteAsJsonAsync(new { result.Value.AccessToken });
 
         var encodedToken = WebUtility.UrlEncode(result.Value.RefreshToken);
 

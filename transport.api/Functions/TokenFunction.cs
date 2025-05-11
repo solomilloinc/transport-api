@@ -27,6 +27,9 @@ public class TokenFunction : FunctionBase
     }
 
     [Function("renew-token")]
+    [OpenApiOperation(operationId: "RenewToken", tags: new[] { "Auth" }, Summary = "Renew access token", Description = "Renews JWT using refresh token from cookie")]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(object), Description = "New access token issued")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Refresh token missing or invalid")]
     [AllowAnonymous]
     public async Task<HttpResponseData> RenewToken(
     [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "renew-token")] HttpRequestData req)
@@ -44,8 +47,10 @@ public class TokenFunction : FunctionBase
         var response = req.CreateResponse(HttpStatusCode.OK);
         await response.WriteAsJsonAsync(new { token = result.Value.AccessToken });
 
+        var encodedToken = WebUtility.UrlEncode(result.Value.RefreshToken);
+
         response.Headers.Add("Set-Cookie",
-            $"refreshToken={result.Value.RefreshToken}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=604800");
+            $"refreshToken={encodedToken}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=604800");
 
         return response;
     }
