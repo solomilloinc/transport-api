@@ -53,4 +53,29 @@ public class UserFunction : FunctionBase
 
         return response;
     }
+
+    [Function("logout")]
+    [Authorize(["Admin", "User"])]
+    [OpenApiOperation(operationId: "Logout", tags: new[] { "Auth" }, Summary = "Cerrar sesión", Description = "Revoca el token de actualización y elimina la cookie.")]
+    [OpenApiResponseWithoutBody(statusCode: HttpStatusCode.OK, Summary = "Logout exitoso", Description = "La sesión fue cerrada correctamente.")]
+    [OpenApiResponseWithoutBody(statusCode: HttpStatusCode.Unauthorized, Summary = "No autorizado", Description = "El token de actualización es inválido o no fue proporcionado.")]
+    public async Task<HttpResponseData> Logout(
+    [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "logout")] HttpRequestData req)
+    {
+        var refreshToken = req.GetCookieValue("refreshToken");
+
+        if (!string.IsNullOrWhiteSpace(refreshToken))
+        {
+            var ipAddress = req.GetClientIp();
+            await _userBusiness.LogoutAsync(refreshToken, ipAddress);
+        }
+
+        var response = req.CreateResponse(HttpStatusCode.OK);
+        await response.WriteStringAsync("Logged out");
+
+        response.Headers.Add("Set-Cookie",
+            $"refreshToken=; HttpOnly; Secure; SameSite=Strict; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT");
+
+        return response;
+    }
 }

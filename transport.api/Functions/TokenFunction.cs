@@ -53,30 +53,7 @@ public class TokenFunction : FunctionBase
             $"refreshToken={encodedToken}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=604800");
 
         return response;
-    }
-
-    [Function("logout")]
-    [Authorize]
-    public async Task<HttpResponseData> Logout(
-    [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "logout")] HttpRequestData req)
-    {
-        var cookieHeader = req.Headers.GetValues("Cookie").FirstOrDefault();
-        var refreshToken = req.GetCookieValue("refreshToken");
-
-        if (!string.IsNullOrWhiteSpace(refreshToken))
-        {
-            var ipAddress = req.GetClientIp();
-            await _userBusiness.LogoutAsync(refreshToken, ipAddress);
-        }
-
-        var response = req.CreateResponse(HttpStatusCode.OK);
-        await response.WriteStringAsync("Logged out");
-
-        response.Headers.Add("Set-Cookie",
-            $"refreshToken=; HttpOnly; Secure; SameSite=Strict; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT");
-
-        return response;
-    }
+    }  
 
 
 }

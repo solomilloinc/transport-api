@@ -6,6 +6,7 @@ using Transport.Business.Authorization;
 using Transport.Business.Data;
 using Microsoft.EntityFrameworkCore;
 using Transport.Business.Authentication;
+using Transport.SharedKernel.Helpers;
 
 namespace Transport.Business.UserBusiness;
 
@@ -70,13 +71,13 @@ public class UserBusiness : IUserBusiness
         var newAccessToken = jwtService.BuildToken(claims);
 
         var newRefreshToken = tokenProvider.GenerateRefreshToken();
+        var hashedNewToken = TokenHasher.HashToken(newRefreshToken);
 
         await unitOfWork.ExecuteInTransactionAsync(async () =>
         {
             await tokenProvider.SaveRefreshTokenAsync(newRefreshToken, user.UserId, ipAddress);
 
-            await tokenProvider.RevokeRefreshTokenAsync(refreshToken, ipAddress);
-
+            await tokenProvider.RevokeRefreshTokenAsync(refreshToken, ipAddress, replacedByToken: hashedNewToken);
         });
 
         return new RefreshTokenResponseDto(newAccessToken, newRefreshToken);

@@ -66,7 +66,7 @@ internal sealed class TokenProvider(IConfiguration configuration, IApplicationDb
             .SingleOrDefaultAsync(rt => rt.Token == hashedToken && rt.RevokedAt == null && rt.ExpiresAt > DateTime.UtcNow);
     }
 
-    public async Task RevokeRefreshTokenAsync(string token, string ipAddress)
+    public async Task RevokeRefreshTokenAsync(string token, string ipAddress, string? replacedByToken = null)
     {
         var refreshToken = await GetRefreshTokenAsync(token);
 
@@ -75,8 +75,9 @@ internal sealed class TokenProvider(IConfiguration configuration, IApplicationDb
 
         refreshToken.RevokedAt = DateTime.UtcNow;
         refreshToken.RevokedByIp = ipAddress;
+        refreshToken.ReplacedByToken = replacedByToken;
 
-        //dbContext.RefreshTokens.Update(refreshToken);
+        dbContext.RefreshTokens.Update(refreshToken);
         await dbContext.SaveChangesWithOutboxAsync();
     }
 
