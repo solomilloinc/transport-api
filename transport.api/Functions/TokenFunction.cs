@@ -13,30 +13,65 @@ using Transport.SharedKernel.Contracts.User;
 using Transport_Api.Functions.Base;
 using Transport.Infraestructure.Authorization;
 using transport_api.Extensions;
+using Transport.Domain.Users.Abstraction;
 
 namespace transport_api.Functions;
 
 public class TokenFunction : FunctionBase
 {
-    private readonly UserBusiness _userBusiness;
+    private readonly IUserBusiness _userBusiness;
 
-    public TokenFunction(UserBusiness userBusiness, IServiceProvider serviceProvider) : base(serviceProvider)
+    public TokenFunction(IUserBusiness userBusiness, IServiceProvider serviceProvider) : base(serviceProvider)
     {
         _userBusiness = userBusiness;
     }
 
     [Function("renew-token")]
     [AllowAnonymous]
-    [OpenApiOperation(operationId: "renew-token", tags: new[] { "User" }, Summary = "Renew Refresh Token", Description = "Renews the refresh token and provides a new access token.", Visibility = OpenApiVisibilityType.Important)]
-    [OpenApiRequestBody(contentType: "application/json", bodyType: typeof(RenewTokenDto), Required = true, Description = "Request body with the refresh token.")]
-    [OpenApiResponseWithBody(statusCode: HttpStatusCode.OK, contentType: "application/json", bodyType: typeof(RefreshTokenResponseDto), Summary = "New Tokens", Description = "The new access token and refresh token.")]
     public async Task<HttpResponseData> RenewToken(
-        [HttpTrigger(AuthorizationLevel.Function, "post", Route = "renew-token")] HttpRequestData req)
+    [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "renew-token")] HttpRequestData req)
     {
-        var renewTokenDto = await req.ReadFromJsonAsync<RenewTokenDto>();
+        var refreshToken = WebUtility.UrlDecode(req.GetCookieValue("refreshToken"));
 
-        var result = await _userBusiness.RenewTokenAsync(renewTokenDto.Token, req.GetClientIp());
+        if (string.IsNullOrWhiteSpace(refreshToken))
+            return req.CreateResponse(HttpStatusCode.Unauthorized);
 
-        return await MatchResultAsync(req, result);
+        var result = await _userBusiness.RenewTokenAsync(refreshToken, req.GetClientIp());
+
+        if (!result.IsSuccess)
+            return await MatchResultAsync(req, result);
+
+        var response = req.CreateResponse(HttpStatusCode.OK);
+        await response.WriteAsJsonAsync(new { token = result.Value.AccessToken });
+
+        response.Headers.Add("Set-Cookie",
+            $"refreshToken={result.Value.RefreshToken}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=604800");
+
+        return response;
     }
+
+    [Function("logout")]
+    [Authorize]
+    public async Task<HttpResponseData> Logout(
+    [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "logout")] HttpRequestData req)
+    {
+        var cookieHeader = req.Headers.GetValues("Cookie").FirstOrDefault();
+        var refreshToken = req.GetCookieValue("refreshToken");
+
+        if (!string.IsNullOrWhiteSpace(refreshToken))
+        {
+            var ipAddress = req.GetClientIp();
+            await _userBusiness.LogoutAsync(refreshToken, ipAddress);
+        }
+
+        var response = req.CreateResponse(HttpStatusCode.OK);
+        await response.WriteStringAsync("Logged out");
+
+        response.Headers.Add("Set-Cookie",
+            $"refreshToken=; HttpOnly; Secure; SameSite=Strict; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT");
+
+        return response;
+    }
+
+
 }

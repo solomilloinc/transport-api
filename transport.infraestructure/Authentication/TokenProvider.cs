@@ -8,6 +8,7 @@ using Microsoft.IdentityModel.Tokens;
 using Transport.Business.Authentication;
 using Transport.Business.Data;
 using Transport.Domain.Users;
+using Transport.SharedKernel.Helpers;
 
 namespace Transport.Infraestructure.Authentication;
 
@@ -42,9 +43,11 @@ internal sealed class TokenProvider(IConfiguration configuration, IApplicationDb
 
     public async Task SaveRefreshTokenAsync(string refreshToken, int userId, string ipAddress)
     {
+        var hashedToken = TokenHasher.HashToken(refreshToken);
+
         var token = new RefreshToken
         {
-            Token = refreshToken,
+            Token = hashedToken,
             UserId = userId,
             CreatedByIp = ipAddress,
             ExpiresAt = DateTime.UtcNow.AddDays(7),
@@ -57,21 +60,24 @@ internal sealed class TokenProvider(IConfiguration configuration, IApplicationDb
 
     public async Task<RefreshToken> GetRefreshTokenAsync(string token)
     {
+        var hashedToken = TokenHasher.HashToken(token);
+
         return await dbContext.RefreshTokens
-            .SingleOrDefaultAsync(rt => rt.Token == token && rt.RevokedAt == null && rt.ExpiresAt > DateTime.UtcNow);
+            .SingleOrDefaultAsync(rt => rt.Token == hashedToken && rt.RevokedAt == null && rt.ExpiresAt > DateTime.UtcNow);
     }
 
     public async Task RevokeRefreshTokenAsync(string token, string ipAddress)
     {
         var refreshToken = await GetRefreshTokenAsync(token);
-        if (refreshToken != null)
-        {
-            refreshToken.RevokedAt = DateTime.UtcNow;
-            refreshToken.RevokedByIp = ipAddress;
 
-            dbContext.RefreshTokens.Update(refreshToken);
-            await dbContext.SaveChangesWithOutboxAsync();
-        }
+        if (token == null) return;
+
+
+        refreshToken.RevokedAt = DateTime.UtcNow;
+        refreshToken.RevokedByIp = ipAddress;
+
+        dbContext.RefreshTokens.Update(refreshToken);
+        await dbContext.SaveChangesWithOutboxAsync();
     }
 
     public string GenerateRefreshToken()

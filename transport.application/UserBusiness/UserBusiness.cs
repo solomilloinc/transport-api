@@ -15,20 +15,22 @@ public class UserBusiness : IUserBusiness
     private readonly IApplicationDbContext dbContext;
     private readonly IPasswordHasher passwordHasher;
     private readonly ITokenProvider tokenProvider;
+    private readonly IUnitOfWork unitOfWork;
 
-    public UserBusiness(IJwtService jwtService, IApplicationDbContext dbContext, IPasswordHasher passwordHasher, ITokenProvider tokenProvider)
+    public UserBusiness(IJwtService jwtService, IApplicationDbContext dbContext, IPasswordHasher passwordHasher, ITokenProvider tokenProvider, IUnitOfWork unitOfWork)
     {
         this.jwtService = jwtService;
         this.dbContext = dbContext;
         this.passwordHasher = passwordHasher;
         this.tokenProvider = tokenProvider;
+        this.unitOfWork = unitOfWork;
     }
 
     public async Task<Result<LoginResponseDto>> Login(LoginDto login)
     {
         var user = await dbContext.Users
-           .Include(u => u.Role)
-           .SingleOrDefaultAsync(u => u.Email == login.Email);
+            .Include(u => u.Role)
+            .SingleOrDefaultAsync(u => u.Email == login.Email);
 
         if (user is null || !passwordHasher.Verify(login.Password, user.Password))
         {
@@ -41,22 +43,15 @@ public class UserBusiness : IUserBusiness
             .SetId(user.UserId.ToString())
             .Build();
 
-        var token = jwtService.BuildToken(tokens);
+        var accessToken = jwtService.BuildToken(tokens);
 
-        var refreshToken = new RefreshToken
-        {
-            Token = tokenProvider.GenerateRefreshToken(),
-            UserId = user.UserId,
-            CreatedAt = DateTime.UtcNow,
-            CreatedByIp = login.IpAddress,
-            ExpiresAt = DateTime.UtcNow.AddDays(7)
-        };
+        var refreshToken = tokenProvider.GenerateRefreshToken();
 
-        await dbContext.RefreshTokens.AddAsync(refreshToken);
-        await dbContext.SaveChangesWithOutboxAsync();
+        await tokenProvider.SaveRefreshTokenAsync(refreshToken, user.UserId, login.IpAddress);
 
-        return new LoginResponseDto(token, refreshToken.Token);
+        return new LoginResponseDto(accessToken, refreshToken);
     }
+
 
     public async Task<Result<RefreshTokenResponseDto>> RenewTokenAsync(string refreshToken, string ipAddress)
     {
@@ -68,18 +63,28 @@ public class UserBusiness : IUserBusiness
         var user = await dbContext.Users.FindAsync(storedRefreshToken.UserId);
         var claims = ClaimBuilder.Create()
             .SetEmail(user.Email)
-            .SetRole(((RoleEnum)user.Role.RoleId).ToString())
+            .SetRole(((RoleEnum)user.RoleId).ToString())
             .SetId(user.UserId.ToString())
             .Build();
 
         var newAccessToken = jwtService.BuildToken(claims);
 
         var newRefreshToken = tokenProvider.GenerateRefreshToken();
-        await tokenProvider.SaveRefreshTokenAsync(newRefreshToken, user.UserId, ipAddress);
 
-        await tokenProvider.RevokeRefreshTokenAsync(refreshToken, ipAddress);
+        await unitOfWork.ExecuteInTransactionAsync(async () =>
+        {
+            await tokenProvider.SaveRefreshTokenAsync(newRefreshToken, user.UserId, ipAddress);
+
+            await tokenProvider.RevokeRefreshTokenAsync(refreshToken, ipAddress);
+
+        });
 
         return new RefreshTokenResponseDto(newAccessToken, newRefreshToken);
+    }
+
+    public async Task LogoutAsync(string refreshToken, string ipAddress)
+    {
+        await tokenProvider.RevokeRefreshTokenAsync(refreshToken, ipAddress);
     }
 
 }

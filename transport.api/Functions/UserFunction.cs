@@ -15,50 +15,38 @@ namespace Transport_Api.Functions;
 
 public class UserFunction : FunctionBase
 {
-    private readonly IUserBusiness _loginBusiness;
+    private readonly IUserBusiness _userBusiness;
     private readonly IValidator<LoginDto> _validator;
 
     public UserFunction(IUserBusiness loginBusiness, IValidator<LoginDto> validator, IServiceProvider serviceProvider) :
         base(serviceProvider)
     {
-        _loginBusiness = loginBusiness;
+        _userBusiness = loginBusiness;
         _validator = validator;
     }
 
     [Function("login")]
     [AllowAnonymous]
-
-    [OpenApiOperation(operationId: "login", tags: new[] { "User" }, Summary = "Authentication Login", Description = "Operation Login User Auth", Visibility = OpenApiVisibilityType.Important)]
-    [OpenApiRequestBody(contentType: "application/json", bodyType: typeof(LoginDto), Required = true, Description = "Login User in App")]
-    [OpenApiResponseWithBody(statusCode: HttpStatusCode.OK, contentType: "application/json", bodyType: typeof(LoginDto), Summary = "Login User", Description = "test.")]
     public async Task<HttpResponseData> Login(
-       [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "login")] HttpRequestData req)
+    [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "login")] HttpRequestData req)
     {
         var login = await req.ReadFromJsonAsync<LoginDto>();
-
-        var ipAddress = req.GetClientIp();
-        login = login with { IpAddress = ipAddress };
+        login = login with { IpAddress = req.GetClientIp() };
 
         var result = await ValidateAndMatchAsync(req, login, GetValidator<LoginDto>())
-                           .BindAsync(_loginBusiness.Login);
+                           .BindAsync(_userBusiness.Login);
 
-        return await MatchResultAsync(req, result);
+        if (!result.IsSuccess)
+            return await MatchResultAsync(req, result);
+
+        var response = req.CreateResponse(HttpStatusCode.OK);
+        await response.WriteAsJsonAsync(new { token = result.Value.AccessToken });
+
+        var encodedToken = WebUtility.UrlEncode(result.Value.RefreshToken);
+
+        response.Headers.Add("Set-Cookie",
+            $"refreshToken={encodedToken}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=604800");
+
+        return response;
     }
-
-    //[Function("renew-token")]
-    //[AllowAnonymous]
-    //[OpenApiOperation(operationId: "renew-token", tags: new[] { "User" }, Summary = "Renew JWT Access Token", Description = "Renews access token using refresh token", Visibility = OpenApiVisibilityType.Important)]
-    //[OpenApiRequestBody(contentType: "application/json", bodyType: typeof(RenewTokenDto), Required = true, Description = "Refresh token DTO")]
-    //[OpenApiResponseWithBody(statusCode: HttpStatusCode.OK, contentType: "application/json", bodyType: typeof(RefreshTokenResponseDto), Summary = "New Access Token", Description = "Returns a new JWT access token and refresh token.")]
-    //public async Task<HttpResponseData> RenewToken(
-    //  [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "renew-token")] HttpRequestData req)
-    //{
-    //    var dto = await req.ReadFromJsonAsync<RenewTokenDto>();
-
-    //    var ipAddress = req.GetClientIp();
-
-    //    var result = await _loginBusiness.RenewTokenAsync(dto.Token, ipAddress);
-
-    //    return await MatchResultAsync(req, result);
-    //}
 }

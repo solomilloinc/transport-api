@@ -17,4 +17,14 @@ public static class HttpRequestDataExtensions
             ? ip?.ToString()
             : "unknown";
     }
+
+    public static string? GetCookieValue(this HttpRequestData req, string cookieName)
+    {
+        var cookieHeader = req.Headers.GetValues("Cookie").FirstOrDefault();
+        return cookieHeader?
+            .Split(';')
+            .Select(c => c.Trim())
+            .FirstOrDefault(c => c.StartsWith($"{cookieName}="))
+            ?.Split('=')[1];
+    }
 }
