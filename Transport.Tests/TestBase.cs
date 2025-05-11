@@ -4,6 +4,7 @@ using System.Linq.Expressions;
 using Transport.SharedKernel;
 using Transport.Business.Data;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
+using Transport.SharedKernel.Configuration;
 
 namespace Transport.Tests;
 
@@ -113,6 +114,38 @@ public abstract class TestBase
         where TDomainEvent : class, IDomainEvent
     {
         return entity.DomainEvents.OfType<TDomainEvent>().FirstOrDefault();
+    }
+
+    public class FakeJwtOption : IJwtOption
+    {
+        public string Secret => "mysupersecuretestsecretkey123456";
+        public string Issuer => "TestIssuer";
+        public string Audience => "TestAudience";
+        public int Expires => 60;
+
+        string IJwtOption.Secret
+        {
+            get => Secret;
+            set => throw new NotImplementedException();
+        }
+
+        string IJwtOption.Issuer
+        {
+            get => Issuer;
+            set => throw new NotImplementedException();
+        }
+
+        string IJwtOption.Audience
+        {
+            get => Audience;
+            set => throw new NotImplementedException();
+        }
+
+        int IJwtOption.Expires
+        {
+            get => Expires;
+            set => throw new NotImplementedException();
+        }
     }
 
 }

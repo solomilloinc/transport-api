@@ -13,4 +13,6 @@ public class User
     public Role Role { get; set; } = null!;
     public Customer? Customer { get; set; }
     public EntityStatusEnum Status { get; set; } = EntityStatusEnum.Active;
+
+    public ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
 }

@@ -22,5 +22,6 @@ public interface IApplicationDbContext
     DbSet<VehicleType> VehicleTypes { get; }
     DbSet<City> Cities { get; }
     DbSet<Service> Services { get; }
+    DbSet<RefreshToken> RefreshTokens { get; }
     Task<int> SaveChangesWithOutboxAsync(CancellationToken cancellationToken = default);
 }

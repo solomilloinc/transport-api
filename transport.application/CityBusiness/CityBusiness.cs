@@ -13,7 +13,6 @@ namespace Transport.Business.CityBusiness;
 
 public class CityBusiness : ICityBusiness
 {
-    private readonly IUnitOfWork _unitOfWork;
     private readonly IApplicationDbContext _context;
 
     public CityBusiness(IApplicationDbContext context)

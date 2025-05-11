@@ -29,6 +29,8 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<VehicleType> VehicleTypes { get; set; }
     public DbSet<City> Cities { get; set; }
     public DbSet<Service> Services { get; set; }
+    public DbSet<RefreshToken> RefreshTokens { get; set; }
+
     public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options) { }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
