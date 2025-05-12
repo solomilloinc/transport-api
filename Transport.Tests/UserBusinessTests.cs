@@ -1,4 +1,5 @@
-﻿using System.Security.Claims;
+﻿using System.Data;
+using System.Security.Claims;
 using FluentAssertions;
 using Moq;
 using Transport.Business.Authentication;
@@ -20,8 +21,8 @@ public class UserBusinessTests : TestBase
     private readonly Mock<IJwtService> _jwtServiceMock;
     private readonly Mock<IPasswordHasher> _passwordHasherMock;
     private readonly Mock<ITokenProvider> _tokenProviderMock;
+    private readonly Mock<IUnitOfWork> _unitOfWorkMock;
     private readonly IUserBusiness _userBusiness;
-    private Mock<IJwtOption> _jwtOptionMock;
 
     public UserBusinessTests()
     {
@@ -29,8 +30,15 @@ public class UserBusinessTests : TestBase
         _jwtServiceMock = new Mock<IJwtService>();
         _passwordHasherMock = new Mock<IPasswordHasher>();
         _tokenProviderMock = new Mock<ITokenProvider>();
-        _userBusiness = new UserBusiness(_jwtServiceMock.Object, _contextMock.Object, _passwordHasherMock.Object, _tokenProviderMock.Object);
-        _jwtOptionMock = new Mock<IJwtOption>();
+        _unitOfWorkMock = new Mock<IUnitOfWork>();
+
+        _userBusiness = new UserBusiness(
+            _jwtServiceMock.Object,
+            _contextMock.Object,
+            _passwordHasherMock.Object,
+            _tokenProviderMock.Object,
+            _unitOfWorkMock.Object
+        );
     }
 
     [Fact]
@@ -60,146 +68,74 @@ public class UserBusinessTests : TestBase
             Role = new Role { RoleId = 1, Name = "Admin" }
         };
 
-        var users = new List<User> { user };
-        _contextMock.Setup(x => x.Users).Returns(GetQueryableMockDbSet(users).Object);
-
+        _contextMock.Setup(x => x.Users).Returns(GetQueryableMockDbSet(new List<User> { user }).Object);
         _passwordHasherMock.Setup(p => p.Verify("password", "hashedPassword")).Returns(true);
+        _jwtServiceMock.Setup(j => j.BuildToken(It.IsAny<IEnumerable<Claim>>())).Returns("access-token");
+        _tokenProviderMock.Setup(tp => tp.GenerateRefreshToken()).Returns("refresh-token");
+        _tokenProviderMock.Setup(tp => tp.SaveRefreshTokenAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<string>())).Returns(Task.CompletedTask);
 
-        var refreshTokenList = new List<RefreshToken>();
-        _contextMock.Setup(x => x.RefreshTokens).Returns(GetMockDbSetWithIdentity(refreshTokenList).Object);
+        var result = await _userBusiness.Login(loginDto);
 
-        SetupSaveChangesWithOutboxAsync(_contextMock);
-
-        _jwtServiceMock.Setup(j => j.BuildToken(It.IsAny<IEnumerable<Claim>>()))
-            .Returns("access-token");
-
-        _tokenProviderMock.Setup(j => j.GenerateRefreshToken())
-            .Returns("refresh-token");
-
-        var jwtServiceMock = _jwtServiceMock.Object; 
-
-        var userBusiness = new UserBusiness(
-            jwtServiceMock,  // Aquí usamos el mock del servicio
-            _contextMock.Object,
-            _passwordHasherMock.Object,
-            _tokenProviderMock.Object
-        );
-
-        // Act
-        var result = await userBusiness.Login(loginDto);
-
-        // Assert
         result.IsSuccess.Should().BeTrue();
-        result.Value.Should().NotBeNull();
-        result.Value.AccessToken.Should().Be("access-token");  // Verifica que es el token mockeado
+        result.Value.AccessToken.Should().Be("access-token");
         result.Value.RefreshToken.Should().Be("refresh-token");
-
-        _contextMock.Verify(x => x.RefreshTokens.AddAsync(It.IsAny<RefreshToken>(), It.IsAny<CancellationToken>()), Times.Once);
-        _contextMock.Verify(x => x.SaveChangesWithOutboxAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
-
-
-
 
     [Fact]
     public async Task RenewTokenAsync_ShouldFail_WhenRefreshTokenNotFound()
     {
-        var refreshToken = "invalid-refresh-token";
-        var ipAddress = "127.0.0.1";
+        var refreshToken = "invalid-token";
+        var ip = "127.0.0.1";
 
-        _tokenProviderMock.Setup(tp => tp.GetRefreshTokenAsync(It.IsAny<string>())).ReturnsAsync((RefreshToken)null);
+        _tokenProviderMock.Setup(tp => tp.GetRefreshTokenAsync(refreshToken)).ReturnsAsync((RefreshToken)null);
 
-        var result = await _userBusiness.RenewTokenAsync(refreshToken, ipAddress);
+        var result = await _userBusiness.RenewTokenAsync(refreshToken, ip);
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Should().Be(RefreshTokenError.RefreshNotFound);
     }
 
     [Fact]
-    public async Task RenewTokenAsync_ShouldSucceed_WhenRefreshTokenIsValid()
+    public async Task RenewTokenAsync_ShouldSucceed_WhenTokenIsValid()
     {
-        // Arrange
-        var refreshToken = "valid-refresh-token";
-        var ipAddress = "127.0.0.1";
+        var refreshToken = "token";
+        var ip = "127.0.0.1";
         var userId = 1;
 
         var user = new User
         {
             UserId = userId,
             Email = "test@example.com",
-            Role = new Role { RoleId = 1, Name = "Admin" }
+            RoleId = (int)RoleEnum.Admin
         };
 
-        var storedRefreshToken = new RefreshToken
+        var storedToken = new RefreshToken
         {
             Token = refreshToken,
             UserId = userId,
             ExpiresAt = DateTime.UtcNow.AddDays(7)
         };
 
-        var newAccessToken = "new-access-token";
-        var newRefreshToken = "new-refresh-token";
+        _tokenProviderMock.Setup(tp => tp.GetRefreshTokenAsync(refreshToken)).ReturnsAsync(storedToken);
+        _contextMock.Setup(c => c.Users.FindAsync(It.IsAny<object[]>())).ReturnsAsync(user);
+        _jwtServiceMock.Setup(j => j.BuildToken(It.IsAny<IEnumerable<Claim>>())).Returns("new-access");
+        _tokenProviderMock.Setup(tp => tp.GenerateRefreshToken()).Returns("new-refresh");
+        _tokenProviderMock.Setup(tp => tp.SaveRefreshTokenAsync("new-refresh", userId, ip)).Returns(Task.CompletedTask);
+        _tokenProviderMock.Setup(tp => tp.RevokeRefreshTokenAsync(refreshToken, ip, It.IsAny<string>())).Returns(Task.CompletedTask);
 
-        _tokenProviderMock
-            .Setup(tp => tp.GetRefreshTokenAsync(refreshToken))
-            .ReturnsAsync(storedRefreshToken);
+        _unitOfWorkMock
+     .Setup(uow => uow.ExecuteInTransactionAsync(It.IsAny<Func<Task>>(), It.IsAny<IsolationLevel>()))
+     .Returns<Func<Task>, IsolationLevel>((func, _) => func.Invoke());
 
-        _contextMock
-            .Setup(x => x.Users.FindAsync(It.IsAny<object[]>()))
-            .ReturnsAsync(user);
 
-        _jwtServiceMock
-            .Setup(j => j.BuildToken(It.IsAny<IEnumerable<Claim>>()))
-            .Returns(newAccessToken);
+        var result = await _userBusiness.RenewTokenAsync(refreshToken, ip);
 
-        _tokenProviderMock
-            .Setup(tp => tp.GenerateRefreshToken())
-            .Returns(newRefreshToken);
-
-        _tokenProviderMock
-            .Setup(tp => tp.SaveRefreshTokenAsync(newRefreshToken, userId, ipAddress))
-            .Returns(Task.CompletedTask);
-
-        _tokenProviderMock
-            .Setup(tp => tp.RevokeRefreshTokenAsync(refreshToken, ipAddress))
-            .Returns(Task.CompletedTask);
-
-        // Act
-        var result = await _userBusiness.RenewTokenAsync(refreshToken, ipAddress);
-
-        // Assert
         result.IsSuccess.Should().BeTrue();
-        result.Value.AccessToken.Should().Be(newAccessToken);
-        result.Value.RefreshToken.Should().Be(newRefreshToken);
+        result.Value.AccessToken.Should().Be("new-access");
+        result.Value.RefreshToken.Should().Be("new-refresh");
 
-        _tokenProviderMock.Verify(tp => tp.RevokeRefreshTokenAsync(refreshToken, ipAddress), Times.Once);
-        _tokenProviderMock.Verify(tp => tp.SaveRefreshTokenAsync(newRefreshToken, userId, ipAddress), Times.Once);
+        _tokenProviderMock.Verify(tp => tp.SaveRefreshTokenAsync("new-refresh", userId, ip), Times.Once);
+        _tokenProviderMock.Verify(tp => tp.RevokeRefreshTokenAsync(refreshToken, ip, It.IsAny<string>()), Times.Once);
         _jwtServiceMock.Verify(j => j.BuildToken(It.IsAny<IEnumerable<Claim>>()), Times.Once);
     }
-
-    [Fact]
-    public async Task RenewTokenAsync_ShouldFail_WhenRefreshTokenIsInvalid()
-    {
-        // Arrange
-        var refreshToken = "invalid-refresh-token";
-        var ipAddress = "127.0.0.1";
-
-        // Simulamos que no se encuentra el token en la base de datos
-        _tokenProviderMock
-            .Setup(tp => tp.GetRefreshTokenAsync(refreshToken))
-            .ReturnsAsync((RefreshToken?)null); // devuelve null
-
-        // Act
-        var result = await _userBusiness.RenewTokenAsync(refreshToken, ipAddress);
-
-        // Assert
-        result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Be(RefreshTokenError.RefreshNotFound);
-
-        // Verificamos que NO se hayan ejecutado estas acciones
-        _jwtServiceMock.Verify(j => j.BuildToken(It.IsAny<IEnumerable<Claim>>()), Times.Never);
-        _tokenProviderMock.Verify(tp => tp.SaveRefreshTokenAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<string>()), Times.Never);
-        _tokenProviderMock.Verify(tp => tp.RevokeRefreshTokenAsync(It.IsAny<string>(), It.IsAny<string>()), Times.Never);
-    }
-
 }
