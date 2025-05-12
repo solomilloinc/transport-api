@@ -17,15 +17,13 @@ namespace Transport.Tests.DriverBusinessTests;
 public class DriverBusinessTests : TestBase
 {
     private readonly Mock<IApplicationDbContext> _contextMock;
-    private readonly Mock<IUnitOfWork> _unitOfWorkMock;
     private readonly IDriverBusiness _driverBusiness;
 
     public DriverBusinessTests()
     {
         _contextMock = new Mock<IApplicationDbContext>();
-        _unitOfWorkMock = new Mock<IUnitOfWork>();
 
-        _driverBusiness = new DriverBusiness(_unitOfWorkMock.Object, _contextMock.Object);
+        _driverBusiness = new DriverBusiness(_contextMock.Object);
     }
 
     [Fact]
