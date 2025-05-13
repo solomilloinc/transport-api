@@ -25,4 +25,15 @@ public class Service
     public ICollection<ServiceCustomer> Customers { get; set; } = new List<ServiceCustomer>();
     public ICollection<Reserve> Reserves { get; set; } = new List<Reserve>();
     public ICollection<ReservePrice> ReservePrices { get; set; } = new List<ReservePrice>();
+
+    public bool IsDayWithinServiceRange(Service service, DayOfWeek day)
+    {
+        if (service.StartDay == service.EndDay)
+            return day == service.StartDay;
+
+        if (service.StartDay < service.EndDay)
+            return day >= service.StartDay && day <= service.EndDay;
+
+        return day >= service.StartDay || day <= service.EndDay;
+    }
 }

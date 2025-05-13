@@ -8,6 +8,7 @@ using Transport.Domain.Services;
 using Transport.Domain.Services.Abstraction;
 using Transport.Domain.Vehicles;
 using Transport.SharedKernel;
+using Transport.SharedKernel.Configuration;
 using Transport.SharedKernel.Contracts.Service;
 
 namespace Transport.Business.ServiceBusiness;
@@ -15,10 +16,12 @@ namespace Transport.Business.ServiceBusiness;
 public class ServiceBusiness : IServiceBusiness
 {
     private readonly IApplicationDbContext _context;
+    private readonly IReserveOption _reserveOption;
 
-    public ServiceBusiness(IApplicationDbContext context)
+    public ServiceBusiness(IApplicationDbContext context, IReserveOption reserveOption)
     {
         _context = context;
+        _reserveOption = reserveOption;
     }
 
     public async Task<Result<int>> Create(ServiceCreateRequestDto requestDto)
@@ -208,4 +211,47 @@ public class ServiceBusiness : IServiceBusiness
         return Result.Success(true);
     }
 
+    public async Task<Result<bool>> GenerateFutureReservesAsync()
+    {
+        var today = DateTime.Today;
+        var endDate = today.AddDays(_reserveOption.ReserveGenerationDays);
+
+        var services = await _context.Services
+            .Include(s => s.Reserves)
+            .Where(s => s.Status == EntityStatusEnum.Active)
+            .ToListAsync();
+
+        foreach (var service in services)
+        {
+            for (var date = today; date <= endDate; date = date.AddDays(1))
+            {
+                if (service.IsDayWithinServiceRange(service, date.DayOfWeek))
+                {
+                    if (service.Reserves.Any(r => r.ReserveDate.Date == date.Date))
+                        continue;
+
+                    if (IsHoliday(date) && !service.IsHoliday)
+                        continue;
+
+                    var reserve = new Reserve
+                    {
+                        ReserveDate = date.Date + service.DepartureHour,
+                        ServiceId = service.ServiceId,
+                        VehicleId = service.VehicleId,
+                        Status = ReserveStatusEnum.Available,                        
+                    };
+
+                    _context.Reserves.Add(reserve);
+                }
+            }
+        }
+
+        await _context.SaveChangesWithOutboxAsync();
+        return true;
+    }
+
+    private bool IsHoliday(DateTime date)
+    {
+        return _context.Holidays.Any(h => h.HolidayDate == date.Date);
+    }
 }

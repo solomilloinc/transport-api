@@ -71,6 +71,7 @@ var host = new HostBuilder()
         services.AddOptions<JwtOption>().Configure<IConfiguration>((s, c) =>
                c.GetSection(nameof(JwtOption)).Bind(s));
         services.AddSingleton<IJwtOption>(x => x.GetRequiredService<IOptions<JwtOption>>().Value);
+        services.AddSingleton<IReserveOption>(x => x.GetRequiredService<IOptions<ReserveOption>>().Value);
     })
     .Build();
 
