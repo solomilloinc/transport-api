@@ -52,6 +52,11 @@ public class ServiceBusiness : IServiceBusiness
             return Result.Failure<int>(CityError.CityNotFound);
         }
 
+        if (requestDto.StartDay > requestDto.EndDay)
+        {
+            return Result.Failure<int>(ServiceError.InvalidDayRange);
+        }
+
         Service service = new Service
         {
             Name = requestDto.Name,
@@ -133,7 +138,8 @@ public class ServiceBusiness : IServiceBusiness
                     s.Vehicle.VehicleType.Quantity,
                     s.Vehicle.VehicleType.Name,
                     s.Vehicle.VehicleType.ImageBase64),
-                s.Status.ToString()
+                s.Status.ToString(),
+                s.ReservePrices.Select(p => new ReservePriceReport((int)p.ReserveTypeId, p.Price)).ToList()
             ),
             sortMappings: sortMappings
         );
@@ -218,7 +224,7 @@ public class ServiceBusiness : IServiceBusiness
 
         var services = await _context.Services
             .Include(s => s.Reserves)
-            .Where(s => s.Status == EntityStatusEnum.Active)
+            .Where(s => s.Status == EntityStatusEnum.Active && s.ReservePrices.Any())
             .ToListAsync();
 
         foreach (var service in services)
@@ -238,7 +244,7 @@ public class ServiceBusiness : IServiceBusiness
                         ReserveDate = date.Date + service.DepartureHour,
                         ServiceId = service.ServiceId,
                         VehicleId = service.VehicleId,
-                        Status = ReserveStatusEnum.Available,                        
+                        Status = ReserveStatusEnum.Available,
                     };
 
                     _context.Reserves.Add(reserve);
@@ -254,4 +260,34 @@ public class ServiceBusiness : IServiceBusiness
     {
         return _context.Holidays.Any(h => h.HolidayDate == date.Date);
     }
+
+    public async Task<Result<bool>> UpdatePricesByPercentageAsync(PriceMassiveUpdateRequestDto requestDto)
+    {
+        var services = await _context.Services
+            .Include(s => s.ReservePrices)
+            .Where(s => s.Status == EntityStatusEnum.Active && s.ReservePrices.Any())
+            .ToListAsync();
+
+        foreach (var service in services)
+        {
+            foreach (var priceUpdate in requestDto.PriceUpdates)
+            {
+                var matchingPrices = service.ReservePrices
+                    .Where(p => p.ReserveTypeId == (ReserveTypeIdEnum)priceUpdate.ReserveTypeId && p.Status == EntityStatusEnum.Active);
+
+                foreach (var price in matchingPrices)
+                {
+                    var originalPrice = price.Price;
+                    var increase = originalPrice * (priceUpdate.Percentage / 100m);
+                    price.Price = decimal.Round(originalPrice + increase, 2);
+                }
+            }
+
+            _context.Services.Update(service);
+        }
+
+        await _context.SaveChangesWithOutboxAsync();
+        return Result.Success(true);
+    }
+
 }
