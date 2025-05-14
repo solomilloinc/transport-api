@@ -18,7 +18,7 @@ public abstract class TestBase
         ContextMock = new Mock<IApplicationDbContext>();
         UnitOfWorkMock = new Mock<IUnitOfWork>();
     }
-    
+
     protected Mock<DbSet<T>> GetMockDbSetWithIdentity<T>(List<T> sourceList, Action<T>? onAdd = null) where T : class
     {
         var queryable = sourceList.AsQueryable();
@@ -116,35 +116,12 @@ public abstract class TestBase
         return entity.DomainEvents.OfType<TDomainEvent>().FirstOrDefault();
     }
 
-    public class FakeJwtOption : IJwtOption
+    public class FakeReserveOption : IReserveOption
     {
-        public string Secret => "mysupersecuretestsecretkey123456";
-        public string Issuer => "TestIssuer";
-        public string Audience => "TestAudience";
-        public int Expires => 60;
-
-        string IJwtOption.Secret
+        public int ReserveGenerationDays
         {
-            get => Secret;
-            set => throw new NotImplementedException();
-        }
-
-        string IJwtOption.Issuer
-        {
-            get => Issuer;
-            set => throw new NotImplementedException();
-        }
-
-        string IJwtOption.Audience
-        {
-            get => Audience;
-            set => throw new NotImplementedException();
-        }
-
-        int IJwtOption.Expires
-        {
-            get => Expires;
-            set => throw new NotImplementedException();
+            get => ReserveGenerationDays;
+            set => this.ReserveGenerationDays = 15;
         }
     }
 

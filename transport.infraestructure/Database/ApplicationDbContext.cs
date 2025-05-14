@@ -30,6 +30,8 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<City> Cities { get; set; }
     public DbSet<Service> Services { get; set; }
     public DbSet<RefreshToken> RefreshTokens { get; set; }
+    public DbSet<Holiday> Holidays { get; set; }
+    public DbSet<ReservePrice> ReservePrices { get; set; }
 
     public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options) { }
 

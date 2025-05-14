@@ -8,6 +8,7 @@ using Transport.Domain.Services;
 using Transport.Domain.Services.Abstraction;
 using Transport.Domain.Vehicles;
 using Transport.SharedKernel;
+using Transport.SharedKernel.Configuration;
 using Transport.SharedKernel.Contracts.Service;
 
 namespace Transport.Business.ServiceBusiness;
@@ -15,10 +16,12 @@ namespace Transport.Business.ServiceBusiness;
 public class ServiceBusiness : IServiceBusiness
 {
     private readonly IApplicationDbContext _context;
+    private readonly IReserveOption _reserveOption;
 
-    public ServiceBusiness(IApplicationDbContext context)
+    public ServiceBusiness(IApplicationDbContext context, IReserveOption reserveOption)
     {
         _context = context;
+        _reserveOption = reserveOption;
     }
 
     public async Task<Result<int>> Create(ServiceCreateRequestDto requestDto)
@@ -47,6 +50,11 @@ public class ServiceBusiness : IServiceBusiness
         if (destination == null)
         {
             return Result.Failure<int>(CityError.CityNotFound);
+        }
+
+        if (requestDto.StartDay > requestDto.EndDay)
+        {
+            return Result.Failure<int>(ServiceError.InvalidDayRange);
         }
 
         Service service = new Service
@@ -130,7 +138,8 @@ public class ServiceBusiness : IServiceBusiness
                     s.Vehicle.VehicleType.Quantity,
                     s.Vehicle.VehicleType.Name,
                     s.Vehicle.VehicleType.ImageBase64),
-                s.Status.ToString()
+                s.Status.ToString(),
+                s.ReservePrices.Select(p => new ReservePriceReport((int)p.ReserveTypeId, p.Price)).ToList()
             ),
             sortMappings: sortMappings
         );
@@ -203,6 +212,79 @@ public class ServiceBusiness : IServiceBusiness
         service.Status = status;
 
         _context.Services.Update(service);
+
+        await _context.SaveChangesWithOutboxAsync();
+        return Result.Success(true);
+    }
+
+    public async Task<Result<bool>> GenerateFutureReservesAsync()
+    {
+        var today = DateTime.Today;
+        var endDate = today.AddDays(_reserveOption.ReserveGenerationDays);
+
+        var services = await _context.Services
+            .Include(s => s.Reserves)
+            .Where(s => s.Status == EntityStatusEnum.Active && s.ReservePrices.Any())
+            .ToListAsync();
+
+        foreach (var service in services)
+        {
+            for (var date = today; date <= endDate; date = date.AddDays(1))
+            {
+                if (service.IsDayWithinServiceRange(service, date.DayOfWeek))
+                {
+                    if (service.Reserves.Any(r => r.ReserveDate.Date == date.Date))
+                        continue;
+
+                    if (IsHoliday(date) && !service.IsHoliday)
+                        continue;
+
+                    var reserve = new Reserve
+                    {
+                        ReserveDate = date.Date + service.DepartureHour,
+                        ServiceId = service.ServiceId,
+                        VehicleId = service.VehicleId,
+                        Status = ReserveStatusEnum.Available,
+                    };
+
+                    _context.Reserves.Add(reserve);
+                }
+            }
+        }
+
+        await _context.SaveChangesWithOutboxAsync();
+        return true;
+    }
+
+    private bool IsHoliday(DateTime date)
+    {
+        return _context.Holidays.Any(h => h.HolidayDate == date.Date);
+    }
+
+    public async Task<Result<bool>> UpdatePricesByPercentageAsync(PriceMassiveUpdateRequestDto requestDto)
+    {
+        var services = await _context.Services
+            .Include(s => s.ReservePrices)
+            .Where(s => s.Status == EntityStatusEnum.Active && s.ReservePrices.Any())
+            .ToListAsync();
+
+        foreach (var service in services)
+        {
+            foreach (var priceUpdate in requestDto.PriceUpdates)
+            {
+                var matchingPrices = service.ReservePrices
+                    .Where(p => p.ReserveTypeId == (ReserveTypeIdEnum)priceUpdate.ReserveTypeId && p.Status == EntityStatusEnum.Active);
+
+                foreach (var price in matchingPrices)
+                {
+                    var originalPrice = price.Price;
+                    var increase = originalPrice * (priceUpdate.Percentage / 100m);
+                    price.Price = decimal.Round(originalPrice + increase, 2);
+                }
+            }
+
+            _context.Services.Update(service);
+        }
 
         await _context.SaveChangesWithOutboxAsync();
         return Result.Success(true);

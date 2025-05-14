@@ -9,4 +9,10 @@ public static class ServiceError
             "The vehicle you are looking for does not exist",
             ErrorType.NotFound
         );
+
+    public static readonly Error InvalidDayRange = new(
+            "Service.InvalidDayRange",
+            "La fecha desde no puede ser mayor a la fecha hasta",
+            ErrorType.Validation
+        );
 }

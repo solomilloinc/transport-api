@@ -84,4 +84,21 @@ public sealed class ServicesFunction : FunctionBase
         var result = await _serviceBusiness.GetServiceReport(filter);
         return await MatchResultAsync(req, result);
     }
+
+    [Function("UpdatePricesByPercentage")]
+    //[Authorize("Admin")]
+    [AllowAnonymous]
+    [OpenApiOperation(operationId: "service-update-prices", tags: new[] { "Service" }, Summary = "Update Prices by Percentage", Description = "Performs a massive update of service prices based on a percentage", Visibility = OpenApiVisibilityType.Important)]
+    [OpenApiRequestBody("application/json", typeof(PriceMassiveUpdateRequestDto), Required = true)]
+    [OpenApiResponseWithoutBody(HttpStatusCode.OK, Summary = "Prices Updated")]
+    public async Task<HttpResponseData> UpdatePricesByPercentage(
+    [HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "service-update-prices")] HttpRequestData req)
+    {
+        var dto = await req.ReadFromJsonAsync<PriceMassiveUpdateRequestDto>();
+        var result = await ValidateAndMatchAsync(req, dto, GetValidator<PriceMassiveUpdateRequestDto>())
+                          .BindAsync(_serviceBusiness.UpdatePricesByPercentageAsync);
+
+        return await MatchResultAsync(req, result);
+    }
+
 }

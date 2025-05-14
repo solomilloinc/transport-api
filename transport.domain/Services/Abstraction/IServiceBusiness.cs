@@ -10,4 +10,6 @@ public interface IServiceBusiness
     Task<Result<bool>> UpdateStatus(int serviceId, EntityStatusEnum status);
     Task<Result<bool>> Delete(int serviceId);
     Task<Result<bool>> Update(int serviceId, ServiceCreateRequestDto dto);
+    Task<Result<bool>> GenerateFutureReservesAsync();
+    Task<Result<bool>> UpdatePricesByPercentageAsync(PriceMassiveUpdateRequestDto requestDto);
 }
