@@ -11,7 +11,7 @@ public class PriceMassiveUpdateRequestValidator : AbstractValidator<PriceMassive
             .NotEmpty()
             .WithMessage("Price updates cannot be empty.");
 
-        RuleForEach<PriceUpdateDto>(x => x.PriceUpdates)
+        RuleForEach<PricePercentageUpdateDto>(x => x.PriceUpdates)
             .ChildRules(priceUpdate =>
             {
                 priceUpdate.RuleFor(x => x.ReserveTypeId)

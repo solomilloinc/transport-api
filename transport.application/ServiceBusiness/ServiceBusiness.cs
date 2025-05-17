@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using Transport.Business.Data;
 using Transport.Domain.Cities;
+using Transport.Domain.Customers;
 using Transport.Domain.Drivers;
 using Transport.Domain.Reserves;
 using Transport.Domain.Services;
@@ -17,11 +18,13 @@ public class ServiceBusiness : IServiceBusiness
 {
     private readonly IApplicationDbContext _context;
     private readonly IReserveOption _reserveOption;
+    private readonly IDateTimeProvider dateTimeProvider;
 
-    public ServiceBusiness(IApplicationDbContext context, IReserveOption reserveOption)
+    public ServiceBusiness(IApplicationDbContext context, IReserveOption reserveOption, IDateTimeProvider dateTimeProvider)
     {
         _context = context;
         _reserveOption = reserveOption;
+        this.dateTimeProvider = dateTimeProvider;
     }
 
     public async Task<Result<int>> Create(ServiceCreateRequestDto requestDto)
@@ -69,15 +72,6 @@ public class ServiceBusiness : IServiceBusiness
             IsHoliday = requestDto.IsHoliday,
             VehicleId = requestDto.VehicleId,
         };
-
-        foreach (var price in requestDto.Prices)
-        {
-            service.ReservePrices.Add(new ReservePrice
-            {
-                Price = price.Price,
-                ReserveTypeId = (ReserveTypeIdEnum)price.ReserveTypeId
-            });
-        }
 
         _context.Services.Add(service);
         await _context.SaveChangesWithOutboxAsync();
@@ -128,12 +122,15 @@ public class ServiceBusiness : IServiceBusiness
             selector: s => new ServiceReportResponseDto(
                 s.ServiceId,
                 s.Name,
+                s.OriginId,
                 s.Origin.Name,
+                s.DestinationId,
                 s.Destination.Name,
                 s.EstimatedDuration,
                 s.DepartureHour,
                 s.IsHoliday,
-                new ServiceVehicleResponseDto(s.Vehicle.InternalNumber,
+                new ServiceVehicleResponseDto(s.VehicleId,
+                    s.Vehicle.InternalNumber,
                     s.Vehicle.AvailableQuantity,
                     s.Vehicle.VehicleType.Quantity,
                     s.Vehicle.VehicleType.Name,
@@ -166,26 +163,14 @@ public class ServiceBusiness : IServiceBusiness
         service.IsHoliday = dto.IsHoliday;
         service.VehicleId = dto.VehicleId;
 
-        foreach (var price in service.ReservePrices)
-        {
-            price.Status = EntityStatusEnum.Inactive;
-        }
-
-        foreach (var price in dto.Prices)
-        {
-            service.ReservePrices.Add(new ReservePrice
-            {
-                Price = price.Price,
-                ReserveTypeId = (ReserveTypeIdEnum)price.ReserveTypeId
-            });
-        }
-
         _context.Services.Update(service);
 
         await _context.SaveChangesWithOutboxAsync();
 
         return Result.Success(true);
     }
+
+
 
     public async Task<Result<bool>> Delete(int serviceId)
     {
@@ -219,7 +204,7 @@ public class ServiceBusiness : IServiceBusiness
 
     public async Task<Result<bool>> GenerateFutureReservesAsync()
     {
-        var today = DateTime.Today;
+        var today = dateTimeProvider.UtcNow;
         var endDate = today.AddDays(_reserveOption.ReserveGenerationDays);
 
         var services = await _context.Services
@@ -246,6 +231,14 @@ public class ServiceBusiness : IServiceBusiness
                         VehicleId = service.VehicleId,
                         Status = ReserveStatusEnum.Available,
                     };
+
+                    //if (service.Customers.Any())
+                    //{
+                    //    reserve.CustomerReserves = new List<CustomerReserve>(service.Customers.Select(p => new CustomerReserve()
+                    //    {
+                    //        CustomerId = p.CustomerId,
+                    //    }));
+                    //}
 
                     _context.Reserves.Add(reserve);
                 }
@@ -290,4 +283,55 @@ public class ServiceBusiness : IServiceBusiness
         return Result.Success(true);
     }
 
+    public async Task<Result<bool>> AddPrice(int serviceId, ServicePriceAddDto requestDto)
+    {
+        var service = await _context.Services.Include(p => p.ReservePrices).SingleOrDefaultAsync(p => p.ServiceId == serviceId);
+
+        if (service is null)
+        {
+            return Result.Failure<bool>(ServiceError.ServiceNotFound);
+        }
+
+        if (service.ReservePrices.Any(p => p.ReserveTypeId == (ReserveTypeIdEnum)requestDto.ReserveTypeId))
+        {
+            return Result.Failure<bool>(ReservePriceError.ReservePriceAlreadyExists);
+        }
+
+        ReservePrice reservePrice = new ReservePrice
+        {
+            ServiceId = serviceId,
+            ReserveTypeId = (ReserveTypeIdEnum)requestDto.ReserveTypeId,
+            Price = requestDto.Price,
+            Status = EntityStatusEnum.Active
+        };
+
+        _context.ReservePrices.Add(reservePrice);
+        await _context.SaveChangesWithOutboxAsync();
+
+        return Result.Success(true);
+    }
+
+    public async Task<Result<bool>> UpdatePrice(int serviceId, ServicePriceUpdateDto requestDto)
+    {
+        ReservePrice reservePrice = await _context.ReservePrices.FindAsync(requestDto.ReservePriceId);
+
+        if (reservePrice is null)
+        {
+            return Result.Failure<bool>(ReservePriceError.ReservePriceNotFound);
+        }
+
+        var service = await _context.Services.Include(p => p.ReservePrices).SingleOrDefaultAsync(p => p.ServiceId == serviceId);
+
+        if (service is null)
+        {
+            return Result.Failure<bool>(ServiceError.ServiceNotFound);
+        }
+
+        reservePrice.Price = requestDto.Price;
+
+        _context.ReservePrices.Update(reservePrice);
+        await _context.SaveChangesWithOutboxAsync();
+
+        return Result.Success(true);
+    }
 }

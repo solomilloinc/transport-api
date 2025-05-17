@@ -2,5 +2,7 @@
 
 public interface IUserContext
 {
-    Guid UserId { get; }
+    int UserId { get; }
+    string? Email { get; }
 }
+

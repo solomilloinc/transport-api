@@ -101,4 +101,40 @@ public sealed class ServicesFunction : FunctionBase
         return await MatchResultAsync(req, result);
     }
 
+    [Function("AddPrice")]
+    //[Authorize("Admin")]
+    [AllowAnonymous]
+    [OpenApiOperation(operationId: "add-price", tags: new[] { "Service" }, Summary = "Add Price", Description = "Adds a price to a service", Visibility = OpenApiVisibilityType.Important)]
+    [OpenApiParameter("serviceId", In = ParameterLocation.Path, Required = true, Type = typeof(int), Description = "Service ID")]
+    [OpenApiRequestBody("application/json", typeof(ServicePriceAddDto), Required = true)]
+    [OpenApiResponseWithoutBody(HttpStatusCode.OK, Summary = "Price Added")]
+    public async Task<HttpResponseData> AddPrice(
+    [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "service/{serviceId:int}/price-add")] HttpRequestData req,
+    int serviceId)
+    {
+        var dto = await req.ReadFromJsonAsync<ServicePriceAddDto>();
+        var result = await ValidateAndMatchAsync(req, dto, GetValidator<ServicePriceAddDto>())
+                        .BindAsync(x => _serviceBusiness.AddPrice(serviceId, x));
+
+        return await MatchResultAsync(req, result);
+    }
+
+    [Function("UpdatePrice")]
+    //[Authorize("Admin")]
+    [AllowAnonymous]
+    [OpenApiOperation(operationId: "update-price", tags: new[] { "Service" }, Summary = "Update Price", Description = "Updates an existing service price", Visibility = OpenApiVisibilityType.Important)]
+    [OpenApiParameter("serviceId", In = ParameterLocation.Path, Required = true, Type = typeof(int), Description = "Service ID")]
+    [OpenApiRequestBody("application/json", typeof(ServicePriceUpdateDto), Required = true)]
+    [OpenApiResponseWithoutBody(HttpStatusCode.OK, Summary = "Price Updated")]
+    public async Task<HttpResponseData> UpdatePrice(
+    [HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "service/{serviceId:int}/price-update")] HttpRequestData req,
+    int serviceId)
+    {
+        var dto = await req.ReadFromJsonAsync<ServicePriceUpdateDto>();
+        var result = await ValidateAndMatchAsync(req, dto, GetValidator<ServicePriceUpdateDto>())
+                        .BindAsync(x => _serviceBusiness.UpdatePrice(serviceId, x));
+
+        return await MatchResultAsync(req, result);
+    }
+
 }

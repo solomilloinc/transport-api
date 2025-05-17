@@ -1,6 +1,8 @@
-﻿namespace Transport.Domain.Users;
+﻿using Transport.SharedKernel;
 
-public class RefreshToken
+namespace Transport.Domain.Users;
+
+public class RefreshToken: IAuditable
 {
     public int Id { get; set; }
     public string Token { get; set; } = string.Empty;
@@ -19,5 +21,10 @@ public class RefreshToken
 
     public bool IsActive => RevokedAt == null && !IsExpired;
     public bool IsExpired => DateTime.UtcNow >= ExpiresAt;
+
+    public string CreatedBy { get; set; } = null!;
+    public string UpdatedBy { get; set; }
+    public DateTime CreatedDate { get; set; } = DateTime.UtcNow;
+    public DateTime? UpdatedDate { get; set; }
 }
 

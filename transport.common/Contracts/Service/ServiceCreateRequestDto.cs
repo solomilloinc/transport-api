@@ -8,8 +8,7 @@ public record ServiceCreateRequestDto(string Name,
     bool IsHoliday,
     int VehicleId,
     int StartDay,
-    int EndDay,
-    List<ReservePriceCreateRequestDto> Prices);
+    int EndDay);
 
 public record ReservePriceCreateRequestDto(
     decimal Price,
