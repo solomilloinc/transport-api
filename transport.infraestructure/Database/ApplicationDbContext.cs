@@ -50,20 +50,12 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
         {
             if (typeof(IAuditable).IsAssignableFrom(entityType.ClrType))
             {
-                modelBuilder.Entity(entityType.ClrType, builder =>
-                {
-                    builder.Property(nameof(IAuditable.CreatedBy))
-                           .IsRequired()
-                           .HasColumnType("VARCHAR(256)");
+                var entity = modelBuilder.Entity(entityType.ClrType);
 
-                    builder.Property(nameof(IAuditable.CreatedDate))
-                           .IsRequired();
-
-                    builder.Property(nameof(IAuditable.UpdatedBy))
-                           .HasColumnType("VARCHAR(256)");
-
-                    builder.Property(nameof(IAuditable.UpdatedDate));
-                });
+                entity.Property("CreatedBy").IsRequired().HasColumnType("VARCHAR(256)").HasDefaultValue("System");
+                entity.Property("CreatedDate").IsRequired().HasDefaultValueSql("GETDATE()");
+                entity.Property("UpdatedBy").HasColumnType("VARCHAR(256)");
+                entity.Property("UpdatedDate");
             }
         }
 
@@ -73,7 +65,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public async Task<int> SaveChangesWithOutboxAsync(CancellationToken cancellationToken = default)
     {
         var now = DateTime.UtcNow;
-        var username = _userContext?.Email.ToString() ?? "System";
+        var username = _userContext?.Email?.ToString() ?? "System";
 
         foreach (var entry in ChangeTracker.Entries<IAuditable>())
         {

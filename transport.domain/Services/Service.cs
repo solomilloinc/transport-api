@@ -19,7 +19,7 @@ public class Service: Entity, IAuditable
     public int VehicleId { get; set; }
     public EntityStatusEnum Status { get; set; } = EntityStatusEnum.Active;
     public string CreatedBy { get; set; } = null!;
-    public string UpdatedBy { get; set; }
+    public string? UpdatedBy { get; set; }
     public DateTime CreatedDate { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedDate { get; set; }
 

@@ -24,9 +24,7 @@ public sealed class ServicesFunction : FunctionBase
     }
 
     [Function("CreateService")]
-
-    //[Authorize("Admin")]
-    [AllowAnonymous]
+    [Authorize("Admin")]
     [OpenApiOperation(operationId: "service-create", tags: new[] { "Service" }, Summary = "Create Service", Description = "Creates a new service", Visibility = OpenApiVisibilityType.Important)]
     [OpenApiRequestBody("application/json", typeof(ServiceCreateRequestDto), Required = true)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(int), Summary = "Service Created")]
@@ -54,8 +52,7 @@ public sealed class ServicesFunction : FunctionBase
     }
 
     [Function("UpdateService")]
-    //[Authorize("Admin")]
-    [AllowAnonymous]
+    [Authorize("Admin")]
     [OpenApiOperation(operationId: "service-update", tags: new[] { "Service" }, Summary = "Update Service", Description = "Updates an existing service", Visibility = OpenApiVisibilityType.Important)]
     [OpenApiParameter("serviceId", In = ParameterLocation.Path, Required = true, Type = typeof(int), Description = "Service ID")]
     [OpenApiRequestBody("application/json", typeof(ServiceUpdateRequestDto), Required = true)]
@@ -72,8 +69,7 @@ public sealed class ServicesFunction : FunctionBase
     }
 
     [Function("GetServiceReport")]
-    //[Authorize("Admin")]
-    [AllowAnonymous]
+    [Authorize("Admin")]
     [OpenApiOperation(operationId: "service-report", tags: new[] { "Service" }, Summary = "Get Service Report", Description = "Returns paginated list of services", Visibility = OpenApiVisibilityType.Important)]
     [OpenApiRequestBody("application/json", typeof(PagedReportRequestDto<ServiceReportFilterRequestDto>), Required = true)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(PagedReportResponseDto<ServiceReportResponseDto>), Summary = "Service Report")]
@@ -86,8 +82,7 @@ public sealed class ServicesFunction : FunctionBase
     }
 
     [Function("UpdatePricesByPercentage")]
-    //[Authorize("Admin")]
-    [AllowAnonymous]
+    [Authorize("Admin")]
     [OpenApiOperation(operationId: "service-update-prices", tags: new[] { "Service" }, Summary = "Update Prices by Percentage", Description = "Performs a massive update of service prices based on a percentage", Visibility = OpenApiVisibilityType.Important)]
     [OpenApiRequestBody("application/json", typeof(PriceMassiveUpdateRequestDto), Required = true)]
     [OpenApiResponseWithoutBody(HttpStatusCode.OK, Summary = "Prices Updated")]
@@ -102,8 +97,7 @@ public sealed class ServicesFunction : FunctionBase
     }
 
     [Function("AddPrice")]
-    //[Authorize("Admin")]
-    [AllowAnonymous]
+    [Authorize("Admin")]
     [OpenApiOperation(operationId: "add-price", tags: new[] { "Service" }, Summary = "Add Price", Description = "Adds a price to a service", Visibility = OpenApiVisibilityType.Important)]
     [OpenApiParameter("serviceId", In = ParameterLocation.Path, Required = true, Type = typeof(int), Description = "Service ID")]
     [OpenApiRequestBody("application/json", typeof(ServicePriceAddDto), Required = true)]
@@ -120,8 +114,7 @@ public sealed class ServicesFunction : FunctionBase
     }
 
     [Function("UpdatePrice")]
-    //[Authorize("Admin")]
-    [AllowAnonymous]
+    [Authorize("Admin")]
     [OpenApiOperation(operationId: "update-price", tags: new[] { "Service" }, Summary = "Update Price", Description = "Updates an existing service price", Visibility = OpenApiVisibilityType.Important)]
     [OpenApiParameter("serviceId", In = ParameterLocation.Path, Required = true, Type = typeof(int), Description = "Service ID")]
     [OpenApiRequestBody("application/json", typeof(ServicePriceUpdateDto), Required = true)]

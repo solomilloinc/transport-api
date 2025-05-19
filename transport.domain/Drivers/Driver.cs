@@ -13,7 +13,7 @@ public class Driver: Entity, IAuditable
     public ICollection<Reserve> Reserves { get; set; } = new List<Reserve>();
 
     public string CreatedBy { get; set; } = null!;
-    public string UpdatedBy { get; set; }
+    public string? UpdatedBy { get; set; }
     public DateTime CreatedDate { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedDate { get; set; }
 }

@@ -11,7 +11,7 @@ public class VehicleType: IAuditable
     public EntityStatusEnum Status { get; set; } = EntityStatusEnum.Active;
 
     public string CreatedBy { get; set; } = null!;
-    public string UpdatedBy { get; set; }
+    public string? UpdatedBy { get; set; }
     public DateTime CreatedDate { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedDate { get; set; }
 

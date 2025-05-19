@@ -663,8 +663,7 @@ public class ServiceBusinessTests : TestBase
             ReservePrices = new List<ReservePrice>
         {
             new ReservePrice { ReserveTypeId = ReserveTypeIdEnum.Ida, Status = EntityStatusEnum.Active, Price = 100m },
-            new ReservePrice { ReserveTypeId = ReserveTypeIdEnum.IdaVuelta, Status = EntityStatusEnum.Active, Price = 200m },
-            new ReservePrice { ReserveTypeId = ReserveTypeIdEnum.Bonificado, Status = EntityStatusEnum.Active, Price = 90m }
+            new ReservePrice { ReserveTypeId = ReserveTypeIdEnum.IdaVuelta, Status = EntityStatusEnum.Active, Price = 200m }
         }
         };
 
@@ -805,7 +804,7 @@ public class ServiceBusinessTests : TestBase
 
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
-        var dto = new ServicePriceUpdateDto(10, (int)ReserveTypeIdEnum.Ida, 4500m);
+        var dto = new ServicePriceUpdateDto(10, 4500m);
 
         // Act
         var result = await _serviceBusiness.UpdatePrice(service.ServiceId, dto);

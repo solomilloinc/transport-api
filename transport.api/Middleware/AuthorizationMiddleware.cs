@@ -47,8 +47,8 @@ public class AuthorizationMiddleware : IFunctionsWorkerMiddleware
 
         if (bearer is not null && service.CheckAuthorization(bearer, out var claims, attributes.FirstOrDefault()?.Roles))
         {
-            var userId = claims?.FindFirst("sub")?.Value ?? claims?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            var email = claims?.FindFirst("email")?.Value;
+            var userId = claims?.FindFirst(ClaimTypes.Sid)?.Value ?? claims?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            var email = claims?.FindFirst(ClaimTypes.Email)?.Value;
 
             if (int.TryParse(userId, out var parsedId))
             {

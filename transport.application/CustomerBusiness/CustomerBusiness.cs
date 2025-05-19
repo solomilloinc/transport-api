@@ -31,7 +31,10 @@ public class CustomerBusiness : ICustomerBusiness
         {
             FirstName = dto.FirstName,
             LastName = dto.LastName,
-            DocumentNumber = dto.DocumentNumber
+            DocumentNumber = dto.DocumentNumber,
+            Email = dto.Email,
+            Phone1 = dto.Phone1,
+            Phone2 = dto.Phone2
         };
 
         _context.Customers.Add(customer);
@@ -75,7 +78,8 @@ public class CustomerBusiness : ICustomerBusiness
         {
             ["firstname"] = c => c.FirstName,
             ["lastname"] = c => c.LastName,
-            ["documentnumber"] = c => c.DocumentNumber
+            ["documentnumber"] = c => c.DocumentNumber,
+            ["email"] = c => c.Email
         };
 
         var pagedResult = await query.ToPagedReportAsync<CustomerReportResponseDto, Customer, CustomerReportFilterRequestDto>(
@@ -98,6 +102,9 @@ public class CustomerBusiness : ICustomerBusiness
 
         customer.FirstName = dto.FirstName;
         customer.LastName = dto.LastName;
+        customer.Email = dto.Email;
+        customer.Phone1 = dto.Phone1;
+        customer.Phone2 = dto.Phone2;
 
         _context.Customers.Update(customer);
         await _context.SaveChangesWithOutboxAsync();

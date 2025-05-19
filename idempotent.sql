@@ -326,3 +326,220 @@ GO
 COMMIT;
 GO
 
+BEGIN TRANSACTION;
+GO
+
+DROP INDEX [IX_ReservePrice_ServiceId] ON [ReservePrice];
+GO
+
+ALTER TABLE [VehicleType] ADD [CreatedBy] VARCHAR(256) NOT NULL DEFAULT 'System';
+GO
+
+ALTER TABLE [VehicleType] ADD [CreatedDate] datetime2 NOT NULL DEFAULT (GETDATE());
+GO
+
+ALTER TABLE [VehicleType] ADD [UpdatedBy] VARCHAR(256) NULL;
+GO
+
+ALTER TABLE [VehicleType] ADD [UpdatedDate] datetime2 NULL;
+GO
+
+ALTER TABLE [Vehicle] ADD [CreatedBy] VARCHAR(256) NOT NULL DEFAULT 'System';
+GO
+
+ALTER TABLE [Vehicle] ADD [CreatedDate] datetime2 NOT NULL DEFAULT (GETDATE());
+GO
+
+ALTER TABLE [Vehicle] ADD [UpdatedBy] VARCHAR(256) NULL;
+GO
+
+ALTER TABLE [Vehicle] ADD [UpdatedDate] datetime2 NULL;
+GO
+
+ALTER TABLE [ServiceCustomer] ADD [CreatedBy] VARCHAR(256) NOT NULL DEFAULT 'System';
+GO
+
+ALTER TABLE [ServiceCustomer] ADD [CreatedDate] datetime2 NOT NULL DEFAULT (GETDATE());
+GO
+
+ALTER TABLE [ServiceCustomer] ADD [UpdatedBy] VARCHAR(256) NULL;
+GO
+
+ALTER TABLE [ServiceCustomer] ADD [UpdatedDate] datetime2 NULL;
+GO
+
+ALTER TABLE [Service] ADD [CreatedBy] VARCHAR(256) NOT NULL DEFAULT 'System';
+GO
+
+ALTER TABLE [Service] ADD [CreatedDate] datetime2 NOT NULL DEFAULT (GETDATE());
+GO
+
+ALTER TABLE [Service] ADD [UpdatedBy] VARCHAR(256) NULL;
+GO
+
+ALTER TABLE [Service] ADD [UpdatedDate] datetime2 NULL;
+GO
+
+ALTER TABLE [Role] ADD [CreatedBy] VARCHAR(256) NOT NULL DEFAULT 'System';
+GO
+
+ALTER TABLE [Role] ADD [CreatedDate] datetime2 NOT NULL DEFAULT (GETDATE());
+GO
+
+ALTER TABLE [Role] ADD [UpdatedBy] VARCHAR(256) NULL;
+GO
+
+ALTER TABLE [Role] ADD [UpdatedDate] datetime2 NULL;
+GO
+
+ALTER TABLE [ReservePrice] ADD [CreatedBy] VARCHAR(256) NOT NULL DEFAULT 'System';
+GO
+
+ALTER TABLE [ReservePrice] ADD [CreatedDate] datetime2 NOT NULL DEFAULT (GETDATE());
+GO
+
+ALTER TABLE [ReservePrice] ADD [UpdatedBy] VARCHAR(256) NULL;
+GO
+
+ALTER TABLE [ReservePrice] ADD [UpdatedDate] datetime2 NULL;
+GO
+
+ALTER TABLE [Reserve] ADD [CreatedBy] VARCHAR(256) NOT NULL DEFAULT 'System';
+GO
+
+ALTER TABLE [Reserve] ADD [CreatedDate] datetime2 NOT NULL DEFAULT (GETDATE());
+GO
+
+ALTER TABLE [Reserve] ADD [UpdatedBy] VARCHAR(256) NULL;
+GO
+
+ALTER TABLE [Reserve] ADD [UpdatedDate] datetime2 NULL;
+GO
+
+ALTER TABLE [RefreshToken] ADD [CreatedBy] VARCHAR(256) NOT NULL DEFAULT 'System';
+GO
+
+ALTER TABLE [RefreshToken] ADD [CreatedDate] datetime2 NOT NULL DEFAULT (GETDATE());
+GO
+
+ALTER TABLE [RefreshToken] ADD [UpdatedBy] VARCHAR(256) NULL;
+GO
+
+ALTER TABLE [RefreshToken] ADD [UpdatedDate] datetime2 NULL;
+GO
+
+ALTER TABLE [Holiday] ADD [CreatedBy] VARCHAR(256) NOT NULL DEFAULT 'System';
+GO
+
+ALTER TABLE [Holiday] ADD [CreatedDate] datetime2 NOT NULL DEFAULT (GETDATE());
+GO
+
+ALTER TABLE [Holiday] ADD [UpdatedBy] VARCHAR(256) NULL;
+GO
+
+ALTER TABLE [Holiday] ADD [UpdatedDate] datetime2 NULL;
+GO
+
+ALTER TABLE [Driver] ADD [CreatedBy] VARCHAR(256) NOT NULL DEFAULT 'System';
+GO
+
+ALTER TABLE [Driver] ADD [CreatedDate] datetime2 NOT NULL DEFAULT (GETDATE());
+GO
+
+ALTER TABLE [Driver] ADD [UpdatedBy] VARCHAR(256) NULL;
+GO
+
+ALTER TABLE [Driver] ADD [UpdatedDate] datetime2 NULL;
+GO
+
+ALTER TABLE [Direction] ADD [CreatedBy] VARCHAR(256) NOT NULL DEFAULT 'System';
+GO
+
+ALTER TABLE [Direction] ADD [CreatedDate] datetime2 NOT NULL DEFAULT (GETDATE());
+GO
+
+ALTER TABLE [Direction] ADD [UpdatedBy] VARCHAR(256) NULL;
+GO
+
+ALTER TABLE [Direction] ADD [UpdatedDate] datetime2 NULL;
+GO
+
+DECLARE @var0 sysname;
+SELECT @var0 = [d].[name]
+FROM [sys].[default_constraints] [d]
+INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
+WHERE ([d].[parent_object_id] = OBJECT_ID(N'[CustomerReserve]') AND [c].[name] = N'PickupLocationId');
+IF @var0 IS NOT NULL EXEC(N'ALTER TABLE [CustomerReserve] DROP CONSTRAINT [' + @var0 + '];');
+ALTER TABLE [CustomerReserve] ALTER COLUMN [PickupLocationId] int NULL;
+GO
+
+DECLARE @var1 sysname;
+SELECT @var1 = [d].[name]
+FROM [sys].[default_constraints] [d]
+INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
+WHERE ([d].[parent_object_id] = OBJECT_ID(N'[CustomerReserve]') AND [c].[name] = N'DropoffLocationId');
+IF @var1 IS NOT NULL EXEC(N'ALTER TABLE [CustomerReserve] DROP CONSTRAINT [' + @var1 + '];');
+ALTER TABLE [CustomerReserve] ALTER COLUMN [DropoffLocationId] int NULL;
+GO
+
+ALTER TABLE [CustomerReserve] ADD [CreatedBy] VARCHAR(256) NOT NULL DEFAULT 'System';
+GO
+
+ALTER TABLE [CustomerReserve] ADD [CreatedDate] datetime2 NOT NULL DEFAULT (GETDATE());
+GO
+
+ALTER TABLE [CustomerReserve] ADD [UpdatedBy] VARCHAR(256) NULL;
+GO
+
+ALTER TABLE [CustomerReserve] ADD [UpdatedDate] datetime2 NULL;
+GO
+
+ALTER TABLE [CustomerReserve] ADD [UserId] int NULL;
+GO
+
+ALTER TABLE [Customer] ADD [CreatedBy] VARCHAR(256) NOT NULL DEFAULT 'System';
+GO
+
+ALTER TABLE [Customer] ADD [CreatedDate] datetime2 NOT NULL DEFAULT (GETDATE());
+GO
+
+ALTER TABLE [Customer] ADD [UpdatedBy] VARCHAR(256) NULL;
+GO
+
+ALTER TABLE [Customer] ADD [UpdatedDate] datetime2 NULL;
+GO
+
+ALTER TABLE [City] ADD [CreatedBy] VARCHAR(256) NOT NULL DEFAULT 'System';
+GO
+
+ALTER TABLE [City] ADD [CreatedDate] datetime2 NOT NULL DEFAULT (GETDATE());
+GO
+
+ALTER TABLE [City] ADD [UpdatedBy] VARCHAR(256) NULL;
+GO
+
+ALTER TABLE [City] ADD [UpdatedDate] datetime2 NULL;
+GO
+
+UPDATE [Role] SET [CreatedBy] = 'System', [CreatedDate] = '2025-05-18T22:41:03.2441076Z', [UpdatedBy] = NULL, [UpdatedDate] = NULL
+WHERE [RoleId] = 1;
+SELECT @@ROWCOUNT;
+
+GO
+
+UPDATE [Role] SET [CreatedBy] = 'System', [CreatedDate] = '2025-05-18T22:41:03.2441079Z', [UpdatedBy] = NULL, [UpdatedDate] = NULL
+WHERE [RoleId] = 2;
+SELECT @@ROWCOUNT;
+
+GO
+
+CREATE UNIQUE INDEX [IX_ReservePrice_ServiceId] ON [ReservePrice] ([ServiceId]);
+GO
+
+INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+VALUES (N'20250518224103_AuditableFields', N'8.0.14');
+GO
+
+COMMIT;
+GO
+

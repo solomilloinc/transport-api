@@ -3,6 +3,5 @@
 public enum ReserveTypeIdEnum
 {
     Ida = 1,
-    IdaVuelta = 2,
-    Bonificado = 3
+    IdaVuelta = 2
 }

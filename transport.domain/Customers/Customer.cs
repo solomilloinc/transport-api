@@ -17,7 +17,7 @@ public class Customer: Entity, IAuditable
     public User? User { get; set; }
 
     public string CreatedBy { get; set; } = null!;
-    public string UpdatedBy { get; set; }
+    public string? UpdatedBy { get; set; }
     public DateTime CreatedDate { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedDate { get; set; }
 
