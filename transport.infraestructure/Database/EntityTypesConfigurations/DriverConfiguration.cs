@@ -1,8 +1,8 @@
 ﻿using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Microsoft.EntityFrameworkCore;
-using transport.domain.Drivers;
+using Transport.Domain.Drivers;
 
-namespace transport.infraestructure.Database.EntityTypesConfigurations;
+namespace Transport.Infraestructure.Database.EntityTypesConfigurations;
 
 public class DriverConfiguration : IEntityTypeConfiguration<Driver>
 {
@@ -14,5 +14,6 @@ public class DriverConfiguration : IEntityTypeConfiguration<Driver>
         builder.Property(d => d.LastName).HasMaxLength(100).IsRequired();
         builder.Property(d => d.DocumentNumber).HasMaxLength(50).IsRequired();
         builder.HasIndex(d => d.DocumentNumber).IsUnique();
+        builder.Property(r => r.Status).IsRequired();
     }
 }

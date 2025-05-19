@@ -1,20 +1,20 @@
 ﻿using System.Text;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
-using transport.common;
-using transport.infraestructure.Database;
-using transport.infraestructure.Time;
+using Transport.SharedKernel;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using transport.application.Authentication;
-using transport.infraestructure.Authentication;
-using transport.infraestructure.Authorization;
-using transport.application.Authorization;
+using Transport.Infraestructure.Time;
+using Transport.Infraestructure.Database;
+using Transport.Infraestructure.Authentication;
+using Transport.Business.Authentication;
+using Transport.Infraestructure.Authorization;
+using Transport.Business.Authorization;
+using Transport.Business.Data;
 
-namespace transport.infraestructure;
+namespace Transport.Infraestructure;
 
 public static class DependencyInjection
 {
@@ -39,12 +39,14 @@ public static class DependencyInjection
     {
         string? connectionString = configuration.GetConnectionString("Database");
 
-        services.AddDbContext<ApplicationDbContext>(
-            options => options
-                .UseSqlServer(connectionString, sqlOptions =>
-                    sqlOptions.MigrationsHistoryTable(HistoryRepository.DefaultTableName, Schemas.Default)));
+        services.AddDbContext<ApplicationDbContext>(options =>
+            options.UseSqlServer(connectionString, sqlOptions =>
+                sqlOptions.MigrationsHistoryTable(HistoryRepository.DefaultTableName)
+                          .EnableRetryOnFailure(5, TimeSpan.FromSeconds(30), null))
+                          .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking));
 
-        //services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<ApplicationDbContext>());
+        services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<ApplicationDbContext>());
+        services.AddScoped<IUnitOfWork, UnitOfWork>();
 
         return services;
     }
@@ -77,13 +79,14 @@ public static class DependencyInjection
 
         services.AddSingleton<IPasswordHasher, PasswordHasher>();
         services.AddSingleton<ITokenProvider, TokenProvider>();
+        services.AddScoped<IUserContext, UserContext>();
 
         return services;
     }
 
     private static IServiceCollection AddAuthorizationInternal(this IServiceCollection services)
     {
-        services.AddScoped<IPermissionService, PermissionProvider>();
+        services.AddScoped<Transport.Business.Authorization.IPermissionService, Transport.Infraestructure.Authorization.PermissionProvider>();
         services.AddScoped<Authorization.IAuthorizationService, AuthorizationService>();
         services.AddScoped<IJwtService, JwtService>();
 

@@ -1,16 +1,25 @@
 ﻿using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Microsoft.EntityFrameworkCore;
-using transport.domain;
+using Transport.Domain.Services;
 
-namespace transport.infraestructure.Database.EntityTypesConfigurations;
+namespace Transport.Infraestructure.Database.EntityTypesConfigurations;
 
 public class ServiceCustomerConfiguration : IEntityTypeConfiguration<ServiceCustomer>
 {
     public void Configure(EntityTypeBuilder<ServiceCustomer> builder)
     {
-        builder.ToTable("Services_Customers");
-        builder.HasKey(sc => new { sc.ServiceId, sc.CustomerId });
-        builder.HasOne(sc => sc.Service).WithMany().HasForeignKey(sc => sc.ServiceId);
-        builder.HasOne(sc => sc.Customer).WithMany().HasForeignKey(sc => sc.CustomerId);
+        builder.ToTable("ServiceCustomer");
+
+        builder.HasKey(sc => sc.ServiceCustomerId);
+
+        builder.HasOne(sc => sc.Service)
+               .WithMany(s => s.Customers)
+               .HasForeignKey(sc => sc.ServiceId)
+               .IsRequired();
+
+        builder.HasOne(sc => sc.Customer)
+               .WithMany(c => c.Services)
+               .HasForeignKey(sc => sc.CustomerId)
+               .IsRequired();
     }
 }

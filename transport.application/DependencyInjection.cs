@@ -1,9 +1,13 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using FluentValidation;
-using Transport.Business.UserBusiness;
-using Transport.Business.DriverBusiness;
+using Transport.Domain.Drivers.Abstraction;
+using Transport.Domain.Users.Abstraction;
+using Transport.Domain.Vehicles.Abstraction;
+using Transport.Domain.Cities.Abstraction;
+using Transport.Domain.Services.Abstraction;
+using Transport.Domain.Customers.Abstraction;
 
-namespace transport.application;
+namespace Transport.Business;
 
 public static class DependencyInjection
 {
@@ -11,8 +15,15 @@ public static class DependencyInjection
     {
         services.AddValidatorsFromAssembly(typeof(DependencyInjection).Assembly, includeInternalTypes: true);
 
-        services.AddScoped<ILoginBusiness, LoginBusiness>();
-        services.AddScoped<IDriverBusiness, DriverBusiness>();
+        services.AddScoped<IUserBusiness, UserBusiness.UserBusiness>();
+        services.AddScoped<IDriverBusiness, DriverBusiness.DriverBusiness>();
+        services.AddScoped<IVehicleBusiness, VehicleBusiness.VehicleBusiness>();
+        services.AddScoped<ICityBusiness, CityBusiness.CityBusiness>();
+        services.AddScoped<IVehicleTypeBusiness, VehicleTypeBusiness.VehicleTypeBusiness>();
+        services.AddScoped<IServiceBusiness, ServiceBusiness.ServiceBusiness>();
+        services.AddScoped<ICustomerBusiness, CustomerBusiness.CustomerBusiness>();
+
+
         return services;
     }
 }

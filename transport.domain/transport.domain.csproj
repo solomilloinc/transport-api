@@ -7,7 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\transport.common\Transport.Common.csproj" />
+    <ProjectReference Include="..\transport.common\Transport.SharedKernel.csproj" />
   </ItemGroup>
 
 </Project>

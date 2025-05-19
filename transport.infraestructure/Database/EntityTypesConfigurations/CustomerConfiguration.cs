@@ -1,8 +1,8 @@
 ﻿using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Microsoft.EntityFrameworkCore;
-using transport.domain;
+using Transport.Domain.Customers;
 
-namespace transport.infraestructure.Database.EntityTypesConfigurations;
+namespace Transport.Infraestructure.Database.EntityTypesConfigurations;
 
 public class CustomerConfiguration : IEntityTypeConfiguration<Customer>
 {
@@ -18,5 +18,6 @@ public class CustomerConfiguration : IEntityTypeConfiguration<Customer>
         builder.HasIndex(c => c.DocumentNumber).IsUnique();
         builder.Property(c => c.Phone1).HasMaxLength(20).IsRequired();
         builder.Property(c => c.Phone2).HasMaxLength(20);
+        builder.Property(r => r.Status).IsRequired();
     }
 }

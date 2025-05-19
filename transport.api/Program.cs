@@ -1,23 +1,21 @@
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using transport.infraestructure;
-using transport.application;
+using Transport.Infraestructure;
+using Transport.Business;
 using Microsoft.Extensions.Configuration;
-using transport_api.Middleware;
+using Transport_Api.Middleware;
 using Microsoft.Azure.Functions.Worker.Extensions.OpenApi.Extensions;
-using FluentValidation;
-using Transport.Business.UserBusiness;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Abstractions;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Configurations;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Enums;
 using Microsoft.OpenApi.Models;
 using Microsoft.Extensions.Options;
-using transport.common.Configuration;
+using Transport.SharedKernel.Configuration;
 
 var configuration = new ConfigurationBuilder()
     .SetBasePath(Directory.GetCurrentDirectory())
-    .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+    .AddJsonFile("local.settings.json", optional: true, reloadOnChange: true)
     .AddEnvironmentVariables()
     .Build();
 
@@ -73,6 +71,7 @@ var host = new HostBuilder()
         services.AddOptions<JwtOption>().Configure<IConfiguration>((s, c) =>
                c.GetSection(nameof(JwtOption)).Bind(s));
         services.AddSingleton<IJwtOption>(x => x.GetRequiredService<IOptions<JwtOption>>().Value);
+        services.AddSingleton<IReserveOption>(x => x.GetRequiredService<IOptions<ReserveOption>>().Value);
     })
     .Build();
 

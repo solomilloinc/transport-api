@@ -1,8 +1,8 @@
 ﻿using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Microsoft.EntityFrameworkCore;
-using transport.domain;
+using Transport.Domain.Users;
 
-namespace transport.infraestructure.Database.EntityTypesConfigurations;
+namespace Transport.Infraestructure.Database.EntityTypesConfigurations;
 
 public class RoleConfiguration : IEntityTypeConfiguration<Role>
 {
@@ -11,5 +11,10 @@ public class RoleConfiguration : IEntityTypeConfiguration<Role>
         builder.ToTable("Role");
         builder.HasKey(r => r.RoleId);
         builder.Property(r => r.Name).HasMaxLength(250).IsRequired();
+
+        builder.HasData(
+        new Role { RoleId = (int)RoleEnum.Admin, Name = "Administrador", CreatedBy = "System", CreatedDate = DateTime.UtcNow },
+        new Role { RoleId = (int)RoleEnum.User, Name = "Cliente", CreatedBy = "System", CreatedDate = DateTime.UtcNow }
+        );
     }
 }

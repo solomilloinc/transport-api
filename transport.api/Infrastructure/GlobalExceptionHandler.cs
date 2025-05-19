@@ -1,14 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Diagnostics;
+﻿using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 
-namespace transport_api.Infrastructure;
+namespace Transport_Api.Infrastructure;
 
 internal sealed class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger)
 : IExceptionHandler

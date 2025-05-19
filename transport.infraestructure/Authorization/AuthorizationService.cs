@@ -2,13 +2,13 @@
 using System.Security.Claims;
 using System.Text;
 using Microsoft.IdentityModel.Tokens;
-using transport.common.Configuration;
+using Transport.SharedKernel.Configuration;
 
-namespace transport.infraestructure.Authorization
+namespace Transport.Infraestructure.Authorization
 {
     public interface IAuthorizationService
     {
-        bool CheckAuthorization(string bearerToken, string[]? roles = null);
+        bool CheckAuthorization(string bearerToken, out ClaimsPrincipal claims, string[]? roles = null);
         string GetSpecificClaim(string claimType);
     }
 
@@ -23,11 +23,11 @@ namespace transport.infraestructure.Authorization
 
         private ClaimsPrincipal? Claims { get; set; }
 
-        public bool CheckAuthorization(string bearerToken, string[]? roles = null)
+        public bool CheckAuthorization(string bearerToken, out ClaimsPrincipal claims, string[]? roles = null)
         {
+            claims = null;
             var token = bearerToken.Replace("Bearer ", string.Empty);
-            SymmetricSecurityKey key = new(Encoding.ASCII.GetBytes(JwtOption.Secret));
-            SigningCredentials credentals = new(key, SecurityAlgorithms.HmacSha256);
+            var key = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(JwtOption.Secret));
             var parameters = new TokenValidationParameters
             {
                 ValidateIssuerSigningKey = true,
@@ -41,14 +41,24 @@ namespace transport.infraestructure.Authorization
                 RequireExpirationTime = true,
             };
 
-            Claims = new JwtSecurityTokenHandler().ValidateToken(token, parameters, out _);
-            if (roles != null)
+            try
             {
-                var role = Claims?.FindFirst(ClaimTypes.Role)?.Value;
-                if (role == null) return false;
-                return roles.Contains(role, StringComparer.InvariantCultureIgnoreCase);
+                var principal = new JwtSecurityTokenHandler().ValidateToken(token, parameters, out _);
+                claims = principal;
+
+                if (roles != null)
+                {
+                    var role = principal.FindFirst(ClaimTypes.Role)?.Value;
+                    if (role == null) return false;
+                    return roles.Contains(role, StringComparer.InvariantCultureIgnoreCase);
+                }
+
+                return true;
             }
-            return false;
+            catch
+            {
+                return false;
+            }
         }
 
         public string GetSpecificClaim(string claimType)

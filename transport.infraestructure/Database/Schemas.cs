@@ -1,4 +1,4 @@
-﻿namespace transport.infraestructure.Database;
+﻿namespace Transport.Infraestructure.Database;
 
 internal static class Schemas
 {

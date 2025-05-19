@@ -1,6 +1,6 @@
 ﻿using System.Security.Claims;
 
-namespace transport.common.Services;
+namespace Transport.SharedKernel.Services;
 
 public interface IJwtService
 {

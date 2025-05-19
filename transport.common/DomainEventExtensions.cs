@@ -1,5 +1,5 @@
 ﻿using System.Text.Json;
-using transport.common;
+using Transport.SharedKernel;
 
 public static class DomainEventExtensions
 {

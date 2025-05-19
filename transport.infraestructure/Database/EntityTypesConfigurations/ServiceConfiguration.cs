@@ -1,27 +1,31 @@
 ﻿using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Microsoft.EntityFrameworkCore;
-using transport.domain;
+using Transport.Domain.Services;
 
-namespace transport.infraestructure.Database.EntityTypesConfigurations;
+namespace Transport.Infraestructure.Database.EntityTypesConfigurations;
 
 public class ServiceConfiguration : IEntityTypeConfiguration<Service>
 {
     public void Configure(EntityTypeBuilder<Service> builder)
     {
-        builder.ToTable("Services");
+        builder.ToTable("Service");
         builder.HasKey(s => s.ServiceId);
         builder.Property(s => s.Name).HasMaxLength(250).IsRequired();
-        builder.Property(s => s.DayStart).IsRequired();
-        builder.Property(s => s.DayEnd).IsRequired();
+        builder.Property(s => s.StartDay).IsRequired();
+        builder.Property(s => s.EndDay).IsRequired();
         builder.Property(s => s.EstimatedDuration).IsRequired();
         builder.Property(s => s.DepartureHour).IsRequired();
         builder.Property(s => s.IsHoliday).IsRequired();
-        builder.Property(s => s.Status).IsRequired();
+        builder.Property(s => s.Status).IsRequired();        
+
         builder.HasOne(s => s.Origin)
-               .WithMany()
-               .HasForeignKey(s => s.OriginId);
+            .WithMany(c => c.OriginServices)
+            .HasForeignKey(s => s.OriginId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.HasOne(s => s.Destination)
-               .WithMany()
-               .HasForeignKey(s => s.DestinationId);
+            .WithMany(c => c.DestinationServices)
+            .HasForeignKey(s => s.DestinationId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

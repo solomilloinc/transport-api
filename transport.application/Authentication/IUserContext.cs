@@ -1,6 +1,8 @@
-﻿namespace transport.application.Authentication;
+﻿namespace Transport.Business.Authentication;
 
 public interface IUserContext
 {
-    Guid UserId { get; }
+    int UserId { get; }
+    string? Email { get; }
 }
+

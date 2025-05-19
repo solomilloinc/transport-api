@@ -1,6 +1,6 @@
-﻿using transport.application.Authorization;
+﻿using Transport.Business.Authorization;
 
-namespace transport.infraestructure.Authorization;
+namespace Transport.Infraestructure.Authorization;
 internal sealed class PermissionProvider: IPermissionService
 {
     public Task<HashSet<string>> GetPermissionsForUserAsync(Guid userId)

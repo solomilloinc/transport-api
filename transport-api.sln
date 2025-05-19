@@ -5,13 +5,20 @@ VisualStudioVersion = 17.13.35919.96
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Transport.Domain", "transport.domain\Transport.Domain.csproj", "{7D8F64F6-5FF1-4D42-8600-6CB5ECB76C4E}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Transport.Common", "transport.common\Transport.Common.csproj", "{F487964A-9CCF-410C-902B-0D48DD3CDE60}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Transport.SharedKernel", "transport.common\Transport.SharedKernel.csproj", "{F487964A-9CCF-410C-902B-0D48DD3CDE60}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Transport.Infraestructure", "transport.infraestructure\Transport.Infraestructure.csproj", "{479B6464-5610-49FB-B121-0776BD54ECB3}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Transport.Business", "transport.application\Transport.Business.csproj", "{3FA8C8ED-5FF2-42B2-AF73-B81140FC9A05}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Transport.Api", "transport.api\Transport.Api.csproj", "{49DE7AEA-29E9-59E5-C69E-E495DB60B8F6}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Transport.Tests", "Transport.Tests\Transport.Tests.csproj", "{F9BBAEF1-FA67-4B27-A7A5-5CFAA8BA6DD8}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Scripts", "Scripts", "{02EA681E-C7D8-13C7-8484-4AC65E1B71E8}"
+	ProjectSection(SolutionItems) = preProject
+		idempotent.sql = idempotent.sql
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -39,6 +46,10 @@ Global
 		{49DE7AEA-29E9-59E5-C69E-E495DB60B8F6}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{49DE7AEA-29E9-59E5-C69E-E495DB60B8F6}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{49DE7AEA-29E9-59E5-C69E-E495DB60B8F6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F9BBAEF1-FA67-4B27-A7A5-5CFAA8BA6DD8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F9BBAEF1-FA67-4B27-A7A5-5CFAA8BA6DD8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F9BBAEF1-FA67-4B27-A7A5-5CFAA8BA6DD8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F9BBAEF1-FA67-4B27-A7A5-5CFAA8BA6DD8}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

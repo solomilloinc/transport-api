@@ -1,7 +1,7 @@
 ﻿using Microsoft.AspNetCore.Builder;
-using transport_api.Middleware;
+using Transport_Api.Middleware;
 
-namespace transport_api.Extensions;
+namespace Transport_Api.Extensions;
 
 public static class MiddlewareExtensions
 {
