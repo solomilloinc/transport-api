@@ -78,6 +78,6 @@ public sealed class VehicleTypeFunction : FunctionBase
     {
         var filter = await req.ReadFromJsonAsync<PagedReportRequestDto<VehicleTypeReportFilterRequestDto>>();
         var result = await _vehicleTypeBusiness.GetVehicleTypeReport(filter);
-        return await MatchResultAsync(req, result);
+        return await MatchResultAsync(req, result); 
     }
 }
