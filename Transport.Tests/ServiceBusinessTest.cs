@@ -28,8 +28,10 @@ public class ServiceBusinessTests : TestBase
         var reserveOptionMock = new Mock<IReserveOption>();
         reserveOptionMock.Setup(x => x.ReserveGenerationDays).Returns(15);
 
-        _serviceBusiness = new ServiceBusiness(_contextMock.Object, reserveOptionMock.Object);
-        _serviceBusiness = new ServiceBusiness(_contextMock.Object, reserveOptionMock.Object);
+        var dateProviderMock = new Mock<IDateTimeProvider>();
+        dateProviderMock.Setup(x => x.UtcNow).Returns(new DateTime(2025, 05, 12));
+
+        _serviceBusiness = new ServiceBusiness(_contextMock.Object, reserveOptionMock.Object, dateProviderMock.Object);
     }
 
     [Fact]
@@ -47,8 +49,7 @@ public class ServiceBusinessTests : TestBase
             IsHoliday: false,
             VehicleId: 999,
             StartDay: 1,
-            EndDay: 5,
-            Prices: new List<ReservePriceCreateRequestDto>()
+            EndDay: 5
         );
 
         var result = await _serviceBusiness.Create(requestDto);
@@ -72,8 +73,7 @@ public class ServiceBusinessTests : TestBase
             IsHoliday: false,
             VehicleId: 1,
             StartDay: 1,
-            EndDay: 5,
-            Prices: new List<ReservePriceCreateRequestDto>()
+            EndDay: 5
         );
 
         var result = await _serviceBusiness.Create(request);
@@ -100,8 +100,7 @@ public class ServiceBusinessTests : TestBase
             IsHoliday: false,
             VehicleId: 1,
             StartDay: 1,
-            EndDay: 5,
-            Prices: new List<ReservePriceCreateRequestDto>()
+            EndDay: 5
         );
 
         var result = await _serviceBusiness.Create(request);
@@ -129,8 +128,7 @@ public class ServiceBusinessTests : TestBase
             IsHoliday: false,
             VehicleId: 1,
             StartDay: 1,
-            EndDay: 5,
-            Prices: new List<ReservePriceCreateRequestDto>()
+            EndDay: 5
         );
 
         var result = await _serviceBusiness.Create(request);
@@ -163,11 +161,7 @@ public class ServiceBusinessTests : TestBase
             IsHoliday: false,
             VehicleId: 1,
             StartDay: (int)DayOfWeek.Monday,
-            EndDay: (int)DayOfWeek.Friday,
-            Prices: new List<ReservePriceCreateRequestDto>
-            {
-                new(Price: 100, ReserveTypeId: (int)ReserveTypeIdEnum.Ida)
-            }
+            EndDay: (int)DayOfWeek.Friday
         );
 
         var result = await _serviceBusiness.Create(request);
@@ -275,8 +269,7 @@ public class ServiceBusinessTests : TestBase
             IsHoliday: true,
             VehicleId: 1,
             StartDay: 1,
-            EndDay: 5,
-            Prices: new List<ReservePriceCreateRequestDto>()
+            EndDay: 5
         ));
 
         result.IsSuccess.Should().BeFalse();
@@ -305,71 +298,21 @@ public class ServiceBusinessTests : TestBase
             IsHoliday: true,
             VehicleId: 1,
             StartDay: 1,
-            EndDay: 5,
-            Prices: new List<ReservePriceCreateRequestDto>()
-            {
-             new ReservePriceCreateRequestDto(ReserveTypeId: 1, Price: 150)
-            }
+            EndDay: 5
         );
 
         var result = await _serviceBusiness.Update(1, dto);
 
         result.IsSuccess.Should().BeTrue();
         service.Name.Should().Be(dto.Name);
-        service.ReservePrices.Should().ContainSingle();
-        service.ReservePrices.First().Price.Should().Be(150);
     }
-
-    [Fact]
-    public async Task Update_ShouldSucceed_WhenServiceExists_WithMultiplePrices()
-    {
-        var service = new Service
-        {
-            ServiceId = 1,
-            ReservePrices = new List<ReservePrice>()
-        };
-
-        _contextMock.Setup(x => x.Services)
-            .Returns(GetQueryableMockDbSet(new List<Service> { service }).Object);
-
-        SetupSaveChangesWithOutboxAsync(_contextMock);
-
-        var dto = new ServiceCreateRequestDto(
-            Name: "Updated",
-            OriginId: 1,
-            DestinationId: 2,
-            EstimatedDuration: TimeSpan.FromHours(2),
-            DepartureHour: TimeSpan.FromHours(10),
-            IsHoliday: true,
-            VehicleId: 1,
-            StartDay: 1,
-            EndDay: 5,
-            Prices: new List<ReservePriceCreateRequestDto>
-            {
-            new ReservePriceCreateRequestDto(150, (int)ReserveTypeIdEnum.Ida),
-            new ReservePriceCreateRequestDto(250, (int)ReserveTypeIdEnum.IdaVuelta),
-            new ReservePriceCreateRequestDto(50, (int)ReserveTypeIdEnum.Bonificado)
-            }
-        );
-
-        var result = await _serviceBusiness.Update(1, dto);
-
-        result.IsSuccess.Should().BeTrue();
-        service.Name.Should().Be(dto.Name);
-        service.ReservePrices.Should().HaveCount(3);
-        service.ReservePrices.Should().Contain(p => p.ReserveTypeId == ReserveTypeIdEnum.Ida && p.Price == 150);
-        service.ReservePrices.Should().Contain(p => p.ReserveTypeId == ReserveTypeIdEnum.IdaVuelta && p.Price == 250);
-        service.ReservePrices.Should().Contain(p => p.ReserveTypeId == ReserveTypeIdEnum.Bonificado && p.Price == 50);
-    }
+   
 
     [Fact]
     public async Task GenerateFutureReserves_ShouldCreateExpectedReserves()
     {
         // Arrange
-        var reserveGenerationDays = 3;
-        var reserveOptionMock = new Mock<IReserveOption>();
-        reserveOptionMock.Setup(x => x.ReserveGenerationDays).Returns(reserveGenerationDays);
-
+      
         var today = DateTime.Today;
         var dayOfWeek = today.DayOfWeek;
 
@@ -414,17 +357,15 @@ public class ServiceBusinessTests : TestBase
         var holidays = new List<Holiday>();
 
         // Mock DbSets
-        ContextMock.Setup(x => x.Services).Returns(GetMockDbSetWithIdentity(services).Object);
-        ContextMock.Setup(x => x.Vehicles).Returns(GetMockDbSetWithIdentity(vehicles).Object);
-        ContextMock.Setup(x => x.Reserves).Returns(GetMockDbSetWithIdentity(reserves).Object);
-        ContextMock.Setup(x => x.Holidays).Returns(GetMockDbSetWithIdentity(holidays).Object);
+        _contextMock.Setup(x => x.Services).Returns(GetMockDbSetWithIdentity(services).Object);
+        _contextMock.Setup(x => x.Vehicles).Returns(GetMockDbSetWithIdentity(vehicles).Object);
+        _contextMock.Setup(x => x.Reserves).Returns(GetMockDbSetWithIdentity(reserves).Object);
+        _contextMock.Setup(x => x.Holidays).Returns(GetMockDbSetWithIdentity(holidays).Object);
 
-        SetupSaveChangesWithOutboxAsync(ContextMock);
-
-        var serviceBusiness = new ServiceBusiness(ContextMock.Object, reserveOptionMock.Object);
+        SetupSaveChangesWithOutboxAsync(_contextMock);
 
         // Act
-        await serviceBusiness.GenerateFutureReservesAsync();
+        await _serviceBusiness.GenerateFutureReservesAsync();
 
         // Assert
         Assert.NotEmpty(reserves);
@@ -432,7 +373,7 @@ public class ServiceBusinessTests : TestBase
         {
             Assert.Equal(vehicle.VehicleId, r.VehicleId);
             Assert.Equal(ReserveStatusEnum.Available, r.Status);
-            Assert.InRange(r.ReserveDate.Date, today, today.AddDays(reserveGenerationDays));
+            Assert.InRange(r.ReserveDate.Date, today, today.AddDays(15));
         });
     }
 
@@ -440,12 +381,12 @@ public class ServiceBusinessTests : TestBase
     public async Task GenerateFutureReserves_ShouldNotCreateReserves_WhenAllNextDaysAreOutsideServiceDays()
     {
         // Arrange
-        var reserveGenerationDays = 3;
-        var reserveOptionMock = new Mock<IReserveOption>();
-        reserveOptionMock.Setup(x => x.ReserveGenerationDays).Returns(reserveGenerationDays);
 
-        var today = DateTime.Today;
-        var todayDayOfWeek = (int)today.DayOfWeek;
+        var reserveOptionMock = new Mock<IReserveOption>();
+        reserveOptionMock.Setup(x => x.ReserveGenerationDays).Returns(2);
+
+        var dateProviderMock = new Mock<IDateTimeProvider>();
+        dateProviderMock.Setup(x => x.UtcNow).Returns(new DateTime(2025, 05, 12));
 
         // Forzamos un rango que excluya todos los próximos días
         // Por ejemplo: solo opera los domingos (0), y estamos en lunes
@@ -483,14 +424,14 @@ public class ServiceBusinessTests : TestBase
         var services = new List<Service> { service };
         var reserves = new List<Reserve>();
 
-        ContextMock.Setup(x => x.Services).Returns(GetMockDbSetWithIdentity(services).Object);
-        ContextMock.Setup(x => x.Vehicles).Returns(GetMockDbSetWithIdentity([vehicle]).Object);
-        ContextMock.Setup(x => x.Reserves).Returns(GetMockDbSetWithIdentity(reserves).Object);
-        ContextMock.Setup(x => x.Holidays).Returns(GetMockDbSetWithIdentity(new List<Holiday>()).Object);
+        _contextMock.Setup(x => x.Services).Returns(GetMockDbSetWithIdentity(services).Object);
+        _contextMock.Setup(x => x.Vehicles).Returns(GetMockDbSetWithIdentity([vehicle]).Object);
+        _contextMock.Setup(x => x.Reserves).Returns(GetMockDbSetWithIdentity(reserves).Object);
+        _contextMock.Setup(x => x.Holidays).Returns(GetMockDbSetWithIdentity(new List<Holiday>()).Object);
 
-        SetupSaveChangesWithOutboxAsync(ContextMock);
+        SetupSaveChangesWithOutboxAsync(_contextMock);
 
-        var serviceBusiness = new ServiceBusiness(ContextMock.Object, reserveOptionMock.Object);
+        var serviceBusiness = new ServiceBusiness(_contextMock.Object, reserveOptionMock.Object, dateProviderMock.Object);
 
         // Act
         await serviceBusiness.GenerateFutureReservesAsync();
@@ -546,9 +487,12 @@ public class ServiceBusinessTests : TestBase
 
         SetupSaveChangesWithOutboxAsync(ContextMock);
 
-        var serviceBusiness = new ServiceBusiness(ContextMock.Object, reserveOptionMock.Object);
-
         // Act
+        var dateProviderMock = new Mock<IDateTimeProvider>();
+        dateProviderMock.Setup(x => x.UtcNow).Returns(new DateTime(2025, 05, 12));
+
+        var serviceBusiness = new ServiceBusiness(ContextMock.Object, reserveOptionMock.Object, dateProviderMock.Object);
+
         await serviceBusiness.GenerateFutureReservesAsync();
 
         // Assert
@@ -559,13 +503,10 @@ public class ServiceBusinessTests : TestBase
     public async Task GenerateFutureReserves_ShouldCreateReservesOnHolidays_WhenIsHolidayIsTrue()
     {
         // Arrange
-        var reserveGenerationDays = 3;
         var today = DateTime.Today;
         var feriado = today.AddDays(2);
 
-        var reserveOptionMock = new Mock<IReserveOption>();
-        reserveOptionMock.Setup(x => x.ReserveGenerationDays).Returns(reserveGenerationDays);
-
+   
         var vehicle = new Vehicle { VehicleId = 1, Status = EntityStatusEnum.Active };
         var service = new Service
         {
@@ -594,17 +535,16 @@ public class ServiceBusinessTests : TestBase
         var services = new List<Service> { service };
         var reserves = new List<Reserve>();
 
-        ContextMock.Setup(x => x.Services).Returns(GetMockDbSetWithIdentity(services).Object);
-        ContextMock.Setup(x => x.Vehicles).Returns(GetMockDbSetWithIdentity([vehicle]).Object);
-        ContextMock.Setup(x => x.Reserves).Returns(GetMockDbSetWithIdentity(reserves).Object);
-        ContextMock.Setup(x => x.Holidays).Returns(GetMockDbSetWithIdentity(holidays).Object);
+        _contextMock.Setup(x => x.Services).Returns(GetMockDbSetWithIdentity(services).Object);
+        _contextMock.Setup(x => x.Vehicles).Returns(GetMockDbSetWithIdentity([vehicle]).Object);
+        _contextMock.Setup(x => x.Reserves).Returns(GetMockDbSetWithIdentity(reserves).Object);
+        _contextMock.Setup(x => x.Holidays).Returns(GetMockDbSetWithIdentity(holidays).Object);
 
-        SetupSaveChangesWithOutboxAsync(ContextMock);
-
-        var serviceBusiness = new ServiceBusiness(ContextMock.Object, reserveOptionMock.Object);
+        SetupSaveChangesWithOutboxAsync(_contextMock);
 
         // Act
-        await serviceBusiness.GenerateFutureReservesAsync();
+
+        await _serviceBusiness.GenerateFutureReservesAsync();
 
         // Assert
         Assert.Contains(reserves, r => r.ReserveDate.Date == feriado.Date);
@@ -614,9 +554,6 @@ public class ServiceBusinessTests : TestBase
     public async Task GenerateFutureReserves_ShouldNotCreateReserves_WhenServiceHasNoPrices()
     {
         // Arrange
-        var reserveGenerationDays = 3;
-        var reserveOptionMock = new Mock<IReserveOption>();
-        reserveOptionMock.Setup(x => x.ReserveGenerationDays).Returns(reserveGenerationDays);
 
         var today = DateTime.Today;
         var dayOfWeek = today.DayOfWeek;
@@ -651,17 +588,15 @@ public class ServiceBusinessTests : TestBase
         var reserves = new List<Reserve>();
         var holidays = new List<Holiday>();
 
-        ContextMock.Setup(x => x.Services).Returns(GetMockDbSetWithIdentity(services).Object);
-        ContextMock.Setup(x => x.Vehicles).Returns(GetMockDbSetWithIdentity(vehicles).Object);
-        ContextMock.Setup(x => x.Reserves).Returns(GetMockDbSetWithIdentity(reserves).Object);
-        ContextMock.Setup(x => x.Holidays).Returns(GetMockDbSetWithIdentity(holidays).Object);
+        _contextMock.Setup(x => x.Services).Returns(GetMockDbSetWithIdentity(services).Object);
+        _contextMock.Setup(x => x.Vehicles).Returns(GetMockDbSetWithIdentity(vehicles).Object);
+        _contextMock.Setup(x => x.Reserves).Returns(GetMockDbSetWithIdentity(reserves).Object);
+        _contextMock.Setup(x => x.Holidays).Returns(GetMockDbSetWithIdentity(holidays).Object);
 
         SetupSaveChangesWithOutboxAsync(ContextMock);
 
-        var serviceBusiness = new ServiceBusiness(ContextMock.Object, reserveOptionMock.Object);
-
         // Act
-        await serviceBusiness.GenerateFutureReservesAsync();
+        await _serviceBusiness.GenerateFutureReservesAsync();
 
         // Assert
         Assert.Empty(reserves);
@@ -686,11 +621,7 @@ public class ServiceBusinessTests : TestBase
             IsHoliday: false,
             VehicleId: 1,
             StartDay: 5,
-            EndDay: 2, 
-            Prices: new List<ReservePriceCreateRequestDto>
-            {
-            new(Price: 120, ReserveTypeId: (int)ReserveTypeIdEnum.Ida)
-            }
+            EndDay: 2
         );
 
         var result = await _serviceBusiness.Create(request);
@@ -706,10 +637,10 @@ public class ServiceBusinessTests : TestBase
         var reserveOptionMock = new Mock<IReserveOption>();
 
         var requestDto = new PriceMassiveUpdateRequestDto(
-            new List<PriceUpdateDto>
+            new List<PricePercentageUpdateDto>
             {
-            new PriceUpdateDto((int)ReserveTypeIdEnum.Ida, 10),
-            new PriceUpdateDto((int)ReserveTypeIdEnum.IdaVuelta, 20)
+            new PricePercentageUpdateDto((int)ReserveTypeIdEnum.Ida, 10),
+            new PricePercentageUpdateDto((int)ReserveTypeIdEnum.IdaVuelta, 20)
             });
 
         var service = new Service
@@ -732,21 +663,19 @@ public class ServiceBusinessTests : TestBase
             ReservePrices = new List<ReservePrice>
         {
             new ReservePrice { ReserveTypeId = ReserveTypeIdEnum.Ida, Status = EntityStatusEnum.Active, Price = 100m },
-            new ReservePrice { ReserveTypeId = ReserveTypeIdEnum.IdaVuelta, Status = EntityStatusEnum.Active, Price = 200m },
-            new ReservePrice { ReserveTypeId = ReserveTypeIdEnum.Bonificado, Status = EntityStatusEnum.Active, Price = 90m }
+            new ReservePrice { ReserveTypeId = ReserveTypeIdEnum.IdaVuelta, Status = EntityStatusEnum.Active, Price = 200m }
         }
         };
 
         var services = new List<Service> { service };
 
-        ContextMock.Setup(x => x.Services).Returns(GetMockDbSetWithIdentity(services).Object);
+        _contextMock.Setup(x => x.Services).Returns(GetMockDbSetWithIdentity(services).Object);
 
         SetupSaveChangesWithOutboxAsync(ContextMock);
 
         // Act
-        var serviceBusiness = new ServiceBusiness(ContextMock.Object, reserveOptionMock.Object);
 
-        var result = await serviceBusiness.UpdatePricesByPercentageAsync(requestDto);
+        var result = await _serviceBusiness.UpdatePricesByPercentageAsync(requestDto);
 
         var requestServiceReportDto = new PagedReportRequestDto<ServiceReportFilterRequestDto>
         {
@@ -757,7 +686,7 @@ public class ServiceBusinessTests : TestBase
             SortDescending = false
         };
 
-        var serviceReportResult = await serviceBusiness.GetServiceReport(requestServiceReportDto);
+        var serviceReportResult = await _serviceBusiness.GetServiceReport(requestServiceReportDto);
 
         // Assert
         Assert.True(serviceReportResult.IsSuccess);
@@ -778,5 +707,112 @@ public class ServiceBusinessTests : TestBase
         Assert.Equal(110m, service.ReservePrices.First(p => p.ReserveTypeId == ReserveTypeIdEnum.Ida).Price);  // 100 + 10%
         Assert.Equal(240m, service.ReservePrices.First(p => p.ReserveTypeId == ReserveTypeIdEnum.IdaVuelta).Price);  // 200 + 20%
     }
+
+    [Fact]
+    public async Task AddPrice_ShouldFail_WhenServiceNotFound()
+    {
+        // Arrange
+        var services = new List<Service>(); // No hay servicios
+        _contextMock.Setup(x => x.Services).Returns(GetQueryableMockDbSet(services).Object);
+
+        var request = new ServicePriceAddDto((int)ReserveTypeIdEnum.Ida, 1000m);
+
+        var result = await _serviceBusiness.AddPrice(1, request);
+
+        // Assert
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Be(ServiceError.ServiceNotFound);
+    }
+
+    [Fact]
+    public async Task AddPrice_ShouldFail_WhenReservePriceAlreadyExists()
+    {
+        // Arrange
+        var existingPrice = new ReservePrice
+        {
+            ReserveTypeId = ReserveTypeIdEnum.Ida
+        };
+
+        var service = new Service
+        {
+            ServiceId = 1,
+            ReservePrices = new List<ReservePrice> { existingPrice }
+        };
+
+        _contextMock.Setup(x => x.Services)
+            .Returns(GetQueryableMockDbSet(new List<Service> { service }).Object);
+
+        var request = new ServicePriceAddDto((int)ReserveTypeIdEnum.Ida, 1500m);
+
+        var result = await _serviceBusiness.AddPrice(1, request);
+
+        // Assert
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Be(ReservePriceError.ReservePriceAlreadyExists);
+    }
+
+    [Fact]
+    public async Task AddPrice_ShouldSucceed_WhenValidData()
+    {
+        // Arrange
+        var serviceId = 1;
+        var reservePrices = new List<ReservePrice>();
+
+        var service = new Service
+        {
+            ServiceId = serviceId,
+            ReservePrices = reservePrices
+        };
+
+        _contextMock.Setup(x => x.Services)
+            .Returns(GetQueryableMockDbSet(new List<Service> { service }).Object);
+
+        _contextMock.Setup(x => x.ReservePrices.Add(It.IsAny<ReservePrice>()));
+
+        SetupSaveChangesWithOutboxAsync(_contextMock);
+
+        var dto = new ServicePriceAddDto((int)ReserveTypeIdEnum.Ida, 5000);
+
+        // Act
+        var result = await _serviceBusiness.AddPrice(serviceId, dto);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task UpdatePrice_ShouldSucceed_WhenValidData()
+    {
+        // Arrange
+        var reservePrice = new ReservePrice
+        {
+            ReservePriceId = 10,
+            Price = 3000,
+            Status = EntityStatusEnum.Active
+        };
+
+        _contextMock.Setup(x => x.ReservePrices.FindAsync(reservePrice.ReservePriceId))
+            .ReturnsAsync(reservePrice);
+
+        var service = new Service
+        {
+            ServiceId = 1
+        };
+
+        _contextMock.Setup(x => x.Services)
+            .Returns(GetQueryableMockDbSet(new List<Service> { service }).Object);
+
+        SetupSaveChangesWithOutboxAsync(_contextMock);
+
+        var dto = new ServicePriceUpdateDto(10, 4500m);
+
+        // Act
+        var result = await _serviceBusiness.UpdatePrice(service.ServiceId, dto);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        reservePrice.Price.Should().Be(4500);
+    }
+
 
 }

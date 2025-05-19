@@ -36,15 +36,5 @@ public class ServiceCreateRequestValidator : AbstractValidator<ServiceCreateRequ
         RuleFor(x => x.VehicleId)
             .GreaterThan(0)
             .WithMessage("Vehicle ID must be greater than 0.");
-
-        RuleFor(x => x.Prices)
-               .NotEmpty()
-               .WithMessage("At least one price must be provided.")
-               .Must(prices => prices.Select(p => p.ReserveTypeId).Distinct().Count() == prices.Count)
-               .WithMessage("Duplicate ReserveTypeId values are not allowed.")
-               .ForEach(price =>
-               {
-                   price.SetValidator(new ReservePriceCreateRequestValidator());
-               });
     }
 }

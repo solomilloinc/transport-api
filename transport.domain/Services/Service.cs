@@ -5,7 +5,7 @@ using Transport.SharedKernel;
 
 namespace Transport.Domain.Services;
 
-public class Service
+public class Service: Entity, IAuditable
 {
     public int ServiceId { get; set; }
     public string Name { get; set; } = null!;
@@ -18,6 +18,10 @@ public class Service
     public bool IsHoliday { get; set; }
     public int VehicleId { get; set; }
     public EntityStatusEnum Status { get; set; } = EntityStatusEnum.Active;
+    public string CreatedBy { get; set; } = null!;
+    public string? UpdatedBy { get; set; }
+    public DateTime CreatedDate { get; set; } = DateTime.UtcNow;
+    public DateTime? UpdatedDate { get; set; }
 
     public City Origin { get; set; } = null!;
     public City Destination { get; set; } = null!;

@@ -13,6 +13,8 @@ public class ReservePriceConfiguration : IEntityTypeConfiguration<ReservePrice>
         builder.Property(rp => rp.Price).HasColumnType("decimal(10,2)").IsRequired();
         builder.Property(rp => rp.ReserveTypeId).HasMaxLength(50).IsRequired();
 
+        builder.HasIndex(rp => rp.ServiceId).IsUnique();
+
         builder.HasOne(rp => rp.Service)
        .WithMany(s => s.ReservePrices)
        .HasForeignKey(rp => rp.ServiceId);

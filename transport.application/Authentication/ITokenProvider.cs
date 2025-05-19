@@ -10,5 +10,4 @@ public interface ITokenProvider
     Task SaveRefreshTokenAsync(string refreshToken, int userId, string ipAddress);
     Task RevokeRefreshTokenAsync(string token, string ipAddress, string? replacedByToken = null);
     string GenerateRefreshToken();
-
 }

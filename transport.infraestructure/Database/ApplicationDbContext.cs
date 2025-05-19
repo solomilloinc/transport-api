@@ -10,6 +10,7 @@ using Transport.Domain.Vehicles;
 using Transport.Domain.Cities;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Transport.Domain.Services;
+using Transport.Business.Authentication;
 
 namespace Transport.Infraestructure.Database;
 
@@ -33,16 +34,54 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<Holiday> Holidays { get; set; }
     public DbSet<ReservePrice> ReservePrices { get; set; }
 
-    public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options) { }
+    private readonly IUserContext _userContext;
+
+    public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options, IUserContext userContext)
+        : base(options)
+    {
+        _userContext = userContext;
+    }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(ApplicationDbContext).Assembly);
+
+        foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+        {
+            if (typeof(IAuditable).IsAssignableFrom(entityType.ClrType))
+            {
+                var entity = modelBuilder.Entity(entityType.ClrType);
+
+                entity.Property("CreatedBy").IsRequired().HasColumnType("VARCHAR(256)").HasDefaultValue("System");
+                entity.Property("CreatedDate").IsRequired().HasDefaultValueSql("GETDATE()");
+                entity.Property("UpdatedBy").HasColumnType("VARCHAR(256)");
+                entity.Property("UpdatedDate");
+            }
+        }
+
         base.OnModelCreating(modelBuilder);
     }
 
     public async Task<int> SaveChangesWithOutboxAsync(CancellationToken cancellationToken = default)
     {
+        var now = DateTime.UtcNow;
+        var username = _userContext?.Email?.ToString() ?? "System";
+
+        foreach (var entry in ChangeTracker.Entries<IAuditable>())
+        {
+            if (entry.State == EntityState.Added)
+            {
+                entry.Entity.CreatedDate = now;
+                entry.Entity.CreatedBy = username;
+            }
+
+            if (entry.State == EntityState.Modified)
+            {
+                entry.Entity.UpdatedDate = now;
+                entry.Entity.UpdatedBy = username;
+            }
+        }
+
         var domainEvents = ChangeTracker.Entries<Entity>()
             .SelectMany(e => e.Entity.DomainEvents)
             .ToList();
@@ -61,4 +100,5 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
 
         return result;
     }
+
 }

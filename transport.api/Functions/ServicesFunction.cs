@@ -24,9 +24,7 @@ public sealed class ServicesFunction : FunctionBase
     }
 
     [Function("CreateService")]
-
-    //[Authorize("Admin")]
-    [AllowAnonymous]
+    [Authorize("Admin")]
     [OpenApiOperation(operationId: "service-create", tags: new[] { "Service" }, Summary = "Create Service", Description = "Creates a new service", Visibility = OpenApiVisibilityType.Important)]
     [OpenApiRequestBody("application/json", typeof(ServiceCreateRequestDto), Required = true)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(int), Summary = "Service Created")]
@@ -54,8 +52,7 @@ public sealed class ServicesFunction : FunctionBase
     }
 
     [Function("UpdateService")]
-    //[Authorize("Admin")]
-    [AllowAnonymous]
+    [Authorize("Admin")]
     [OpenApiOperation(operationId: "service-update", tags: new[] { "Service" }, Summary = "Update Service", Description = "Updates an existing service", Visibility = OpenApiVisibilityType.Important)]
     [OpenApiParameter("serviceId", In = ParameterLocation.Path, Required = true, Type = typeof(int), Description = "Service ID")]
     [OpenApiRequestBody("application/json", typeof(ServiceUpdateRequestDto), Required = true)]
@@ -72,8 +69,7 @@ public sealed class ServicesFunction : FunctionBase
     }
 
     [Function("GetServiceReport")]
-    //[Authorize("Admin")]
-    [AllowAnonymous]
+    [Authorize("Admin")]
     [OpenApiOperation(operationId: "service-report", tags: new[] { "Service" }, Summary = "Get Service Report", Description = "Returns paginated list of services", Visibility = OpenApiVisibilityType.Important)]
     [OpenApiRequestBody("application/json", typeof(PagedReportRequestDto<ServiceReportFilterRequestDto>), Required = true)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(PagedReportResponseDto<ServiceReportResponseDto>), Summary = "Service Report")]
@@ -86,8 +82,7 @@ public sealed class ServicesFunction : FunctionBase
     }
 
     [Function("UpdatePricesByPercentage")]
-    //[Authorize("Admin")]
-    [AllowAnonymous]
+    [Authorize("Admin")]
     [OpenApiOperation(operationId: "service-update-prices", tags: new[] { "Service" }, Summary = "Update Prices by Percentage", Description = "Performs a massive update of service prices based on a percentage", Visibility = OpenApiVisibilityType.Important)]
     [OpenApiRequestBody("application/json", typeof(PriceMassiveUpdateRequestDto), Required = true)]
     [OpenApiResponseWithoutBody(HttpStatusCode.OK, Summary = "Prices Updated")]
@@ -97,6 +92,40 @@ public sealed class ServicesFunction : FunctionBase
         var dto = await req.ReadFromJsonAsync<PriceMassiveUpdateRequestDto>();
         var result = await ValidateAndMatchAsync(req, dto, GetValidator<PriceMassiveUpdateRequestDto>())
                           .BindAsync(_serviceBusiness.UpdatePricesByPercentageAsync);
+
+        return await MatchResultAsync(req, result);
+    }
+
+    [Function("AddPrice")]
+    [Authorize("Admin")]
+    [OpenApiOperation(operationId: "add-price", tags: new[] { "Service" }, Summary = "Add Price", Description = "Adds a price to a service", Visibility = OpenApiVisibilityType.Important)]
+    [OpenApiParameter("serviceId", In = ParameterLocation.Path, Required = true, Type = typeof(int), Description = "Service ID")]
+    [OpenApiRequestBody("application/json", typeof(ServicePriceAddDto), Required = true)]
+    [OpenApiResponseWithoutBody(HttpStatusCode.OK, Summary = "Price Added")]
+    public async Task<HttpResponseData> AddPrice(
+    [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "service/{serviceId:int}/price-add")] HttpRequestData req,
+    int serviceId)
+    {
+        var dto = await req.ReadFromJsonAsync<ServicePriceAddDto>();
+        var result = await ValidateAndMatchAsync(req, dto, GetValidator<ServicePriceAddDto>())
+                        .BindAsync(x => _serviceBusiness.AddPrice(serviceId, x));
+
+        return await MatchResultAsync(req, result);
+    }
+
+    [Function("UpdatePrice")]
+    [Authorize("Admin")]
+    [OpenApiOperation(operationId: "update-price", tags: new[] { "Service" }, Summary = "Update Price", Description = "Updates an existing service price", Visibility = OpenApiVisibilityType.Important)]
+    [OpenApiParameter("serviceId", In = ParameterLocation.Path, Required = true, Type = typeof(int), Description = "Service ID")]
+    [OpenApiRequestBody("application/json", typeof(ServicePriceUpdateDto), Required = true)]
+    [OpenApiResponseWithoutBody(HttpStatusCode.OK, Summary = "Price Updated")]
+    public async Task<HttpResponseData> UpdatePrice(
+    [HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "service/{serviceId:int}/price-update")] HttpRequestData req,
+    int serviceId)
+    {
+        var dto = await req.ReadFromJsonAsync<ServicePriceUpdateDto>();
+        var result = await ValidateAndMatchAsync(req, dto, GetValidator<ServicePriceUpdateDto>())
+                        .BindAsync(x => _serviceBusiness.UpdatePrice(serviceId, x));
 
         return await MatchResultAsync(req, result);
     }
