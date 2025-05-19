@@ -306,7 +306,14 @@ ASALocalRun/
 [Tt]est[Rr]esult*/
 [Bb]uild[Ll]og.*
 
+<<<<<<< ayuse/6
+# Fody - auto-generated XML schema
+FodyWeavers.xsd
+=======
 # NUnit
 *.VisualState.xml
 TestResult.xml
 nunit-*.xml
+
+/transport.api/appsettings.dev.json
+>>>>>>> main
