@@ -9,7 +9,3 @@ public record ServiceCreateRequestDto(string Name,
     int VehicleId,
     int StartDay,
     int EndDay);
-
-public record ReservePriceCreateRequestDto(
-    decimal Price,
-    int ReserveTypeId);
