@@ -24,7 +24,7 @@ public class CustomerBusiness : ICustomerBusiness
 
         if (customer != null)
         {
-            return Result.Failure<int>(CustomerError.CustomerAlreadyExist);
+            return Result.Failure<int>(CustomerError.AlreadyExists);
         }
 
         customer = new Customer
@@ -49,7 +49,7 @@ public class CustomerBusiness : ICustomerBusiness
 
         if (customer is null)
         {
-            return Result.Failure<bool>(CustomerError.CustomerNotFound);
+            return Result.Failure<bool>(CustomerError.NotFound);
         }
 
         customer.Status = EntityStatusEnum.Deleted;
@@ -97,7 +97,7 @@ public class CustomerBusiness : ICustomerBusiness
 
         if (customer is null)
         {
-            return Result.Failure<bool>(CustomerError.CustomerNotFound);
+            return Result.Failure<bool>(CustomerError.NotFound);
         }
 
         customer.FirstName = dto.FirstName;
@@ -118,7 +118,7 @@ public class CustomerBusiness : ICustomerBusiness
 
         if (customer is null)
         {
-            return Result.Failure<bool>(CustomerError.CustomerNotFound);
+            return Result.Failure<bool>(CustomerError.NotFound);
         }
 
         customer.Status = status;

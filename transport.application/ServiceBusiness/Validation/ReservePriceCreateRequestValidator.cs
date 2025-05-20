@@ -4,7 +4,7 @@ using Transport.SharedKernel.Contracts.Service;
 
 namespace Transport.Business.ServiceBusiness.Validation;
 
-public class ReservePriceCreateRequestValidator : AbstractValidator<ReservePriceCreateRequestDto>
+public class ReservePriceCreateRequestValidator : AbstractValidator<ReservePriceRequestDto>
 {
     public ReservePriceCreateRequestValidator()
     {
