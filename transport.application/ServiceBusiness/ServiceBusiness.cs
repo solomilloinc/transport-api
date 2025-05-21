@@ -128,6 +128,21 @@ public class ServiceBusiness : IServiceBusiness
                 s.Destination.Name,
                 s.EstimatedDuration,
                 s.DepartureHour,
+                s.StartDay == DayOfWeek.Monday ? "Lunes" :
+                s.StartDay == DayOfWeek.Tuesday ? "Martes" :
+                s.StartDay == DayOfWeek.Wednesday ? "Miércoles" :
+                s.StartDay == DayOfWeek.Thursday ? "Jueves" :
+                s.StartDay == DayOfWeek.Friday ? "Viernes" :
+                s.StartDay == DayOfWeek.Saturday ? "Sábado" :
+                s.StartDay == DayOfWeek.Sunday ? "Domingo" : "",
+
+                s.EndDay == DayOfWeek.Monday ? "Lunes" :
+                s.EndDay == DayOfWeek.Tuesday ? "Martes" :
+                s.EndDay == DayOfWeek.Wednesday ? "Miércoles" :
+                s.EndDay == DayOfWeek.Thursday ? "Jueves" :
+                s.EndDay == DayOfWeek.Friday ? "Viernes" :
+                s.EndDay == DayOfWeek.Saturday ? "Sábado" :
+                s.EndDay == DayOfWeek.Sunday ? "Domingo" : "",
                 s.IsHoliday,
                 new ServiceVehicleResponseDto(s.VehicleId,
                     s.Vehicle.InternalNumber,

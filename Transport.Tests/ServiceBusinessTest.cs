@@ -19,6 +19,7 @@ namespace Transport.Tests.ServiceBusinessTests;
 public class ServiceBusinessTests : TestBase
 {
     private readonly Mock<IApplicationDbContext> _contextMock;
+    private readonly Mock<IDateTimeProvider> _dateTimeProviderMock;
     private readonly ServiceBusiness _serviceBusiness;
 
     public ServiceBusinessTests()
@@ -28,10 +29,10 @@ public class ServiceBusinessTests : TestBase
         var reserveOptionMock = new Mock<IReserveOption>();
         reserveOptionMock.Setup(x => x.ReserveGenerationDays).Returns(15);
 
-        var dateProviderMock = new Mock<IDateTimeProvider>();
-        dateProviderMock.Setup(x => x.UtcNow).Returns(new DateTime(2025, 05, 12));
+        _dateTimeProviderMock = new Mock<IDateTimeProvider>();
+        _dateTimeProviderMock.Setup(x => x.UtcNow).Returns(new DateTime(2025, 05, 12));
 
-        _serviceBusiness = new ServiceBusiness(_contextMock.Object, reserveOptionMock.Object, dateProviderMock.Object);
+        _serviceBusiness = new ServiceBusiness(_contextMock.Object, reserveOptionMock.Object, _dateTimeProviderMock.Object);
     }
 
     [Fact]
@@ -313,7 +314,7 @@ public class ServiceBusinessTests : TestBase
     {
         // Arrange
       
-        var today = DateTime.Today;
+        var today = _dateTimeProviderMock.Object.UtcNow.Date;
         var dayOfWeek = today.DayOfWeek;
 
         var vehicle = new Vehicle
