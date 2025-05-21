@@ -1,6 +1,7 @@
 ﻿using System.Linq.Expressions;
 using System.Linq;
 using Microsoft.EntityFrameworkCore;
+
 namespace Transport.SharedKernel;
 
 public static class QueryableExtensions

@@ -314,7 +314,7 @@ public class ServiceBusinessTests : TestBase
     {
         // Arrange
       
-        var today = _dateTimeProviderMock.Object.UtcNow.Date;
+        var today = _dateTimeProviderMock.Object.UtcNow;
         var dayOfWeek = today.DayOfWeek;
 
         var vehicle = new Vehicle
