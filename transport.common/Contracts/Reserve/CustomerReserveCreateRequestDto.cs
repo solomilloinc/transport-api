@@ -2,8 +2,7 @@
 
 namespace Transport.SharedKernel.Contracts.Reserve;
 
-public record CustomerReserveCreateRequestDto(int? UserId, 
-    int? CustomerId, 
+public record CustomerReserveCreateRequestDto(int? CustomerId, 
     bool IsPayment, 
     int? PickupLocationId,
     int? DropoffLocationId,
