@@ -6,8 +6,8 @@ using Transport.Domain.Reserves;
 using Transport.Domain.Users;
 using Transport.Domain.Vehicles;
 using Transport.Domain.Cities;
-using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Transport.Domain.Services;
+using Transport.Domain.Payments;
 
 namespace Transport.Business.Data;
 
@@ -25,5 +25,6 @@ public interface IApplicationDbContext
     DbSet<RefreshToken> RefreshTokens { get; }
     DbSet<Holiday> Holidays { get; }
     DbSet<ReservePrice> ReservePrices { get; }
+    DbSet<Payment> Payments { get; }
     Task<int> SaveChangesWithOutboxAsync(CancellationToken cancellationToken = default);
 }

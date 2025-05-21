@@ -11,6 +11,7 @@ using Transport.Domain.Cities;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Transport.Domain.Services;
 using Transport.Business.Authentication;
+using Transport.Domain.Payments;
 
 namespace Transport.Infraestructure.Database;
 
@@ -33,6 +34,8 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<RefreshToken> RefreshTokens { get; set; }
     public DbSet<Holiday> Holidays { get; set; }
     public DbSet<ReservePrice> ReservePrices { get; set; }
+    public DbSet<Payment> Payments { get; set; }
+
 
     private readonly IUserContext _userContext;
 
