@@ -128,6 +128,8 @@ public class ServiceBusiness : IServiceBusiness
                 s.Destination.Name,
                 s.EstimatedDuration,
                 s.DepartureHour,
+                s.StartDay,
+                s.EndDay,
                 s.IsHoliday,
                 new ServiceVehicleResponseDto(s.VehicleId,
                     s.Vehicle.InternalNumber,
