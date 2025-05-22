@@ -25,5 +25,5 @@ public enum PaymentStatusDetail
     CcRejectedBlacklist,
     CcRejectedHighRisk,
     CcRejectedCallForAuthorize,
-    Other // Para detalles que no estén cubiertos aún
+    Other
 }

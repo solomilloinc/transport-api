@@ -2,5 +2,5 @@
 
 public class MpIntegrationOption : IMpIntegrationOption
 {
-    public string AccessToken { get; set; } = null!;
+    public string AccessToken { get; set; }
 }

@@ -2,5 +2,5 @@
 
 public interface IMpIntegrationOption
 {
-    string AccessToken { get; set; }
+    public string AccessToken { get; set; }
 }

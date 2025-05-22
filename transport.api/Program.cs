@@ -71,7 +71,15 @@ var host = new HostBuilder()
         services.AddOptions<JwtOption>().Configure<IConfiguration>((s, c) =>
                c.GetSection(nameof(JwtOption)).Bind(s));
         services.AddSingleton<IJwtOption>(x => x.GetRequiredService<IOptions<JwtOption>>().Value);
+
+        services.AddOptions<ReserveOption>().Configure<IConfiguration>((s, c) =>
+              c.GetSection(nameof(ReserveOption)).Bind(s));
         services.AddSingleton<IReserveOption>(x => x.GetRequiredService<IOptions<ReserveOption>>().Value);
+
+        services.AddOptions<MpIntegrationOption>().Configure<IConfiguration>((s, c) =>
+               c.GetSection(nameof(MpIntegrationOption)).Bind(s));
+        services.AddSingleton<IMpIntegrationOption>(x => x.GetRequiredService<IOptions<MpIntegrationOption>>().Value);
+
     })
     .Build();
 

@@ -26,8 +26,8 @@ public class PaymentCreateRequestValidator : AbstractValidator<PaymentCreateRequ
         RuleFor(x => x.Payer)
             .NotNull().WithMessage("Payer information is required.");
 
-        RuleFor(x => x.Payer.Email)
-            .NotEmpty().WithMessage("The payer email is required.")
-            .EmailAddress().WithMessage("The payer email is not valid.");
+        //RuleFor(x => x.Payer.Email)
+        //    .NotEmpty().WithMessage("The payer email is required.")
+        //    .EmailAddress().WithMessage("The payer email is not valid.");
     }
 }

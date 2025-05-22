@@ -19,7 +19,7 @@ public static class PaymentStatusMapper
         };
     }
 
-    public static PaymentStatusDetail? ToPaymentStatusDetail(this string statusDetail)
+    public static PaymentStatusDetail ToPaymentStatusDetail(this string statusDetail)
     {
         return statusDetail?.ToLower() switch
         {

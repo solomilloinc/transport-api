@@ -30,7 +30,7 @@ public sealed class PaymentFunction : FunctionBase
     [OpenApiRequestBody("application/json", typeof(PaymentCreateRequestDto), Required = true)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(bool), Summary = "Payment Created")]
     public async Task<HttpResponseData> CreatePayment(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "payment-webhook")] HttpRequestData req)
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "payment-create")] HttpRequestData req)
     {
         var dto = await req.ReadFromJsonAsync<PaymentCreateRequestDto>();
         var result = await ValidateAndMatchAsync(req, dto, GetValidator<PaymentCreateRequestDto>())
