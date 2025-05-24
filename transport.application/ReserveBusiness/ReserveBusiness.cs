@@ -14,14 +14,15 @@ public class ReserveBusiness : IReserveBusiness
     private readonly IApplicationDbContext _context;
     private readonly IUnitOfWork _unitOfWork;
 
+    public ReserveBusiness(IApplicationDbContext context, IUnitOfWork unitOfWork)
     {
         _context = context;
         _unitOfWork = unitOfWork;
     }
 
     public async Task<Result<bool>> CreatePassengerReserves(int reserveId,
-    int reserveTypeId,
-    List<CustomerReserveCreateRequestDto> passengers)
+      int reserveTypeId,
+      List<CustomerReserveCreateRequestDto> passengers)
     {
         var reserve = await _context.Reserves
             .Include(r => r.Service)
@@ -50,20 +51,33 @@ public class ReserveBusiness : IReserveBusiness
                 var customer = customerResult.Value;
 
                 if (!reserve.CustomerReserves.Any(cr => cr.CustomerId == customer.CustomerId))
-    public async Task<Result<PagedReportResponseDto<ReserveReportResponseDto>>>
-     GetReserveReport(PagedReportRequestDto<ReserveReportFilterRequestDto> requestDto)
-    {
-        var query = _context.ReservePrices
-            .AsNoTracking()
-            .Include(rp => rp.Service)
-            .Where(rp => rp.Status == EntityStatusEnum.Active)
-            .AsQueryable();
+                {
+                    reserve.CustomerReserves.Add(new CustomerReserve
+                    {
+                        Customer = customer,
+                        ReserveId = reserve.ReserveId,
+                        DropoffLocationId = passenger.DropoffLocationId,
+                        PickupLocationId = passenger.PickupLocationId,
+                        HasTraveled = passenger.HasTraveled,
+                        Price = reservePrice.Price,
+                        IsPayment = passenger.IsPayment,
+                        StatusPayment = (StatusPaymentEnum)passenger.StatusPaymentId
+                    });
+                }
+            }
 
-        if (requestDto.Filters?.ReserveTypeId is not null)
-            query = query.Where(rp => (int)rp.ReserveTypeId == requestDto.Filters.ReserveTypeId);
+            foreach (var cr in reserve.CustomerReserves)
+                reserve.Raise(new CustomerReserveCreatedEvent(cr.CustomerReserveId));
 
-        if (requestDto.Filters?.ServiceId is not null)
-            query = query.Where(rp => rp.ServiceId == requestDto.Filters.ServiceId);
+            _context.Reserves.Update(reserve);
+            await _context.SaveChangesWithOutboxAsync();
+
+            return Result.Success(true);
+        });
+
+        return result;
+    }
+
 
     private async Task<Result<Customer>> GetOrCreateCustomerAsync(CustomerReserveCreateRequestDto passenger)
     {
@@ -71,31 +85,21 @@ public class ReserveBusiness : IReserveBusiness
         {
             var existing = await _context.Customers
                 .SingleOrDefaultAsync(c => c.DocumentNumber == passenger.CustomerCreate.DocumentNumber);
-        if (requestDto.Filters?.PriceFrom is not null)
-            query = query.Where(rp => rp.Price >= requestDto.Filters.PriceFrom);
 
             if (existing != null)
             {
                 return Result.Failure<Customer>(ReserveError.CustomerAlreadyExists(existing.DocumentNumber));
             }
-        if (requestDto.Filters?.PriceTo is not null)
-            query = query.Where(rp => rp.Price <= requestDto.Filters.PriceTo);
 
             var newCustomer = new Customer
-        var sortMappings = new Dictionary<string, Expression<Func<ReservePrice, object>>>
-        {
+            {
                 FirstName = passenger.CustomerCreate.FirstName,
                 LastName = passenger.CustomerCreate.LastName,
                 DocumentNumber = passenger.CustomerCreate.DocumentNumber,
                 Email = passenger.CustomerCreate.Email,
                 Phone1 = passenger.CustomerCreate.Phone1,
                 Phone2 = passenger.CustomerCreate.Phone2
-            ["reservepriceid"] = rp => rp.ReservePriceId,
-            ["serviceid"] = rp => rp.ServiceId,
-            ["servicename"] = rp => rp.Service.Name,
-            ["price"] = rp => rp.Price,
-            ["reservetypeid"] = rp => rp.ReserveTypeId
-        };
+            };
 
             _context.Customers.Add(newCustomer);
             await _context.SaveChangesWithOutboxAsync();
@@ -114,6 +118,42 @@ public class ReserveBusiness : IReserveBusiness
             {
                 return Result.Failure<Customer>(ReserveError.CustomerAlreadyExists(customer.DocumentNumber));
             }
+
+            return Result.Success(customer);
+        }
+    }
+
+
+    public async Task<Result<PagedReportResponseDto<ReserveReportResponseDto>>>
+    GetReserveReport(PagedReportRequestDto<ReserveReportFilterRequestDto> requestDto)
+    {
+        var query = _context.ReservePrices
+            .AsNoTracking()
+            .Include(rp => rp.Service)
+            .Where(rp => rp.Status == EntityStatusEnum.Active)
+            .AsQueryable();
+
+        if (requestDto.Filters?.ReserveTypeId is not null)
+            query = query.Where(rp => (int)rp.ReserveTypeId == requestDto.Filters.ReserveTypeId);
+
+        if (requestDto.Filters?.ServiceId is not null)
+            query = query.Where(rp => rp.ServiceId == requestDto.Filters.ServiceId);
+
+        if (requestDto.Filters?.PriceFrom is not null)
+            query = query.Where(rp => rp.Price >= requestDto.Filters.PriceFrom);
+
+        if (requestDto.Filters?.PriceTo is not null)
+            query = query.Where(rp => rp.Price <= requestDto.Filters.PriceTo);
+
+        var sortMappings = new Dictionary<string, Expression<Func<ReservePrice, object>>>
+        {
+            ["reservepriceid"] = rp => rp.ReservePriceId,
+            ["serviceid"] = rp => rp.ServiceId,
+            ["servicename"] = rp => rp.Service.Name,
+            ["price"] = rp => rp.Price,
+            ["reservetypeid"] = rp => rp.ReserveTypeId
+        };
+
         var pagedResult = await query.ToPagedReportAsync<ReserveReportResponseDto, ReservePrice, ReserveReportFilterRequestDto>(
             requestDto,
             selector: rp => new ReserveReportResponseDto(
@@ -126,8 +166,7 @@ public class ReserveBusiness : IReserveBusiness
             sortMappings: sortMappings
         );
 
-            return Result.Success(customer);
-        }
+        return Result.Success(pagedResult);
     }
 
 }
