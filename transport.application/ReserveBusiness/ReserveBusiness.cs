@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using System.Linq.Expressions;
 using Transport.Business.Data;
+using Transport.Domain.Customers;
 using Transport.Domain.Reserves;
 using Transport.Domain.Reserves.Abstraction;
 using Transport.SharedKernel;
@@ -11,14 +12,120 @@ namespace Transport.Business.ReserveBusiness;
 public class ReserveBusiness : IReserveBusiness
 {
     private readonly IApplicationDbContext _context;
+    private readonly IUnitOfWork _unitOfWork;
 
-    public ReserveBusiness(IApplicationDbContext context)
+    public ReserveBusiness(IApplicationDbContext context, IUnitOfWork unitOfWork)
     {
         _context = context;
+        _unitOfWork = unitOfWork;
     }
 
+    public async Task<Result<bool>> CreatePassengerReserves(int reserveId,
+      int reserveTypeId,
+      List<CustomerReserveCreateRequestDto> passengers)
+    {
+        var reserve = await _context.Reserves
+            .Include(r => r.Service)
+                .ThenInclude(s => s.ReservePrices.Where(p => p.ReserveTypeId == (ReserveTypeIdEnum)reserveTypeId))
+            .Include(r => r.CustomerReserves)
+            .SingleOrDefaultAsync(r => r.ReserveId == reserveId);
+
+        if (reserve is null)
+            return Result.Failure<bool>(ReserveError.NotFound);
+
+        if (reserve.Status != ReserveStatusEnum.Available)
+            return Result.Failure<bool>(ReserveError.NotAvailable);
+
+        var reservePrice = reserve.Service?.ReservePrices.FirstOrDefault();
+        if (reservePrice is null)
+            return Result.Failure<bool>(ReserveError.PriceNotAvailable);
+
+        var result = await _unitOfWork.ExecuteInTransactionAsync(async () =>
+        {
+            foreach (var passenger in passengers)
+            {
+                var customerResult = await GetOrCreateCustomerAsync(passenger);
+                if (!customerResult.IsSuccess)
+                    return Result.Failure<bool>(customerResult.Error);
+
+                var customer = customerResult.Value;
+
+                if (!reserve.CustomerReserves.Any(cr => cr.CustomerId == customer.CustomerId))
+                {
+                    reserve.CustomerReserves.Add(new CustomerReserve
+                    {
+                        Customer = customer,
+                        ReserveId = reserve.ReserveId,
+                        DropoffLocationId = passenger.DropoffLocationId,
+                        PickupLocationId = passenger.PickupLocationId,
+                        HasTraveled = passenger.HasTraveled,
+                        Price = reservePrice.Price,
+                        IsPayment = passenger.IsPayment,
+                        StatusPayment = (StatusPaymentEnum)passenger.StatusPaymentId
+                    });
+                }
+            }
+
+            foreach (var cr in reserve.CustomerReserves)
+                reserve.Raise(new CustomerReserveCreatedEvent(cr.CustomerReserveId));
+
+            _context.Reserves.Update(reserve);
+            await _context.SaveChangesWithOutboxAsync();
+
+            return Result.Success(true);
+        });
+
+        return result;
+    }
+
+
+    private async Task<Result<Customer>> GetOrCreateCustomerAsync(CustomerReserveCreateRequestDto passenger)
+    {
+        if (passenger.CustomerId is null)
+        {
+            var existing = await _context.Customers
+                .SingleOrDefaultAsync(c => c.DocumentNumber == passenger.CustomerCreate.DocumentNumber);
+
+            if (existing != null)
+            {
+                return Result.Failure<Customer>(ReserveError.CustomerAlreadyExists(existing.DocumentNumber));
+            }
+
+            var newCustomer = new Customer
+            {
+                FirstName = passenger.CustomerCreate.FirstName,
+                LastName = passenger.CustomerCreate.LastName,
+                DocumentNumber = passenger.CustomerCreate.DocumentNumber,
+                Email = passenger.CustomerCreate.Email,
+                Phone1 = passenger.CustomerCreate.Phone1,
+                Phone2 = passenger.CustomerCreate.Phone2
+            };
+
+            _context.Customers.Add(newCustomer);
+            await _context.SaveChangesWithOutboxAsync();
+
+            return Result.Success(newCustomer);
+        }
+        else
+        {
+            var customer = await _context.Customers.FindAsync(passenger.CustomerId);
+            if (customer is null)
+            {
+                return Result.Failure<Customer>(CustomerError.NotFound);
+            }
+
+            if (customer.Status != EntityStatusEnum.Active)
+            {
+                return Result.Failure<Customer>(ReserveError.CustomerAlreadyExists(customer.DocumentNumber));
+            }
+
+            return Result.Success(customer);
+        }
+    }
+
+
     public async Task<Result<PagedReportResponseDto<ReserveReportResponseDto>>>
-     GetReserveReport(PagedReportRequestDto<ReserveReportFilterRequestDto> requestDto)
+    GetReserveReport(PagedReportRequestDto<ReserveReportFilterRequestDto> requestDto)
     {
         var query = _context.ReservePrices
             .AsNoTracking()
@@ -61,4 +168,5 @@ public class ReserveBusiness : IReserveBusiness
 
         return Result.Success(pagedResult);
     }
+
 }

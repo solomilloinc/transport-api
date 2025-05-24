@@ -52,7 +52,7 @@ public class CustomerBusinessTest : TestBase
         var result = await _customerBusiness.Create(dto);
 
         result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Be(CustomerError.CustomerAlreadyExist);
+        result.Error.Should().Be(CustomerError.AlreadyExists);
     }
 
     [Fact]
@@ -92,7 +92,7 @@ public class CustomerBusinessTest : TestBase
 
         // Assert
         Assert.False(result.IsSuccess);
-        Assert.Equal(CustomerError.CustomerNotFound, result.Error);
+        Assert.Equal(CustomerError.NotFound, result.Error);
     }
 
     [Fact]
@@ -125,7 +125,7 @@ public class CustomerBusinessTest : TestBase
         var result = await _customerBusiness.Update(1, dto);
 
         Assert.False(result.IsSuccess);
-        Assert.Equal(CustomerError.CustomerNotFound, result.Error);
+        Assert.Equal(CustomerError.NotFound, result.Error);
     }
 
     [Fact]
@@ -154,7 +154,7 @@ public class CustomerBusinessTest : TestBase
         var result = await _customerBusiness.UpdateStatus(1, EntityStatusEnum.Active);
 
         Assert.False(result.IsSuccess);
-        Assert.Equal(CustomerError.CustomerNotFound, result.Error);
+        Assert.Equal(CustomerError.NotFound, result.Error);
     }
 
     [Fact]

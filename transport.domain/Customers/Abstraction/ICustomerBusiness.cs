@@ -1,6 +1,5 @@
 ﻿using Transport.SharedKernel;
 using Transport.SharedKernel.Contracts.Customer;
-using Transport.SharedKernel.Contracts.Customer.Reserve;
 
 namespace Transport.Domain.Customers.Abstraction;
 
