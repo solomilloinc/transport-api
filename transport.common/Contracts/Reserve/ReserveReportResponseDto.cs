@@ -5,5 +5,5 @@ public record ReserveReportResponseDto(int ReserveId,
     string DestinationName,
     int AvailableQuantity,
     int ReservedQuantity,
-    TimeSpan DepartureHour,
+    string DepartureHour,
     List<CustomerReserveReportResponseDto> Passengers);
