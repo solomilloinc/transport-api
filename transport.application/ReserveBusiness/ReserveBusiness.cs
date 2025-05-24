@@ -200,6 +200,7 @@ public class ReserveBusiness : IReserveBusiness
                 rp.Service.Destination.Name,
                 rp.Service.Vehicle.AvailableQuantity,
                 rp.CustomerReserves.Count,
+                rp.Service.DepartureHour,
                 rp.CustomerReserves
                   .Select(p => new CustomerReserveReportResponseDto(
                       p.CustomerReserveId,
