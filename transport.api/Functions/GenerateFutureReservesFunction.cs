@@ -17,7 +17,7 @@ public class GenerateFutureReservesFunction
         _serviceBusiness = serviceBusiness;
     }
 
-    [Function("test")]
+    [Function("GenerateFutureReservesFunction")]
     public async Task<HttpResponseData> Run(
      [HttpTrigger(AuthorizationLevel.Anonymous, "get", "post")] HttpRequestData req)
     {

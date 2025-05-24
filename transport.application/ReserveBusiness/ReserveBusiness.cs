@@ -5,6 +5,7 @@ using Transport.Domain.Customers;
 using Transport.Domain.Reserves;
 using Transport.Domain.Reserves.Abstraction;
 using Transport.SharedKernel;
+using Transport.SharedKernel.Contracts.Customer;
 using Transport.SharedKernel.Contracts.Reserve;
 
 namespace Transport.Business.ReserveBusiness;
@@ -20,16 +21,15 @@ public class ReserveBusiness : IReserveBusiness
         _unitOfWork = unitOfWork;
     }
 
-    public async Task<Result<bool>> CreatePassengerReserves(List<CustomerReserveCreateRequestDto> customerReserves)
+    public async Task<Result<bool>> CreatePassengerReserves(CustomerReserveCreateRequestWrapperDto customerReserves)
     {
         return await _unitOfWork.ExecuteInTransactionAsync(async () =>
         {
-            foreach (var passenger in customerReserves)
+            foreach (var passenger in customerReserves.Items)
             {
                 var reserve = await _context.Reserves
                     .Include(r => r.Service)
-                        .ThenInclude(s => s.ReservePrices
-                            .Where(p => p.ReserveTypeId == ReserveTypeIdEnum.Ida))
+                        .ThenInclude(s => s.ReservePrices)
                     .Include(r => r.CustomerReserves)
                     .SingleOrDefaultAsync(r => r.ReserveId == passenger.reserveId);
 

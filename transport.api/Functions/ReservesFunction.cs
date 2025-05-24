@@ -14,6 +14,10 @@ using System.Globalization;
 using Microsoft.OpenApi.Models;
 using Transport.SharedKernel.Contracts.Vehicle;
 using Transport_Api.Extensions;
+using Transport.Business.ReserveBusiness.Validation;
+using static System.Runtime.InteropServices.JavaScript.JSType;
+using System.Text.Json;
+using Transport.SharedKernel.Contracts.Customer;
 
 namespace transport_api.Functions;
 
@@ -35,14 +39,14 @@ public class ReservesFunction : FunctionBase
     Summary = "Create Passenger Reserves",
     Description = "Creates customer reserves for passengers, creating customers if needed.",
     Visibility = OpenApiVisibilityType.Important)]
-    [OpenApiRequestBody("application/json", typeof(List<CustomerReserveCreateRequestDto>), Required = true)]
+    [OpenApiRequestBody("application/json", typeof(CustomerReserveCreateRequestWrapperValidator), Required = true)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(Result<bool>), Summary = "Passenger reserves created successfully.")]
     public async Task<HttpResponseData> CreatePassengerReserves(
     [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "passenger-reserves-create")] HttpRequestData req)
     {
-        var dto = await req.ReadFromJsonAsync<List<CustomerReserveCreateRequestDto>>();
+        var dto = await req.ReadFromJsonAsync<CustomerReserveCreateRequestWrapperDto>();
 
-        var result = await ValidateAndMatchAsync(req, dto, GetValidator<List<CustomerReserveCreateRequestDto>>())
+        var result = await ValidateAndMatchAsync(req, dto, GetValidator<CustomerReserveCreateRequestWrapperDto>())
                         .BindAsync(_reserveBusiness.CreatePassengerReserves);
 
         return await MatchResultAsync(req, result);

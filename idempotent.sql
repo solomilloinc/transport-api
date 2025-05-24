@@ -589,3 +589,31 @@ GO
 COMMIT;
 GO
 
+BEGIN TRANSACTION;
+GO
+
+DROP INDEX [IX_ReservePrice_ServiceId] ON [ReservePrice];
+GO
+
+UPDATE [Role] SET [CreatedDate] = '2025-05-24T19:17:50.5670852Z'
+WHERE [RoleId] = 1;
+SELECT @@ROWCOUNT;
+
+GO
+
+UPDATE [Role] SET [CreatedDate] = '2025-05-24T19:17:50.5670855Z'
+WHERE [RoleId] = 2;
+SELECT @@ROWCOUNT;
+
+GO
+
+CREATE INDEX [IX_ReservePrice_ServiceId_ReserveTypeId] ON [ReservePrice] ([ServiceId], [ReserveTypeId]);
+GO
+
+INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+VALUES (N'20250524191751_AddIndexInServiceIdAndReserveTypeId', N'8.0.14');
+GO
+
+COMMIT;
+GO
+

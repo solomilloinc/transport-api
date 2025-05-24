@@ -1,11 +1,12 @@
 ﻿using Transport.SharedKernel;
+using Transport.SharedKernel.Contracts.Customer;
 using Transport.SharedKernel.Contracts.Reserve;
 
 namespace Transport.Domain.Reserves.Abstraction;
 
 public interface IReserveBusiness
 {
-    Task<Result<bool>> CreatePassengerReserves(List<CustomerReserveCreateRequestDto> customerReserves);
+    Task<Result<bool>> CreatePassengerReserves(CustomerReserveCreateRequestWrapperDto dto);
 
     Task<Result<PagedReportResponseDto<ReservePriceReportResponseDto>>>
      GetReservePriceReport(PagedReportRequestDto<ReservePriceReportFilterRequestDto> requestDto);
