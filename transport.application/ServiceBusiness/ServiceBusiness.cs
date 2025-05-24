@@ -64,7 +64,7 @@ public class ServiceBusiness : IServiceBusiness
         {
             Name = requestDto.Name,
             StartDay = (DayOfWeek)requestDto.StartDay,
-            EndDay = (DayOfWeek)requestDto.StartDay,
+            EndDay = (DayOfWeek)requestDto.EndDay,
             OriginId = requestDto.OriginId,
             DestinationId = requestDto.DestinationId,
             EstimatedDuration = requestDto.EstimatedDuration,

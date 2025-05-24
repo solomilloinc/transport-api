@@ -70,7 +70,7 @@ public class ReserveReportBusinessTest : TestBase
 
         var request = new PagedReportRequestDto<ReserveReportFilterRequestDto>
         {
-            Filters = new ReserveReportFilterRequestDto (ReserveDate: reserveDate ),
+            Filters = new ReserveReportFilterRequestDto(),
             PageNumber = 1,
             PageSize = 10
         };
@@ -79,7 +79,7 @@ public class ReserveReportBusinessTest : TestBase
             .Returns(GetQueryableMockDbSet(reserves).Object);
 
         // Act
-        var result = await _reserveBusiness.GetReserveReport(request);
+        var result = await _reserveBusiness.GetReserveReport(reserveDate, request);
 
         // Assert
         Assert.True(result.IsSuccess);
@@ -129,7 +129,7 @@ public class ReserveReportBusinessTest : TestBase
 
         var request = new PagedReportRequestDto<ReserveReportFilterRequestDto>
         {
-            Filters = new ReserveReportFilterRequestDto( ReserveDate: reserveDate ),
+            Filters = new ReserveReportFilterRequestDto(),
             PageNumber = 1,
             PageSize = 10
         };
@@ -138,7 +138,7 @@ public class ReserveReportBusinessTest : TestBase
             .Returns(GetQueryableMockDbSet(reserves).Object);
 
         // Act
-        var result = await _reserveBusiness.GetReserveReport(request);
+        var result = await _reserveBusiness.GetReserveReport(reserveDate, request);
 
         // Assert
         Assert.True(result.IsSuccess);
@@ -172,7 +172,7 @@ public class ReserveReportBusinessTest : TestBase
 
         var request = new PagedReportRequestDto<ReserveReportFilterRequestDto>
         {
-            Filters = new ReserveReportFilterRequestDto ( ReserveDate: requestDate ),
+            Filters = new ReserveReportFilterRequestDto(),
             PageNumber = 1,
             PageSize = 10
         };
@@ -181,7 +181,7 @@ public class ReserveReportBusinessTest : TestBase
             .Returns(GetQueryableMockDbSet(reserves).Object);
 
         // Act
-        var result = await _reserveBusiness.GetReserveReport(request);
+        var result = await _reserveBusiness.GetReserveReport(requestDate, request);
 
         // Assert
         Assert.True(result.IsSuccess);
@@ -213,7 +213,7 @@ public class ReserveReportBusinessTest : TestBase
 
         var request = new PagedReportRequestDto<ReserveReportFilterRequestDto>
         {
-            Filters = new ReserveReportFilterRequestDto (ReserveDate: reserveDate),
+            Filters = new ReserveReportFilterRequestDto(),
             PageNumber = 1,
             PageSize = 10
         };
@@ -222,7 +222,7 @@ public class ReserveReportBusinessTest : TestBase
             .Returns(GetQueryableMockDbSet(reserves).Object);
 
         // Act
-        var result = await _reserveBusiness.GetReserveReport(request);
+        var result = await _reserveBusiness.GetReserveReport(reserveDate, request);
 
         // Assert
         Assert.True(result.IsSuccess);

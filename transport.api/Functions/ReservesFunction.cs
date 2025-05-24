@@ -10,6 +10,8 @@ using Transport.SharedKernel;
 using Transport.Infraestructure.Authorization;
 using Transport_Api.Functions.Base;
 using Transport.Domain.Reserves.Abstraction;
+using System.Globalization;
+using Microsoft.OpenApi.Models;
 
 namespace transport_api.Functions;
 
@@ -37,17 +39,21 @@ public class ReservesFunction : FunctionBase
     }
 
     [Function("GetReserveReport")]
-    [Authorize("Admin")]
+    //[Authorize("Admin")]
     [OpenApiOperation(operationId: "reserve-report", tags: new[] { "Reserve" }, Summary = "Get Reserve Report", Description = "Returns paginated list of reserve", Visibility = OpenApiVisibilityType.Important)]
     [OpenApiRequestBody("application/json", typeof(PagedReportRequestDto<ReserveReportFilterRequestDto>), Required = true)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(PagedReportResponseDto<ReserveReportResponseDto>), Summary = "Reserve Report")]
     public async Task<HttpResponseData> GetReserveReport(
-    [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "reserve-report")] HttpRequestData req)
+    [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "reserve-report/{reserveDate}")] HttpRequestData req, string reserveDate)
     {
+        if (!DateTime.TryParseExact(reserveDate, "yyyyMMdd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsedDate))
+            return req.CreateResponse(HttpStatusCode.BadRequest);
+
         var filter = await req.ReadFromJsonAsync<PagedReportRequestDto<ReserveReportFilterRequestDto>>();
-        var result = await _reserveBusiness.GetReserveReport(filter);
+        var result = await _reserveBusiness.GetReserveReport(parsedDate, filter);
         return await MatchResultAsync(req, result);
     }
+
 
     [Function("GetCustomerReserveReport")]
     [Authorize("Admin")]

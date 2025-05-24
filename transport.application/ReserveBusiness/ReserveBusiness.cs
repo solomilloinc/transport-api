@@ -20,63 +20,63 @@ public class ReserveBusiness : IReserveBusiness
         _unitOfWork = unitOfWork;
     }
 
-    public async Task<Result<bool>> CreatePassengerReserves(int reserveId,
-      int reserveTypeId,
-      List<CustomerReserveCreateRequestDto> passengers)
+    public async Task<Result<bool>> CreatePassengerReserves(List<CustomerReserveCreateRequestDto> customerReserves)
     {
-        var reserve = await _context.Reserves
-            .Include(r => r.Service)
-                .ThenInclude(s => s.ReservePrices.Where(p => p.ReserveTypeId == (ReserveTypeIdEnum)reserveTypeId))
-            .Include(r => r.CustomerReserves)
-            .SingleOrDefaultAsync(r => r.ReserveId == reserveId);
+        //var reserve = await _context.Reserves
+        //    .Include(r => r.Service)
+        //        .ThenInclude(s => s.ReservePrices.Where(p => p.ReserveTypeId == (ReserveTypeIdEnum)reserveTypeId))
+        //    .Include(r => r.CustomerReserves)
+        //    .SingleOrDefaultAsync(r => r.ReserveId == reserveId);
 
-        if (reserve is null)
-            return Result.Failure<bool>(ReserveError.NotFound);
+        //if (reserve is null)
+        //    return Result.Failure<bool>(ReserveError.NotFound);
 
-        if (reserve.Status != ReserveStatusEnum.Available)
-            return Result.Failure<bool>(ReserveError.NotAvailable);
+        //if (reserve.Status != ReserveStatusEnum.Available)
+        //    return Result.Failure<bool>(ReserveError.NotAvailable);
 
-        var reservePrice = reserve.Service?.ReservePrices.FirstOrDefault();
-        if (reservePrice is null)
-            return Result.Failure<bool>(ReserveError.PriceNotAvailable);
+        //var reservePrice = reserve.Service?.ReservePrices.FirstOrDefault();
+        //if (reservePrice is null)
+        //    return Result.Failure<bool>(ReserveError.PriceNotAvailable);
 
-        var result = await _unitOfWork.ExecuteInTransactionAsync(async () =>
-        {
-            foreach (var passenger in passengers)
-            {
-                var customerResult = await GetOrCreateCustomerAsync(passenger);
-                if (!customerResult.IsSuccess)
-                    return Result.Failure<bool>(customerResult.Error);
+        //var result = await _unitOfWork.ExecuteInTransactionAsync(async () =>
+        //{
+        //    foreach (var passenger in customerReserves)
+        //    {
+        //        var customerResult = await GetOrCreateCustomerAsync(passenger);
+        //        if (!customerResult.IsSuccess)
+        //            return Result.Failure<bool>(customerResult.Error);
 
-                var customer = customerResult.Value;
+        //        var customer = customerResult.Value;
 
-                if (!reserve.CustomerReserves.Any(cr => cr.CustomerId == customer.CustomerId))
-                {
-                    reserve.CustomerReserves.Add(new CustomerReserve
-                    {
-                        Customer = customer,
-                        ReserveId = reserve.ReserveId,
-                        DropoffLocationId = passenger.DropoffLocationId,
-                        PickupLocationId = passenger.PickupLocationId,
-                        HasTraveled = passenger.HasTraveled,
-                        Price = reservePrice.Price,
-                        IsPayment = passenger.IsPayment,
-                        StatusPayment = (StatusPaymentEnum)passenger.StatusPaymentId,
-                        PaymentMethod = (PaymentMethodEnum)passenger.PaymentMethodId
-                    });
-                }
-            }
+        //        if (!reserve.CustomerReserves.Any(cr => cr.CustomerId == customer.CustomerId))
+        //        {
+        //            reserve.CustomerReserves.Add(new CustomerReserve
+        //            {
+        //                Customer = customer,
+        //                ReserveId = reserve.ReserveId,
+        //                DropoffLocationId = passenger.DropoffLocationId,
+        //                PickupLocationId = passenger.PickupLocationId,
+        //                HasTraveled = passenger.HasTraveled,
+        //                Price = reservePrice.Price,
+        //                IsPayment = passenger.IsPayment,
+        //                StatusPayment = (StatusPaymentEnum)passenger.StatusPaymentId,
+        //                PaymentMethod = (PaymentMethodEnum)passenger.PaymentMethodId
+        //            });
+        //        }
+        //    }
 
-            foreach (var cr in reserve.CustomerReserves)
-                reserve.Raise(new CustomerReserveCreatedEvent(cr.CustomerReserveId));
+        //    foreach (var cr in reserve.CustomerReserves)
+        //        reserve.Raise(new CustomerReserveCreatedEvent(cr.CustomerReserveId));
 
-            _context.Reserves.Update(reserve);
-            await _context.SaveChangesWithOutboxAsync();
+        //    _context.Reserves.Update(reserve);
+        //    await _context.SaveChangesWithOutboxAsync();
 
-            return Result.Success(true);
-        });
+        //    return Result.Success(true);
+        //});
 
-        return result;
+        //return result;
+
+        throw new NotImplementedException("This method is not implemented yet. Please implement it according to your business logic.");
     }
 
 
@@ -171,7 +171,7 @@ public class ReserveBusiness : IReserveBusiness
     }
 
 
-    public async Task<Result<PagedReportResponseDto<ReserveReportResponseDto>>> GetReserveReport(
+    public async Task<Result<PagedReportResponseDto<ReserveReportResponseDto>>> GetReserveReport(DateTime reserveDate,
     PagedReportRequestDto<ReserveReportFilterRequestDto> requestDto)
     {
         var query = _context.Reserves
@@ -182,7 +182,7 @@ public class ReserveBusiness : IReserveBusiness
             .Where(rp => rp.Status == ReserveStatusEnum.Available);
 
 
-        var date = requestDto.Filters.ReserveDate.Date;
+        var date = reserveDate.Date;
         query = query.Where(rp => rp.ReserveDate.Date == date);
 
         var sortMappings = new Dictionary<string, Expression<Func<Reserve, object>>>
