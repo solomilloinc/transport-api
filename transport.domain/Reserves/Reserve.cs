@@ -9,10 +9,10 @@ public class Reserve: Entity, IAuditable
 {
     public int ReserveId { get; set; }
     public DateTime ReserveDate { get; set; }
-    public ReserveStatusEnum Status { get; set; }
     public int VehicleId { get; set; }
     public int? DriverId { get; set; }
     public int ServiceId { get; set;}
+    public ReserveStatusEnum Status { get; set; }
 
     public Vehicle Vehicle { get; set; } = null!;
     public Driver? Driver { get; set; }

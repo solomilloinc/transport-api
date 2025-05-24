@@ -44,7 +44,7 @@ public class ReserveReportBusinessTest : TestBase
         {
             ReserveId = 1,
             ReserveDate = reserveDate,
-            Status = ReserveStatusEnum.Available,
+            Status = ReserveStatusEnum.Confirmed,
             Service = service,
             CustomerReserves = new List<CustomerReserve>
             {
@@ -103,7 +103,7 @@ public class ReserveReportBusinessTest : TestBase
         {
             ReserveId = 1,
             ReserveDate = reserveDate,
-            Status = ReserveStatusEnum.Available,
+            Status = ReserveStatusEnum.Confirmed,
             Service = new Service
             {
                 Origin = new City { Name = "Rosario" },
@@ -116,7 +116,7 @@ public class ReserveReportBusinessTest : TestBase
         {
             ReserveId = 2,
             ReserveDate = reserveDate,
-            Status = ReserveStatusEnum.Available,
+            Status = ReserveStatusEnum.Confirmed,
             Service = new Service
             {
                 Origin = new City { Name = "Mendoza" },

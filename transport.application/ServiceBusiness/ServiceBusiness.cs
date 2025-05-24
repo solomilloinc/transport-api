@@ -206,50 +206,79 @@ public class ServiceBusiness : IServiceBusiness
 
     public async Task<Result<bool>> GenerateFutureReservesAsync()
     {
+        await MarkOldReservesAsExpiredAsync();
+
         var today = dateTimeProvider.UtcNow;
         var endDate = today.AddDays(_reserveOption.ReserveGenerationDays);
 
         var services = await _context.Services
-            .Include(s => s.Reserves)
             .Where(s => s.Status == EntityStatusEnum.Active && s.ReservePrices.Any())
             .ToListAsync();
 
         foreach (var service in services)
         {
+            var existingReserves = await _context.Reserves
+                                  .Where(r =>
+                                      r.ServiceId == service.ServiceId &&
+                                      r.ReserveDate.Date >= today &&
+                                      r.ReserveDate.Date <= endDate)
+                                  .ToListAsync();
+
             for (var date = today; date <= endDate; date = date.AddDays(1))
             {
-                if (service.IsDayWithinServiceRange(service, date.DayOfWeek))
+                if (!service.IsDayWithinServiceRange(service, date.DayOfWeek))
+                    continue;
+
+                if (IsHoliday(date) && !service.IsHoliday)
+                    continue;
+
+                var reserveDate = date.Date + service.DepartureHour;
+
+                var existing = existingReserves.FirstOrDefault(r => r.ReserveDate.Date == date.Date);
+
+                if (existing != null)
                 {
-                    if (service.Reserves.Any(r => r.ReserveDate.Date == date.Date))
-                        continue;
-
-                    if (IsHoliday(date) && !service.IsHoliday)
-                        continue;
-
-                    var reserve = new Reserve
+                    if (existing.Status == ReserveStatusEnum.Expired)
                     {
-                        ReserveDate = date.Date + service.DepartureHour,
-                        ServiceId = service.ServiceId,
-                        VehicleId = service.VehicleId,
-                        Status = ReserveStatusEnum.Available,
-                    };
+                        existing.ReserveDate = reserveDate;
+                        existing.Status = ReserveStatusEnum.Confirmed;
+                    }
 
-                    //if (service.Customers.Any())
-                    //{
-                    //    reserve.CustomerReserves = new List<CustomerReserve>(service.Customers.Select(p => new CustomerReserve()
-                    //    {
-                    //        CustomerId = p.CustomerId,
-                    //    }));
-                    //}
-
-                    _context.Reserves.Add(reserve);
+                    continue;
                 }
+
+                var newReserve = new Reserve
+                {
+                    ReserveDate = reserveDate,
+                    ServiceId = service.ServiceId,
+                    VehicleId = service.VehicleId,
+                    Status = ReserveStatusEnum.Confirmed,
+                };
+
+                _context.Reserves.Add(newReserve);
             }
         }
 
         await _context.SaveChangesWithOutboxAsync();
         return true;
     }
+
+    private async Task MarkOldReservesAsExpiredAsync()
+    {
+        var now = dateTimeProvider.UtcNow;
+
+        var oldAvailableReserves = await _context.Reserves
+            .Where(r => r.Status == ReserveStatusEnum.Available && r.ReserveDate < now)
+            .ToListAsync();
+
+        foreach (var reserve in oldAvailableReserves)
+        {
+            reserve.Status = ReserveStatusEnum.Expired;
+        }
+
+        await _context.SaveChangesWithOutboxAsync();
+    }
+
 
     private bool IsHoliday(DateTime date)
     {

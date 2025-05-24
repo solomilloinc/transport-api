@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Transport.Infraestructure.Database;
 
@@ -11,9 +12,11 @@ using Transport.Infraestructure.Database;
 namespace Transport.Infraestructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250524184457_AddReserveReportsAndPassengers")]
+    partial class AddReserveReportsAndPassengers
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -442,7 +445,8 @@ namespace Transport.Infraestructure.Migrations
 
                     b.HasKey("ReservePriceId");
 
-                    b.HasIndex("ServiceId", "ReserveTypeId");
+                    b.HasIndex("ServiceId")
+                        .IsUnique();
 
                     b.ToTable("ReservePrice", (string)null);
                 });
@@ -656,14 +660,14 @@ namespace Transport.Infraestructure.Migrations
                         {
                             RoleId = 1,
                             CreatedBy = "System",
-                            CreatedDate = new DateTime(2025, 5, 24, 19, 17, 50, 567, DateTimeKind.Utc).AddTicks(852),
+                            CreatedDate = new DateTime(2025, 5, 24, 18, 44, 56, 558, DateTimeKind.Utc).AddTicks(5699),
                             Name = "Administrador"
                         },
                         new
                         {
                             RoleId = 2,
                             CreatedBy = "System",
-                            CreatedDate = new DateTime(2025, 5, 24, 19, 17, 50, 567, DateTimeKind.Utc).AddTicks(855),
+                            CreatedDate = new DateTime(2025, 5, 24, 18, 44, 56, 558, DateTimeKind.Utc).AddTicks(5702),
                             Name = "Cliente"
                         });
                 });
