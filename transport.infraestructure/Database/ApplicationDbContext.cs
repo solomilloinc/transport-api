@@ -33,6 +33,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<RefreshToken> RefreshTokens { get; set; }
     public DbSet<Holiday> Holidays { get; set; }
     public DbSet<ReservePrice> ReservePrices { get; set; }
+    public DbSet<CustomerReserve> CustomerReserves { get; set; }
 
     private readonly IUserContext _userContext;
 
