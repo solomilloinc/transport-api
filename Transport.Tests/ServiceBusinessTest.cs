@@ -373,7 +373,7 @@ public class ServiceBusinessTests : TestBase
         Assert.All(reserves, r =>
         {
             Assert.Equal(vehicle.VehicleId, r.VehicleId);
-            Assert.Equal(ReserveStatusEnum.Available, r.Status);
+            Assert.Equal(ReserveStatusEnum.Confirmed, r.Status);
             Assert.InRange(r.ReserveDate.Date, today, today.AddDays(15));
         });
     }

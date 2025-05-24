@@ -543,3 +543,49 @@ GO
 COMMIT;
 GO
 
+BEGIN TRANSACTION;
+GO
+
+DROP INDEX [IX_Reserve_ServiceId] ON [Reserve];
+GO
+
+DECLARE @var2 sysname;
+SELECT @var2 = [d].[name]
+FROM [sys].[default_constraints] [d]
+INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
+WHERE ([d].[parent_object_id] = OBJECT_ID(N'[Reserve]') AND [c].[name] = N'Status');
+IF @var2 IS NOT NULL EXEC(N'ALTER TABLE [Reserve] DROP CONSTRAINT [' + @var2 + '];');
+ALTER TABLE [Reserve] ALTER COLUMN [Status] VARCHAR(20) NOT NULL;
+GO
+
+ALTER TABLE [CustomerReserve] ADD [PaymentMethod] VARCHAR(20) NULL;
+GO
+
+ALTER TABLE [CustomerReserve] ADD [Status] int NOT NULL DEFAULT 0;
+GO
+
+UPDATE [Role] SET [CreatedDate] = '2025-05-24T18:44:56.5585699Z'
+WHERE [RoleId] = 1;
+SELECT @@ROWCOUNT;
+
+GO
+
+UPDATE [Role] SET [CreatedDate] = '2025-05-24T18:44:56.5585702Z'
+WHERE [RoleId] = 2;
+SELECT @@ROWCOUNT;
+
+GO
+
+CREATE INDEX [IX_Reserve_ServiceId_ReserveDate] ON [Reserve] ([ServiceId], [ReserveDate]);
+GO
+
+CREATE INDEX [IX_Reserve_Status_ReserveDate] ON [Reserve] ([Status], [ReserveDate]);
+GO
+
+INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+VALUES (N'20250524184457_AddReserveReportsAndPassengers', N'8.0.14');
+GO
+
+COMMIT;
+GO
+

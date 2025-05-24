@@ -37,6 +37,7 @@ public class CustomerReserveConfiguration : IEntityTypeConfiguration<CustomerRes
 
         builder.Property(r => r.PaymentMethod)
                .HasConversion<string>()
-               .IsRequired();
+               .HasColumnType("VARCHAR(20)")
+               .IsRequired(false);
     }
 }

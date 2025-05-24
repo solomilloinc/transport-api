@@ -28,12 +28,17 @@ public class ReserveConfiguration : IEntityTypeConfiguration<Reserve>
                  .IsRequired();
 
         builder.HasOne(r => r.Vehicle)
-            .WithMany() 
+            .WithMany()
             .HasForeignKey(r => r.VehicleId)
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.Property(r => r.Status)
                .HasConversion<string>()
+               .HasColumnType("VARCHAR(20)")
                .IsRequired();
+
+        builder.HasIndex(r => new { r.ServiceId, r.ReserveDate });
+
+        builder.HasIndex(r => new { r.Status, r.ReserveDate });
     }
 }
