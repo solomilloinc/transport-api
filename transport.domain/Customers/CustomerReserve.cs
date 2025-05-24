@@ -8,6 +8,7 @@ public class CustomerReserve: IAuditable
     public int? UserId { get; set; }
     public int CustomerId { get; set; }
     public int ReserveId { get; set; }
+    public PaymentMethodEnum PaymentMethod { get; set; }
     public bool IsPayment { get; set; }
     public StatusPaymentEnum StatusPayment { get; set; }
     public decimal Price { get; set; }

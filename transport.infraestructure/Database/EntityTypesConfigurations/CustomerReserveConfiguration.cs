@@ -34,5 +34,9 @@ public class CustomerReserveConfiguration : IEntityTypeConfiguration<CustomerRes
                .WithMany(d => d.DropoffCustomerReserves)
                .HasForeignKey(cr => cr.DropoffLocationId)
                .OnDelete(DeleteBehavior.NoAction);
+
+        builder.Property(r => r.PaymentMethod)
+               .HasConversion<string>()
+               .IsRequired();
     }
 }

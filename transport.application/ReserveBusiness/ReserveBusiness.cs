@@ -61,7 +61,8 @@ public class ReserveBusiness : IReserveBusiness
                         HasTraveled = passenger.HasTraveled,
                         Price = reservePrice.Price,
                         IsPayment = passenger.IsPayment,
-                        StatusPayment = (StatusPaymentEnum)passenger.StatusPaymentId
+                        StatusPayment = (StatusPaymentEnum)passenger.StatusPaymentId,
+                        PaymentMethod = (PaymentMethodEnum)passenger.PaymentMethodId
                     });
                 }
             }
@@ -124,8 +125,8 @@ public class ReserveBusiness : IReserveBusiness
     }
 
 
-    public async Task<Result<PagedReportResponseDto<ReserveReportResponseDto>>>
-    GetReserveReport(PagedReportRequestDto<ReserveReportFilterRequestDto> requestDto)
+    public async Task<Result<PagedReportResponseDto<ReservePriceReportResponseDto>>>
+    GetReservePriceReport(PagedReportRequestDto<ReservePriceReportFilterRequestDto> requestDto)
     {
         var query = _context.ReservePrices
             .AsNoTracking()
@@ -154,15 +155,116 @@ public class ReserveBusiness : IReserveBusiness
             ["reservetypeid"] = rp => rp.ReserveTypeId
         };
 
-        var pagedResult = await query.ToPagedReportAsync<ReserveReportResponseDto, ReservePrice, ReserveReportFilterRequestDto>(
+        var pagedResult = await query.ToPagedReportAsync<ReservePriceReportResponseDto, ReservePrice, ReservePriceReportFilterRequestDto>(
             requestDto,
-            selector: rp => new ReserveReportResponseDto(
+            selector: rp => new ReservePriceReportResponseDto(
                 rp.ReservePriceId,
                 rp.ServiceId,
                 rp.Service.Name,
                 rp.Price,
                 (int)rp.ReserveTypeId
             ),
+            sortMappings: sortMappings
+        );
+
+        return Result.Success(pagedResult);
+    }
+
+
+    public async Task<Result<PagedReportResponseDto<ReserveReportResponseDto>>> GetReserveReport(
+    PagedReportRequestDto<ReserveReportFilterRequestDto> requestDto)
+    {
+        var query = _context.Reserves
+            .Include(rp => rp.Service).ThenInclude(s => s.Origin)
+            .Include(rp => rp.Service).ThenInclude(s => s.Destination)
+            .Include(rp => rp.Service).ThenInclude(s => s.Vehicle)
+            .Include(rp => rp.CustomerReserves).ThenInclude(cr => cr.Customer)
+            .Where(rp => rp.Status == ReserveStatusEnum.Available);
+
+
+        var date = requestDto.Filters.ReserveDate.Date;
+        query = query.Where(rp => rp.ReserveDate.Date == date);
+
+        var sortMappings = new Dictionary<string, Expression<Func<Reserve, object>>>
+        {
+            ["reservedate"] = rp => rp.ReserveDate,
+            ["serviceorigin"] = rp => rp.Service.Origin.Name,
+            ["servicedest"] = rp => rp.Service.Destination.Name,
+        };
+
+        var pagedResult = await query.ToPagedReportAsync<ReserveReportResponseDto, Reserve, ReserveReportFilterRequestDto>(
+            requestDto,
+            selector: rp => new ReserveReportResponseDto(
+                rp.ReserveId,
+                rp.Service.Origin.Name,
+                rp.Service.Destination.Name,
+                rp.Service.Vehicle.AvailableQuantity,
+                rp.CustomerReserves.Count,
+                rp.CustomerReserves
+                  .Select(p => new CustomerReserveReportResponseDto(
+                      p.CustomerReserveId,
+                      p.CustomerId,
+                      $"{p.Customer.FirstName} {p.Customer.LastName}",
+                      p.Customer.DocumentNumber,
+                      p.Customer.Email,
+                      $"{p.Customer.Phone1} {p.Customer.Phone1}",
+                      p.ReserveId,
+                      p.DropoffLocationId!.Value,
+                      p.PickupLocationId!.Value))
+                  .ToList()
+            ),
+            sortMappings: sortMappings
+        );
+
+        return Result.Success(pagedResult);
+    }
+
+    public async Task<Result<PagedReportResponseDto<CustomerReserveReportResponseDto>>> GetReserveCustomerReport(
+    int reserveId,
+    PagedReportRequestDto<CustomerReserveReportFilterRequestDto> requestDto)
+    {
+        var query = _context.CustomerReserves
+            .Include(cr => cr.Customer)
+            .Where(cr => cr.ReserveId == reserveId);
+
+        if (!string.IsNullOrWhiteSpace(requestDto.Filters.CustomerFullName))
+        {
+            var nameFilter = requestDto.Filters.CustomerFullName.ToLower();
+            query = query.Where(cr =>
+                (cr.Customer.FirstName + " " + cr.Customer.LastName).ToLower().Contains(nameFilter));
+        }
+
+        if (!string.IsNullOrWhiteSpace(requestDto.Filters.DocumentNumber))
+        {
+            var docFilter = requestDto.Filters.DocumentNumber.Trim();
+            query = query.Where(cr => cr.Customer.DocumentNumber.Contains(docFilter));
+        }
+
+        if (!string.IsNullOrWhiteSpace(requestDto.Filters.Email))
+        {
+            var emailFilter = requestDto.Filters.Email.ToLower().Trim();
+            query = query.Where(cr => cr.Customer.Email.ToLower().Contains(emailFilter));
+        }
+
+        var sortMappings = new Dictionary<string, Expression<Func<CustomerReserve, object>>>
+        {
+            ["firstname"] = cr => cr.Customer.FirstName,
+            ["lastname"] = cr => cr.Customer.LastName,
+            ["documentnumber"] = cr => cr.Customer.DocumentNumber,
+        };
+
+        var pagedResult = await query.ToPagedReportAsync<CustomerReserveReportResponseDto, CustomerReserve, CustomerReserveReportFilterRequestDto>(
+            requestDto,
+            selector: cr => new CustomerReserveReportResponseDto(
+                cr.CustomerReserveId,
+                cr.CustomerId,
+                $"{cr.Customer.FirstName} {cr.Customer.LastName}",
+                cr.Customer.DocumentNumber,
+                cr.Customer.Email,
+                $"{cr.Customer.Phone1} {cr.Customer.Phone2}",
+                cr.ReserveId,
+                cr.DropoffLocationId!.Value,
+                cr.PickupLocationId!.Value),
             sortMappings: sortMappings
         );
 

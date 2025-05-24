@@ -25,5 +25,7 @@ public interface IApplicationDbContext
     DbSet<RefreshToken> RefreshTokens { get; }
     DbSet<Holiday> Holidays { get; }
     DbSet<ReservePrice> ReservePrices { get; }
+    DbSet<CustomerReserve> CustomerReserves { get; }
+
     Task<int> SaveChangesWithOutboxAsync(CancellationToken cancellationToken = default);
 }

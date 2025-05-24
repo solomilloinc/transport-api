@@ -9,4 +9,5 @@ public record CustomerReserveCreateRequestDto(int? CustomerId,
     bool HasTraveled,
     decimal price,
     int StatusPaymentId,
+    int PaymentMethodId,
     CustomerCreateRequestDto? CustomerCreate);
