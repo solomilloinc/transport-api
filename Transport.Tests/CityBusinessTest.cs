@@ -8,7 +8,7 @@ using Transport.Domain.Cities.Abstraction;
 using Transport.Business.Data;
 using Xunit;
 using Transport.Domain.Vehicles;
-using Transport.Domain;
+using Transport.Domain.Directions;
 
 namespace Transport.Tests.CityBusinessTests;
 

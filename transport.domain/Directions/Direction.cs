@@ -2,7 +2,7 @@
 using Transport.Domain.Customers;
 using Transport.SharedKernel;
 
-namespace Transport.Domain;
+namespace Transport.Domain.Directions;
 
 public class Direction: IAuditable
 {
@@ -11,6 +11,7 @@ public class Direction: IAuditable
     public double? Lat { get; set; }
     public double? Lng { get; set; }
     public int CityId { get; set; }
+    public EntityStatusEnum Status { get; set; }
 
     public string CreatedBy { get; set; } = null!;
     public string? UpdatedBy { get; set; }

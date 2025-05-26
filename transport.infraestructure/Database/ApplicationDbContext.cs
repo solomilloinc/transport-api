@@ -11,6 +11,7 @@ using Transport.Domain.Cities;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Transport.Domain.Services;
 using Transport.Business.Authentication;
+using Transport.Domain.Directions;
 
 namespace Transport.Infraestructure.Database;
 

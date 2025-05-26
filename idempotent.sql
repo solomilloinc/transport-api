@@ -617,3 +617,37 @@ GO
 COMMIT;
 GO
 
+BEGIN TRANSACTION;
+GO
+
+DECLARE @var3 sysname;
+SELECT @var3 = [d].[name]
+FROM [sys].[default_constraints] [d]
+INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
+WHERE ([d].[parent_object_id] = OBJECT_ID(N'[Direction]') AND [c].[name] = N'Name');
+IF @var3 IS NOT NULL EXEC(N'ALTER TABLE [Direction] DROP CONSTRAINT [' + @var3 + '];');
+ALTER TABLE [Direction] ALTER COLUMN [Name] VARCHAR(250) NOT NULL;
+GO
+
+ALTER TABLE [Direction] ADD [Status] int NOT NULL DEFAULT 0;
+GO
+
+UPDATE [Role] SET [CreatedDate] = '2025-05-26T11:33:42.5415717Z'
+WHERE [RoleId] = 1;
+SELECT @@ROWCOUNT;
+
+GO
+
+UPDATE [Role] SET [CreatedDate] = '2025-05-26T11:33:42.5415719Z'
+WHERE [RoleId] = 2;
+SELECT @@ROWCOUNT;
+
+GO
+
+INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+VALUES (N'20250526113343_AddStatusInDirection', N'8.0.14');
+GO
+
+COMMIT;
+GO
+
