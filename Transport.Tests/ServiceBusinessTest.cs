@@ -447,8 +447,8 @@ public class ServiceBusinessTests : TestBase
     {
         // Arrange
         var reserveGenerationDays = 3;
-        var today = DateTime.Today;
-        var feriado = today.AddDays(1); // Mañana es feriado
+        var today = _dateTimeProviderMock.Object.UtcNow;
+        var feriado = today.AddDays(1);
 
         var reserveOptionMock = new Mock<IReserveOption>();
         reserveOptionMock.Setup(x => x.ReserveGenerationDays).Returns(reserveGenerationDays);
@@ -504,7 +504,7 @@ public class ServiceBusinessTests : TestBase
     public async Task GenerateFutureReserves_ShouldCreateReservesOnHolidays_WhenIsHolidayIsTrue()
     {
         // Arrange
-        var today = DateTime.Today;
+        var today = _dateTimeProviderMock.Object.UtcNow;
         var feriado = today.AddDays(2);
 
    

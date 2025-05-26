@@ -6,8 +6,8 @@ using Transport.Domain.Cities;
 using Transport.Domain.Cities.Abstraction;
 using Transport.SharedKernel;
 using Transport.SharedKernel.Contracts.City;
-using Transport.Domain;
 using Transport.Domain.Vehicles;
+using Transport.Domain.Directions;
 
 namespace Transport.Business.CityBusiness;
 
