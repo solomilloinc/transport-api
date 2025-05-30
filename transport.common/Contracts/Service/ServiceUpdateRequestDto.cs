@@ -4,11 +4,7 @@ public record ServiceUpdateRequestDto(
     string Name,
     int OriginId,
     int DestinationId,
-    int StartDay,
-    int EndDay,
     TimeSpan EstimatedDuration,
-    TimeSpan DepartureHour,
-    bool IsHoliday,
     int VehicleId,
     List<ServiceReservePriceDto> Prices
 );

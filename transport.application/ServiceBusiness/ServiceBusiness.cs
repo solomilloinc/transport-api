@@ -55,21 +55,12 @@ public class ServiceBusiness : IServiceBusiness
             return Result.Failure<int>(CityError.CityNotFound);
         }
 
-        if (requestDto.StartDay > requestDto.EndDay)
-        {
-            return Result.Failure<int>(ServiceError.InvalidDayRange);
-        }
-
         Service service = new Service
         {
             Name = requestDto.Name,
-            StartDay = (DayOfWeek)requestDto.StartDay,
-            EndDay = (DayOfWeek)requestDto.EndDay,
             OriginId = requestDto.OriginId,
             DestinationId = requestDto.DestinationId,
             EstimatedDuration = requestDto.EstimatedDuration,
-            DepartureHour = requestDto.DepartureHour,
-            IsHoliday = requestDto.IsHoliday,
             VehicleId = requestDto.VehicleId,
         };
 
@@ -101,9 +92,6 @@ public class ServiceBusiness : IServiceBusiness
         if (requestDto.Filters?.VehicleId is not null && requestDto.Filters.VehicleId > 0)
             query = query.Where(s => s.VehicleId == requestDto.Filters.VehicleId);
 
-        if (requestDto.Filters?.IsHoliday is not null)
-            query = query.Where(s => s.IsHoliday == requestDto.Filters.IsHoliday);
-
         if (requestDto.Filters?.Status is not null)
             query = query.Where(s => s.Status == requestDto.Filters.Status);
 
@@ -113,7 +101,6 @@ public class ServiceBusiness : IServiceBusiness
             ["originid"] = s => s.OriginId,
             ["destinationid"] = s => s.DestinationId,
             ["vehicleid"] = s => s.VehicleId,
-            ["isholiday"] = s => s.IsHoliday,
             ["status"] = s => s.Status
         };
 
@@ -127,10 +114,6 @@ public class ServiceBusiness : IServiceBusiness
                 s.DestinationId,
                 s.Destination.Name,
                 s.EstimatedDuration,
-                s.DepartureHour,
-                s.StartDay,
-                s.EndDay,
-                s.IsHoliday,
                 new ServiceVehicleResponseDto(s.VehicleId,
                     s.Vehicle.InternalNumber,
                     s.Vehicle.AvailableQuantity,
@@ -138,7 +121,16 @@ public class ServiceBusiness : IServiceBusiness
                     s.Vehicle.VehicleType.Name,
                     s.Vehicle.VehicleType.ImageBase64),
                 s.Status.ToString(),
-                s.ReservePrices.Select(p => new ReservePriceReport((int)p.ReserveTypeId, p.Price)).ToList()
+                s.ReservePrices.Select(p => new ReservePriceReport((int)p.ReserveTypeId, p.Price)).ToList(),
+                s.Schedules.Select(sc => new ServiceScheduleReportResponseDto(
+                    sc.ServiceScheduleId,
+                    sc.ServiceId,
+                    sc.StartDay,
+                    sc.EndDay,
+                    sc.DepartureHour,
+                    sc.IsHoliday,
+                    sc.Status.ToString()
+                )).ToList()
             ),
             sortMappings: sortMappings
         );
@@ -156,13 +148,9 @@ public class ServiceBusiness : IServiceBusiness
             return Result.Failure<bool>(ServiceError.ServiceNotFound);
 
         service.Name = dto.Name;
-        service.StartDay = (DayOfWeek)dto.StartDay;
-        service.EndDay = (DayOfWeek)dto.EndDay;
         service.OriginId = dto.OriginId;
         service.DestinationId = dto.DestinationId;
         service.EstimatedDuration = dto.EstimatedDuration;
-        service.DepartureHour = dto.DepartureHour;
-        service.IsHoliday = dto.IsHoliday;
         service.VehicleId = dto.VehicleId;
 
         _context.Services.Update(service);
@@ -213,49 +201,38 @@ public class ServiceBusiness : IServiceBusiness
 
         var services = await _context.Services
             .Where(s => s.Status == EntityStatusEnum.Active && s.ReservePrices.Any())
+            .Include(p => p.Reserves.Where(p => p.Status != ReserveStatusEnum.Expired))
+            .Include(s => s.Schedules.Where(p => p.Status == EntityStatusEnum.Active))
             .ToListAsync();
 
         foreach (var service in services)
         {
-            var existingReserves = await _context.Reserves
-                                  .Where(r =>
-                                      r.ServiceId == service.ServiceId &&
-                                      r.ReserveDate.Date >= today &&
-                                      r.ReserveDate.Date <= endDate)
-                                  .ToListAsync();
-
-            for (var date = today; date <= endDate; date = date.AddDays(1))
+            foreach (var schedule in service.Schedules)
             {
-                if (!service.IsDayWithinServiceRange(service, date.DayOfWeek))
-                    continue;
-
-                if (IsHoliday(date) && !service.IsHoliday)
-                    continue;
-
-                var reserveDate = date.Date + service.DepartureHour;
-
-                var existing = existingReserves.FirstOrDefault(r => r.ReserveDate.Date == date.Date);
-
-                if (existing != null)
+                for (var date = today; date <= endDate; date = date.AddDays(1))
                 {
-                    if (existing.Status == ReserveStatusEnum.Expired)
+                    if (!service.IsDayWithinScheduleRange(schedule, date.DayOfWeek))
+                        continue;
+
+                    if (IsHoliday(date) && !schedule.IsHoliday)
+                        continue;
+
+                    var fullReserveDate = date.Date + schedule.DepartureHour;
+
+                    if (service.Reserves.Any(r => r.ReserveDate.Date == fullReserveDate.Date && r.ReserveDate.TimeOfDay == schedule.DepartureHour))
+                        continue;
+
+                    var reserve = new Reserve
                     {
-                        existing.ReserveDate = reserveDate;
-                        existing.Status = ReserveStatusEnum.Confirmed;
-                    }
+                        ReserveDate = fullReserveDate,
+                        ServiceId = service.ServiceId,
+                        VehicleId = service.VehicleId,
+                        Status = ReserveStatusEnum.Confirmed,
+                        ServiceScheduleId = schedule.ServiceScheduleId
+                    };
 
-                    continue;
+                    _context.Reserves.Add(reserve);
                 }
-
-                var newReserve = new Reserve
-                {
-                    ReserveDate = reserveDate,
-                    ServiceId = service.ServiceId,
-                    VehicleId = service.VehicleId,
-                    Status = ReserveStatusEnum.Confirmed,
-                };
-
-                _context.Reserves.Add(newReserve);
             }
         }
 
@@ -361,6 +338,94 @@ public class ServiceBusiness : IServiceBusiness
         reservePrice.Price = requestDto.Price;
 
         _context.ReservePrices.Update(reservePrice);
+        await _context.SaveChangesWithOutboxAsync();
+
+        return Result.Success(true);
+    }
+
+    public async Task<Result<List<ServiceSchedule>>> GetSchedulesByServiceId(int serviceId)
+    {
+        var service = await _context.Services
+            .Include(s => s.Schedules)
+            .FirstOrDefaultAsync(s => s.ServiceId == serviceId);
+
+        if (service is null)
+            return Result.Failure<List<ServiceSchedule>>(ServiceError.ServiceNotFound);
+
+        return Result.Success(service.Schedules.ToList());
+    }
+
+    public async Task<Result<int>> CreateSchedule(int serviceId, ServiceScheduleCreateDto request)
+    {
+        var service = await _context.Services.FindAsync(serviceId);
+        if (service is null)
+            return Result.Failure<int>(ServiceError.ServiceNotFound);
+
+        if (request.StartDay > request.EndDay)
+            return Result.Failure<int>(ServiceError.InvalidDayRange);
+
+        var schedule = new ServiceSchedule
+        {
+            ServiceId = serviceId,
+            StartDay = request.StartDay,
+            EndDay = request.EndDay,
+            DepartureHour = request.DepartureHour,
+            IsHoliday = request.IsHoliday,
+            Status = EntityStatusEnum.Active
+        };
+
+        _context.ServiceSchedules.Add(schedule);
+        await _context.SaveChangesWithOutboxAsync();
+
+        return Result.Success(schedule.ServiceScheduleId);
+    }
+
+    public async Task<Result<bool>> UpdateSchedule(int scheduleId, ServiceScheduleUpdateDto request)
+    {
+        var schedule = await _context.ServiceSchedules.FindAsync(scheduleId);
+
+        if (schedule is null)
+            return Result.Failure<bool>(ServiceError.ServiceScheduleNotFound);
+
+        if (request.StartDay > request.EndDay)
+            return Result.Failure<bool>(ServiceError.InvalidDayRange);
+
+        schedule.StartDay = request.StartDay;
+        schedule.EndDay = request.EndDay;
+        schedule.DepartureHour = request.DepartureHour;
+        schedule.IsHoliday = request.IsHoliday;
+
+        _context.ServiceSchedules.Update(schedule);
+        await _context.SaveChangesWithOutboxAsync();
+
+        return Result.Success(true);
+    }
+
+    public async Task<Result<bool>> DeleteSchedule(int scheduleId)
+    {
+        var schedule = await _context.ServiceSchedules.FindAsync(scheduleId);
+
+        if (schedule is null)
+            return Result.Failure<bool>(ServiceError.ServiceScheduleNotFound);
+
+        schedule.Status = EntityStatusEnum.Deleted;
+
+        _context.ServiceSchedules.Update(schedule);
+        await _context.SaveChangesWithOutboxAsync();
+
+        return Result.Success(true);
+    }
+
+    public async Task<Result<bool>> UpdateScheduleStatus(int scheduleId, EntityStatusEnum status)
+    {
+        var schedule = await _context.ServiceSchedules.FindAsync(scheduleId);
+
+        if (schedule is null)
+            return Result.Failure<bool>(ServiceError.ServiceScheduleNotFound);
+
+        schedule.Status = status;
+
+        _context.ServiceSchedules.Update(schedule);
         await _context.SaveChangesWithOutboxAsync();
 
         return Result.Success(true);

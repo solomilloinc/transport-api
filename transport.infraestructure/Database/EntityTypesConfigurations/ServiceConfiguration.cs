@@ -11,11 +11,7 @@ public class ServiceConfiguration : IEntityTypeConfiguration<Service>
         builder.ToTable("Service");
         builder.HasKey(s => s.ServiceId);
         builder.Property(s => s.Name).HasMaxLength(250).IsRequired();
-        builder.Property(s => s.StartDay).IsRequired();
-        builder.Property(s => s.EndDay).IsRequired();
         builder.Property(s => s.EstimatedDuration).IsRequired();
-        builder.Property(s => s.DepartureHour).IsRequired();
-        builder.Property(s => s.IsHoliday).IsRequired();
         builder.Property(s => s.Status).IsRequired();        
 
         builder.HasOne(s => s.Origin)

@@ -35,6 +35,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<Holiday> Holidays { get; set; }
     public DbSet<ReservePrice> ReservePrices { get; set; }
     public DbSet<CustomerReserve> CustomerReserves { get; set; }
+    public DbSet<ServiceSchedule> ServiceSchedules { get; set; }
 
     private readonly IUserContext _userContext;
 
