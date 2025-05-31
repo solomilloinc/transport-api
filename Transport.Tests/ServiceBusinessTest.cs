@@ -41,12 +41,18 @@ public class ServiceBusinessTests : TestBase
         _contextMock.Setup(x => x.Vehicles.FindAsync(It.IsAny<int>()))
             .ReturnsAsync((Vehicle)null);
 
+        var schedules = new List<ServiceScheduleCreateDto>
+    {
+        new(0,DayOfWeek.Monday, DayOfWeek.Friday, false, TimeSpan.FromHours(8))
+    };
+
         var requestDto = new ServiceCreateRequestDto(
             Name: "Test",
             OriginId: 1,
             DestinationId: 2,
             EstimatedDuration: TimeSpan.FromHours(1),
-            VehicleId: 999
+            VehicleId: 999,
+            schedules
         );
 
         var result = await _serviceBusiness.Create(requestDto);
@@ -61,12 +67,18 @@ public class ServiceBusinessTests : TestBase
         _contextMock.Setup(x => x.Vehicles.FindAsync(It.IsAny<int>()))
             .ReturnsAsync(new Vehicle { VehicleId = 1, Status = EntityStatusEnum.Inactive });
 
+        var schedules = new List<ServiceScheduleCreateDto>
+    {
+        new(0,DayOfWeek.Monday, DayOfWeek.Friday, false, TimeSpan.FromHours(8))
+    };
+
         var request = new ServiceCreateRequestDto(
             Name: "Test",
             OriginId: 1,
             DestinationId: 2,
             EstimatedDuration: TimeSpan.FromHours(1),
-            VehicleId: 1
+            VehicleId: 1,
+            schedules
         );
 
         var result = await _serviceBusiness.Create(request);
@@ -84,12 +96,18 @@ public class ServiceBusinessTests : TestBase
         _contextMock.Setup(x => x.Cities.FindAsync(It.IsAny<int>()))
             .ReturnsAsync((City)null);
 
+        var schedules = new List<ServiceScheduleCreateDto>
+    {
+        new(0,DayOfWeek.Monday, DayOfWeek.Friday, false, TimeSpan.FromHours(8))
+    };
+
         var request = new ServiceCreateRequestDto(
             Name: "Test",
             OriginId: 1,
             DestinationId: 2,
             EstimatedDuration: TimeSpan.FromHours(1),
-            VehicleId: 1
+            VehicleId: 1,
+            schedules
         );
 
         var result = await _serviceBusiness.Create(request);
@@ -108,12 +126,18 @@ public class ServiceBusinessTests : TestBase
             .ReturnsAsync(new City { CityId = 1 })
             .ReturnsAsync((City)null);
 
+        var schedules = new List<ServiceScheduleCreateDto>
+    {
+        new(0,DayOfWeek.Monday, DayOfWeek.Friday, false, TimeSpan.FromHours(8))
+    };
+
         var request = new ServiceCreateRequestDto(
             Name: "Test",
             OriginId: 1,
             DestinationId: 2,
             EstimatedDuration: TimeSpan.FromHours(1),
-            VehicleId: 1
+            VehicleId: 1,
+            schedules
         );
 
         var result = await _serviceBusiness.Create(request);
@@ -135,14 +159,23 @@ public class ServiceBusinessTests : TestBase
         _contextMock.Setup(x => x.Services.Add(It.IsAny<Service>()))
             .Callback<Service>(s => s.ServiceId = 99);
 
+        _contextMock.Setup(x => x.ServiceSchedules)
+       .Returns(GetQueryableMockDbSet(new List<ServiceSchedule>()).Object);
+
         SetupSaveChangesWithOutboxAsync(_contextMock);
+
+        var schedules = new List<ServiceScheduleCreateDto>
+    {
+        new(0,  DayOfWeek.Monday, DayOfWeek.Friday, false, TimeSpan.FromHours(8))
+    };
 
         var request = new ServiceCreateRequestDto(
             Name: "TestService",
             OriginId: 1,
             DestinationId: 2,
             EstimatedDuration: TimeSpan.FromHours(3),
-            VehicleId: 1
+            VehicleId: 1,
+            schedules
         );
 
         var result = await _serviceBusiness.Create(request);
@@ -237,17 +270,24 @@ public class ServiceBusinessTests : TestBase
 
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
+        var schedules = new List<ServiceScheduleCreateDto>
+    {
+        new(0,DayOfWeek.Monday, DayOfWeek.Friday, false, TimeSpan.FromHours(8))
+    };
+
         var result = await _serviceBusiness.Update(1, new ServiceCreateRequestDto(
             Name: "Updated",
             OriginId: 1,
             DestinationId: 2,
             EstimatedDuration: TimeSpan.FromHours(2),
-            VehicleId: 1
+            VehicleId: 1,
+            schedules
         ));
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Should().Be(ServiceError.ServiceNotFound);
     }
+  
     [Fact]
     public async Task Update_ShouldSucceed_WhenServiceExists()
     {
@@ -260,14 +300,23 @@ public class ServiceBusinessTests : TestBase
         _contextMock.Setup(x => x.Services)
             .Returns(GetQueryableMockDbSet(new List<Service> { service }).Object);
 
+        _contextMock.Setup(x => x.ServiceSchedules)
+       .Returns(GetQueryableMockDbSet(new List<ServiceSchedule>()).Object);
+
         SetupSaveChangesWithOutboxAsync(_contextMock);
+
+        var schedules = new List<ServiceScheduleCreateDto>
+    {
+        new(0,DayOfWeek.Monday, DayOfWeek.Friday, false, TimeSpan.FromHours(8))
+    };
 
         var dto = new ServiceCreateRequestDto(
             Name: "Updated",
             OriginId: 1,
             DestinationId: 2,
             EstimatedDuration: TimeSpan.FromHours(2),
-            VehicleId: 1
+            VehicleId: 1,
+            schedules
         );
 
         var result = await _serviceBusiness.Update(1, dto);

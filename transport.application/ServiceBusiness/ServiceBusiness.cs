@@ -2,8 +2,6 @@
 using Microsoft.EntityFrameworkCore;
 using Transport.Business.Data;
 using Transport.Domain.Cities;
-using Transport.Domain.Customers;
-using Transport.Domain.Drivers;
 using Transport.Domain.Reserves;
 using Transport.Domain.Services;
 using Transport.Domain.Services.Abstraction;
@@ -30,45 +28,59 @@ public class ServiceBusiness : IServiceBusiness
     public async Task<Result<int>> Create(ServiceCreateRequestDto requestDto)
     {
         Vehicle vehicle = await _context.Vehicles.FindAsync(requestDto.VehicleId);
-
-        if (vehicle == null)
-        {
+        if (vehicle is null)
             return Result.Failure<int>(VehicleError.VehicleNotFound);
-        }
 
         if (vehicle.Status != EntityStatusEnum.Active)
-        {
             return Result.Failure<int>(VehicleError.VehicleNotAvailable);
-        }
 
         City origin = await _context.Cities.FindAsync(requestDto.OriginId);
-
-        if (origin == null)
-        {
+        if (origin is null)
             return Result.Failure<int>(CityError.CityNotFound);
-        }
 
         City destination = await _context.Cities.FindAsync(requestDto.DestinationId);
-
-        if (destination == null)
-        {
+        if (destination is null)
             return Result.Failure<int>(CityError.CityNotFound);
-        }
 
-        Service service = new Service
+        var service = new Service
         {
             Name = requestDto.Name,
             OriginId = requestDto.OriginId,
             DestinationId = requestDto.DestinationId,
             EstimatedDuration = requestDto.EstimatedDuration,
             VehicleId = requestDto.VehicleId,
+            Status = EntityStatusEnum.Active
         };
 
         _context.Services.Add(service);
         await _context.SaveChangesWithOutboxAsync();
 
-        return service.ServiceId;
+        if (requestDto.Schedules?.Any() == true)
+        {
+            foreach (var scheduleDto in requestDto.Schedules)
+            {
+                if (scheduleDto.StartDay > scheduleDto.EndDay)
+                    return Result.Failure<int>(ServiceError.InvalidDayRange);
+
+                var schedule = new ServiceSchedule
+                {
+                    ServiceId = service.ServiceId,
+                    StartDay = scheduleDto.StartDay,
+                    EndDay = scheduleDto.EndDay,
+                    DepartureHour = scheduleDto.DepartureHour,
+                    IsHoliday = scheduleDto.IsHoliday,
+                    Status = EntityStatusEnum.Active
+                };
+
+                _context.ServiceSchedules.Add(schedule);
+            }
+
+            await _context.SaveChangesWithOutboxAsync();
+        }
+
+        return Result.Success(service.ServiceId);
     }
+
 
     public async Task<Result<PagedReportResponseDto<ServiceReportResponseDto>>>
         GetServiceReport(PagedReportRequestDto<ServiceReportFilterRequestDto> requestDto)
@@ -141,8 +153,9 @@ public class ServiceBusiness : IServiceBusiness
     public async Task<Result<bool>> Update(int serviceId, ServiceCreateRequestDto dto)
     {
         var service = await _context.Services
+            .Include(s => s.Schedules)
             .Include(s => s.ReservePrices)
-            .FirstOrDefaultAsync(s => s.ServiceId == serviceId);
+            .SingleOrDefaultAsync(s => s.ServiceId == serviceId);
 
         if (service == null)
             return Result.Failure<bool>(ServiceError.ServiceNotFound);
@@ -155,12 +168,33 @@ public class ServiceBusiness : IServiceBusiness
 
         _context.Services.Update(service);
 
+        if (dto.Schedules != null)
+        {
+            _context.ServiceSchedules.RemoveRange(service.Schedules);
+
+            foreach (var scheduleDto in dto.Schedules)
+            {
+                if (scheduleDto.StartDay > scheduleDto.EndDay)
+                    return Result.Failure<bool>(ServiceError.InvalidDayRange);
+
+                var newSchedule = new ServiceSchedule
+                {
+                    ServiceId = serviceId,
+                    StartDay = scheduleDto.StartDay,
+                    EndDay = scheduleDto.EndDay,
+                    DepartureHour = scheduleDto.DepartureHour,
+                    IsHoliday = scheduleDto.IsHoliday,
+                    Status = EntityStatusEnum.Active
+                };
+
+                _context.ServiceSchedules.Add(newSchedule);
+            }
+        }
+
         await _context.SaveChangesWithOutboxAsync();
 
         return Result.Success(true);
     }
-
-
 
     public async Task<Result<bool>> Delete(int serviceId)
     {

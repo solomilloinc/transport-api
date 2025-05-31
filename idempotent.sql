@@ -651,3 +651,90 @@ GO
 COMMIT;
 GO
 
+BEGIN TRANSACTION;
+GO
+
+DECLARE @var4 sysname;
+SELECT @var4 = [d].[name]
+FROM [sys].[default_constraints] [d]
+INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
+WHERE ([d].[parent_object_id] = OBJECT_ID(N'[Service]') AND [c].[name] = N'DepartureHour');
+IF @var4 IS NOT NULL EXEC(N'ALTER TABLE [Service] DROP CONSTRAINT [' + @var4 + '];');
+ALTER TABLE [Service] DROP COLUMN [DepartureHour];
+GO
+
+DECLARE @var5 sysname;
+SELECT @var5 = [d].[name]
+FROM [sys].[default_constraints] [d]
+INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
+WHERE ([d].[parent_object_id] = OBJECT_ID(N'[Service]') AND [c].[name] = N'EndDay');
+IF @var5 IS NOT NULL EXEC(N'ALTER TABLE [Service] DROP CONSTRAINT [' + @var5 + '];');
+ALTER TABLE [Service] DROP COLUMN [EndDay];
+GO
+
+DECLARE @var6 sysname;
+SELECT @var6 = [d].[name]
+FROM [sys].[default_constraints] [d]
+INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
+WHERE ([d].[parent_object_id] = OBJECT_ID(N'[Service]') AND [c].[name] = N'IsHoliday');
+IF @var6 IS NOT NULL EXEC(N'ALTER TABLE [Service] DROP CONSTRAINT [' + @var6 + '];');
+ALTER TABLE [Service] DROP COLUMN [IsHoliday];
+GO
+
+DECLARE @var7 sysname;
+SELECT @var7 = [d].[name]
+FROM [sys].[default_constraints] [d]
+INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
+WHERE ([d].[parent_object_id] = OBJECT_ID(N'[Service]') AND [c].[name] = N'StartDay');
+IF @var7 IS NOT NULL EXEC(N'ALTER TABLE [Service] DROP CONSTRAINT [' + @var7 + '];');
+ALTER TABLE [Service] DROP COLUMN [StartDay];
+GO
+
+ALTER TABLE [Reserve] ADD [ServiceScheduleId] int NOT NULL DEFAULT 0;
+GO
+
+CREATE TABLE [ServiceSchedule] (
+    [ServiceScheduleId] int NOT NULL IDENTITY,
+    [ServiceId] int NOT NULL,
+    [StartDay] int NOT NULL,
+    [EndDay] int NOT NULL,
+    [DepartureHour] time NOT NULL,
+    [IsHoliday] bit NOT NULL,
+    [Status] int NOT NULL,
+    [CreatedBy] VARCHAR(256) NOT NULL DEFAULT 'System',
+    [UpdatedBy] VARCHAR(256) NULL,
+    [CreatedDate] datetime2 NOT NULL DEFAULT (GETDATE()),
+    [UpdatedDate] datetime2 NULL,
+    CONSTRAINT [PK_ServiceSchedule] PRIMARY KEY ([ServiceScheduleId]),
+    CONSTRAINT [FK_ServiceSchedule_Service_ServiceId] FOREIGN KEY ([ServiceId]) REFERENCES [Service] ([ServiceId]) ON DELETE NO ACTION
+);
+GO
+
+UPDATE [Role] SET [CreatedDate] = '2025-05-30T01:26:03.4101367Z'
+WHERE [RoleId] = 1;
+SELECT @@ROWCOUNT;
+
+GO
+
+UPDATE [Role] SET [CreatedDate] = '2025-05-30T01:26:03.4101370Z'
+WHERE [RoleId] = 2;
+SELECT @@ROWCOUNT;
+
+GO
+
+CREATE INDEX [IX_Reserve_ServiceScheduleId] ON [Reserve] ([ServiceScheduleId]);
+GO
+
+CREATE INDEX [IX_ServiceSchedule_ServiceId] ON [ServiceSchedule] ([ServiceId]);
+GO
+
+ALTER TABLE [Reserve] ADD CONSTRAINT [FK_Reserve_ServiceSchedule_ServiceScheduleId] FOREIGN KEY ([ServiceScheduleId]) REFERENCES [ServiceSchedule] ([ServiceScheduleId]) ON DELETE NO ACTION;
+GO
+
+INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+VALUES (N'20250530012604_AddServiceSchedule', N'8.0.14');
+GO
+
+COMMIT;
+GO
+

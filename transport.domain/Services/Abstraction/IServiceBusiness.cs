@@ -18,4 +18,5 @@ public interface IServiceBusiness
     Task<Result<bool>> UpdateScheduleStatus(int scheduleId, EntityStatusEnum status);
     Task<Result<bool>> DeleteSchedule(int scheduleId);
     Task<Result<bool>> UpdateSchedule(int scheduleId, ServiceScheduleUpdateDto request);
+    Task<Result<List<ServiceSchedule>>> GetSchedulesByServiceId(int serviceId);
 }

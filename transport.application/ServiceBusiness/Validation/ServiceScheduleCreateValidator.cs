@@ -7,12 +7,6 @@ public class ServiceScheduleCreateValidator: AbstractValidator<ServiceScheduleCr
 {
     public ServiceScheduleCreateValidator()
     {
-        RuleFor(x => x.ServiceId)
-           .GreaterThan(0).WithMessage("El ID del servicio debe ser mayor a 0.");
-
-        RuleFor(x => x.DayOfWeek)
-            .InclusiveBetween(0, 6).WithMessage("El día de la semana debe estar entre 0 (domingo) y 6 (sábado).");
-
         RuleFor(x => x.DepartureHour)
             .NotEqual(TimeSpan.Zero).WithMessage("La hora de salida debe ser mayor a 00:00.");
 

@@ -39,7 +39,7 @@ public class ReservesFunction : FunctionBase
     Summary = "Create Passenger Reserves",
     Description = "Creates customer reserves for passengers, creating customers if needed.",
     Visibility = OpenApiVisibilityType.Important)]
-    [OpenApiRequestBody("application/json", typeof(CustomerReserveCreateRequestWrapperValidator), Required = true)]
+    [OpenApiRequestBody("application/json", typeof(CustomerReserveCreateRequestWrapperDto), Required = true)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(Result<bool>), Summary = "Passenger reserves created successfully.")]
     public async Task<HttpResponseData> CreatePassengerReserves(
     [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "passenger-reserves-create")] HttpRequestData req)

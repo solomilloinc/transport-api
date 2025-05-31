@@ -24,5 +24,8 @@ public class ServiceCreateRequestValidator : AbstractValidator<ServiceCreateRequ
         RuleFor(x => x.VehicleId)
             .GreaterThan(0)
             .WithMessage("Vehicle ID must be greater than 0.");
+
+        RuleForEach(x => x.Schedules)
+       .SetValidator(new ServiceScheduleCreateValidator());
     }
 }
