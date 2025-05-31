@@ -1,6 +1,7 @@
 using System.Net;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
+using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Attributes;
 using Microsoft.Extensions.Logging;
 using Transport.Domain.Services.Abstraction;
 
@@ -18,6 +19,8 @@ public class GenerateFutureReservesFunction
     }
 
     [Function("GenerateFutureReservesFunction")]
+    [OpenApiOperation(operationId: "GenerateFutureReserves", tags: new[] { "Reserves" })]
+    [OpenApiResponseWithoutBody(statusCode: HttpStatusCode.OK, Description = "Future reserves generated successfully")]
     public async Task<HttpResponseData> Run(
      [HttpTrigger(AuthorizationLevel.Anonymous, "get", "post")] HttpRequestData req)
     {

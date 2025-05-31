@@ -12,11 +12,13 @@ public class Reserve: Entity, IAuditable
     public int VehicleId { get; set; }
     public int? DriverId { get; set; }
     public int ServiceId { get; set;}
+    public int ServiceScheduleId { get; set; }
     public ReserveStatusEnum Status { get; set; }
 
     public Vehicle Vehicle { get; set; } = null!;
     public Driver? Driver { get; set; }
     public Service Service { get; set; } = null!;
+    public ServiceSchedule ServiceSchedule { get; set; } = null!;
     public ICollection<CustomerReserve> CustomerReserves { get; set; } = new List<CustomerReserve>();
 
     public string CreatedBy { get; set; } = null!;

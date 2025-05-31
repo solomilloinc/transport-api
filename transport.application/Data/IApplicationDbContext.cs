@@ -27,6 +27,6 @@ public interface IApplicationDbContext
     DbSet<Holiday> Holidays { get; }
     DbSet<ReservePrice> ReservePrices { get; }
     DbSet<CustomerReserve> CustomerReserves { get; }
-
+    DbSet<ServiceSchedule> ServiceSchedules { get; }
     Task<int> SaveChangesWithOutboxAsync(CancellationToken cancellationToken = default);
 }

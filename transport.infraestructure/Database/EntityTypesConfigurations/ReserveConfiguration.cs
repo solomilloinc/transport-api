@@ -37,6 +37,12 @@ public class ReserveConfiguration : IEntityTypeConfiguration<Reserve>
                .HasColumnType("VARCHAR(20)")
                .IsRequired();
 
+        builder.HasOne(r => r.ServiceSchedule)
+       .WithMany()
+       .HasForeignKey(r => r.ServiceScheduleId)
+       .IsRequired()
+       .OnDelete(DeleteBehavior.Restrict);
+
         builder.HasIndex(r => new { r.ServiceId, r.ReserveDate });
 
         builder.HasIndex(r => new { r.Status, r.ReserveDate });

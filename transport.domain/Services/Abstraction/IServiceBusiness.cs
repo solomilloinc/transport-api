@@ -14,4 +14,9 @@ public interface IServiceBusiness
     Task<Result<bool>> UpdatePricesByPercentageAsync(PriceMassiveUpdateRequestDto requestDto);
     Task<Result<bool>> UpdatePrice(int serviceId, ServicePriceUpdateDto requestDto);
     Task<Result<bool>> AddPrice(int serviceId, ServicePriceAddDto requestDto);
+    Task<Result<int>> CreateSchedule(int serviceId, ServiceScheduleCreateDto request);
+    Task<Result<bool>> UpdateScheduleStatus(int scheduleId, EntityStatusEnum status);
+    Task<Result<bool>> DeleteSchedule(int scheduleId);
+    Task<Result<bool>> UpdateSchedule(int scheduleId, ServiceScheduleUpdateDto request);
+    Task<Result<List<ServiceSchedule>>> GetSchedulesByServiceId(int serviceId);
 }

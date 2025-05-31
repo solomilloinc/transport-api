@@ -31,11 +31,23 @@ public class ReserveReportBusinessTest : TestBase
     {
         // Arrange
         var reserveDate = new DateTime(2024, 10, 5);
+
+        var schedule = new ServiceSchedule
+        {
+            ServiceScheduleId = 1,
+            StartDay = DayOfWeek.Monday,
+            EndDay = DayOfWeek.Friday,
+            DepartureHour = new TimeSpan(8, 0, 0),
+            IsHoliday = false,
+            Status = EntityStatusEnum.Active
+        };
+
         var service = new Service
         {
             Origin = new City { Name = "Buenos Aires" },
             Destination = new City { Name = "Córdoba" },
-            Vehicle = new Vehicle { AvailableQuantity = 3 }
+            Vehicle = new Vehicle { AvailableQuantity = 3 },
+            Schedules = new List<ServiceSchedule> { schedule }
         };
 
         var reserves = new List<Reserve>
@@ -45,6 +57,7 @@ public class ReserveReportBusinessTest : TestBase
             ReserveId = 1,
             ReserveDate = reserveDate,
             Status = ReserveStatusEnum.Confirmed,
+            ServiceSchedule = schedule,
             Service = service,
             CustomerReserves = new List<CustomerReserve>
             {
@@ -97,6 +110,16 @@ public class ReserveReportBusinessTest : TestBase
         // Arrange
         var reserveDate = new DateTime(2024, 11, 1);
 
+        var schedule = new ServiceSchedule
+        {
+            ServiceScheduleId = 1,
+            StartDay = DayOfWeek.Monday,
+            EndDay = DayOfWeek.Friday,
+            DepartureHour = new TimeSpan(8, 0, 0),
+            IsHoliday = false,
+            Status = EntityStatusEnum.Active
+        };
+
         var reserves = new List<Reserve>
     {
         new Reserve
@@ -104,11 +127,13 @@ public class ReserveReportBusinessTest : TestBase
             ReserveId = 1,
             ReserveDate = reserveDate,
             Status = ReserveStatusEnum.Confirmed,
+            ServiceSchedule = schedule,
             Service = new Service
             {
                 Origin = new City { Name = "Rosario" },
                 Destination = new City { Name = "Santa Fe" },
-                Vehicle = new Vehicle { AvailableQuantity = 2 }
+                Vehicle = new Vehicle { AvailableQuantity = 2 },
+                Schedules = new List<ServiceSchedule> { schedule }
             },
             CustomerReserves = new List<CustomerReserve>()
         },
@@ -117,11 +142,13 @@ public class ReserveReportBusinessTest : TestBase
             ReserveId = 2,
             ReserveDate = reserveDate,
             Status = ReserveStatusEnum.Confirmed,
+            ServiceSchedule = schedule,
             Service = new Service
             {
                 Origin = new City { Name = "Mendoza" },
                 Destination = new City { Name = "San Juan" },
-                Vehicle = new Vehicle { AvailableQuantity = 5 }
+                Vehicle = new Vehicle { AvailableQuantity = 5 },
+                Schedules = new List<ServiceSchedule> { schedule }
             },
             CustomerReserves = new List<CustomerReserve>()
         }
@@ -146,6 +173,7 @@ public class ReserveReportBusinessTest : TestBase
         Assert.Contains(result.Value.Items, r => r.OriginName == "Rosario");
         Assert.Contains(result.Value.Items, r => r.OriginName == "Mendoza");
     }
+
 
     [Fact]
     public async Task GetReserveReport_ShouldReturnEmptyList_WhenNoReserveMatchesDate()
