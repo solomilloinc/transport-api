@@ -16,6 +16,12 @@ public static class ReserveError
         "Reserve.PriceNotAvailable",
         "No se encontró un precio válido para el tipo de reserva.");
 
+    public static Error VehicleQuantityNotAvailable(int existing, int incoming, int capacity) =>
+      Error.Problem(
+          "Reserve.VehicleNotAvailable",
+          $"No hay suficientes asientos disponibles. Ya reservados: {existing}, nuevos: {incoming}, capacidad: {capacity}."
+      );
+
     public static Error CustomerAlreadyExists(string documentNumber) =>
         Error.Validation(
             "Reserve.CustomerAlreadyExists",
