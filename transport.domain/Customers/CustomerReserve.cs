@@ -27,4 +27,18 @@ public class CustomerReserve: IAuditable
     public Reserve Reserve { get; set; } = null!;
     public Direction PickupLocation { get; set; } = null!;
     public Direction DropoffLocation { get; set; } = null!;
+
+    public string ServiceName { get; set; } = null!;
+    public string OriginCityName { get; set; } = null!;
+    public string DestinationCityName { get; set; } = null!;
+    public string VehicleInternalNumber { get; set; } = null!;
+    public string? DriverName { get; set; }
+    public string? PickupAddress { get; set; }
+    public string? DropoffAddress { get; set; }
+    public string CustomerFullName { get; set; } = null!;
+    public string DocumentNumber { get; set; } = null!;
+    public string CustomerEmail { get; set; } = null!;
+    public string? Phone1 { get; set; }
+    public string? Phone2 { get; set; }
+
 }

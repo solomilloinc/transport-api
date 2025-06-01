@@ -2,6 +2,7 @@
 using System.Linq.Expressions;
 using Transport.Business.Data;
 using Transport.Domain.Customers;
+using Transport.Domain.Directions;
 using Transport.Domain.Reserves;
 using Transport.Domain.Reserves.Abstraction;
 using Transport.SharedKernel;
@@ -28,10 +29,18 @@ public class ReserveBusiness : IReserveBusiness
             foreach (var passenger in customerReserves.Items)
             {
                 var reserve = await _context.Reserves
-                    .Include(r => r.Service)
-                        .ThenInclude(s => s.ReservePrices)
                     .Include(r => r.CustomerReserves)
                     .SingleOrDefaultAsync(r => r.ReserveId == passenger.reserveId);
+
+                var service = await _context.Services
+                    .Include(s => s.ReservePrices)
+                    .Include(s => s.Origin)
+                    .Include(s => s.Destination)
+                    .Include(s => s.ReservePrices)
+                    .SingleOrDefaultAsync(s => s.ServiceId == reserve.ServiceId);
+
+                var vehicle = await _context.Vehicles
+                    .FindAsync(reserve.VehicleId);
 
                 if (reserve is null)
                     return Result.Failure<bool>(ReserveError.NotFound);
@@ -39,12 +48,25 @@ public class ReserveBusiness : IReserveBusiness
                 if (reserve.Status != ReserveStatusEnum.Confirmed)
                     return Result.Failure<bool>(ReserveError.NotAvailable);
 
-                var reservePrice = reserve.Service?.ReservePrices.Single(p => p.ReserveTypeId == (ReserveTypeIdEnum)passenger.ReserveTypeId);
+                var existingPassengerCount = reserve.CustomerReserves.Count;
+                var newPassengerCount = customerReserves.Items.Count;
+                var totalAfterInsert = existingPassengerCount + newPassengerCount;
+                var vehicleCapacity = vehicle.AvailableQuantity;
+
+                if (totalAfterInsert > vehicleCapacity)
+                {
+                    return Result.Failure<bool>(
+                        ReserveError.VehicleQuantityNotAvailable(existingPassengerCount, newPassengerCount, vehicleCapacity)
+                    );
+                }
+
+                var reservePrice = service.ReservePrices.Single(p => p.ReserveTypeId == (ReserveTypeIdEnum)passenger.ReserveTypeId);
                 if (reservePrice is null)
                     return Result.Failure<bool>(ReserveError.PriceNotAvailable);
 
                 if (passenger.price != reservePrice.Price)
                     return Result.Failure<bool>(ReserveError.PriceNotAvailable);
+
 
                 var customerResult = await GetOrCreateCustomerAsync(passenger);
                 if (!customerResult.IsSuccess)
@@ -54,6 +76,15 @@ public class ReserveBusiness : IReserveBusiness
 
                 if (reserve.CustomerReserves.Any(cr => cr.CustomerId == customer.CustomerId))
                     return Result.Failure<bool>(ReserveError.CustomerAlreadyExists(customer.DocumentNumber));
+
+                var pickupResult = await GetDirectionAsync(passenger.PickupLocationId, "Pickup");
+                if (pickupResult.IsFailure) return Result.Failure<bool>(pickupResult.Error);
+
+                var dropoffResult = await GetDirectionAsync(passenger.DropoffLocationId, "Dropoff");
+                if (dropoffResult.IsFailure) return Result.Failure<bool>(dropoffResult.Error);
+
+                var pickUpDirection = pickupResult.Value;
+                var dropOffDirection = dropoffResult.Value;
 
                 var newCustomerReserve = new CustomerReserve
                 {
@@ -65,7 +96,19 @@ public class ReserveBusiness : IReserveBusiness
                     Price = reservePrice.Price,
                     IsPayment = passenger.IsPayment,
                     StatusPayment = (StatusPaymentEnum)passenger.StatusPaymentId,
-                    PaymentMethod = (PaymentMethodEnum)passenger.PaymentMethodId
+                    PaymentMethod = (PaymentMethodEnum)passenger.PaymentMethodId,
+                    CustomerFullName = $"{customer.FirstName} {customer.LastName}",
+                    DestinationCityName = service.Destination.Name,
+                    OriginCityName = service.Origin.Name,
+                    DriverName = reserve.Driver is not null ? $"{reserve.Driver?.FirstName} {reserve.Driver.LastName}" : null,
+                    PickupAddress = pickUpDirection?.Name,
+                    DropoffAddress = dropOffDirection?.Name,
+                    ServiceName = service.Name,
+                    VehicleInternalNumber = vehicle.InternalNumber,
+                    CustomerEmail = customer.Email,
+                    DocumentNumber = customer.DocumentNumber,
+                    Phone1 = customer.Phone1,
+                    Phone2 = customer.Phone2
                 };
 
                 reserve.CustomerReserves.Add(newCustomerReserve);
@@ -80,6 +123,25 @@ public class ReserveBusiness : IReserveBusiness
         });
     }
 
+    private async Task<Result<Direction?>> GetDirectionAsync(int? locationId, string type)
+    {
+        if (locationId is null)
+            return Result.Success<Direction?>(null);
+
+        var direction = await _context.Directions.FindAsync(locationId);
+
+        if (direction is null)
+        {
+            return Result.Failure<Direction?>(
+                Error.NotFound(
+                    $"Direction.{type}NotFound",
+                    $"{type} direction not found"
+                )
+            );
+        }
+
+        return Result.Success<Direction?>(direction);
+    }
 
     private async Task<Result<Customer>> GetOrCreateCustomerAsync(CustomerReserveCreateRequestDto passenger)
     {
@@ -226,33 +288,31 @@ public class ReserveBusiness : IReserveBusiness
     PagedReportRequestDto<CustomerReserveReportFilterRequestDto> requestDto)
     {
         var query = _context.CustomerReserves
-            .Include(cr => cr.Customer)
             .Where(cr => cr.ReserveId == reserveId);
 
         if (!string.IsNullOrWhiteSpace(requestDto.Filters.CustomerFullName))
         {
             var nameFilter = requestDto.Filters.CustomerFullName.ToLower();
             query = query.Where(cr =>
-                (cr.Customer.FirstName + " " + cr.Customer.LastName).ToLower().Contains(nameFilter));
+                (cr.CustomerFullName).ToLower().Contains(nameFilter));
         }
 
         if (!string.IsNullOrWhiteSpace(requestDto.Filters.DocumentNumber))
         {
             var docFilter = requestDto.Filters.DocumentNumber.Trim();
-            query = query.Where(cr => cr.Customer.DocumentNumber.Contains(docFilter));
+            query = query.Where(cr => cr.DocumentNumber.Contains(docFilter));
         }
 
         if (!string.IsNullOrWhiteSpace(requestDto.Filters.Email))
         {
             var emailFilter = requestDto.Filters.Email.ToLower().Trim();
-            query = query.Where(cr => cr.Customer.Email.ToLower().Contains(emailFilter));
+            query = query.Where(cr => cr.CustomerEmail.ToLower().Contains(emailFilter));
         }
 
         var sortMappings = new Dictionary<string, Expression<Func<CustomerReserve, object>>>
         {
-            ["firstname"] = cr => cr.Customer.FirstName,
-            ["lastname"] = cr => cr.Customer.LastName,
-            ["documentnumber"] = cr => cr.Customer.DocumentNumber,
+            ["customerfullname"] = cr => cr.CustomerFullName,
+            ["documentnumber"] = cr => cr.DocumentNumber,
         };
 
         var pagedResult = await query.ToPagedReportAsync<CustomerReserveReportResponseDto, CustomerReserve, CustomerReserveReportFilterRequestDto>(
@@ -260,10 +320,10 @@ public class ReserveBusiness : IReserveBusiness
             selector: cr => new CustomerReserveReportResponseDto(
                 cr.CustomerReserveId,
                 cr.CustomerId,
-                $"{cr.Customer.FirstName} {cr.Customer.LastName}",
-                cr.Customer.DocumentNumber,
-                cr.Customer.Email,
-                $"{cr.Customer.Phone1} {cr.Customer.Phone2}",
+                cr.CustomerFullName,
+                cr.DocumentNumber,
+                cr.CustomerEmail,
+                $"{cr.Phone1} {cr.Phone2}",
                 cr.ReserveId,
                 cr.DropoffLocationId!.Value,
                 cr.PickupLocationId!.Value),

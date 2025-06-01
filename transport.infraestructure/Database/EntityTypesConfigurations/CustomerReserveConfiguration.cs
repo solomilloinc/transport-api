@@ -39,5 +39,65 @@ public class CustomerReserveConfiguration : IEntityTypeConfiguration<CustomerRes
                .HasConversion<string>()
                .HasColumnType("VARCHAR(20)")
                .IsRequired(false);
+
+        builder.Property(cr => cr.ServiceName)
+                .HasMaxLength(250)
+                .HasColumnType("VARCHAR(250)")
+                .IsRequired();
+
+        builder.Property(cr => cr.OriginCityName)
+            .HasMaxLength(100)
+            .HasColumnType("VARCHAR(100)")
+            .IsRequired();
+
+        builder.Property(cr => cr.DestinationCityName)
+            .HasMaxLength(100)
+            .HasColumnType("VARCHAR(100)")
+            .IsRequired();
+
+        builder.Property(cr => cr.VehicleInternalNumber)
+            .HasMaxLength(20)
+            .HasColumnType("VARCHAR(20)")
+            .IsRequired();
+
+        builder.Property(cr => cr.DriverName)
+            .HasMaxLength(100)
+            .HasColumnType("VARCHAR(100)")
+            .IsRequired(false);
+
+        builder.Property(cr => cr.PickupAddress)
+            .HasMaxLength(250)
+            .HasColumnType("VARCHAR(250)")
+            .IsRequired(false);
+
+        builder.Property(cr => cr.DropoffAddress)
+            .HasMaxLength(250)
+            .HasColumnType("VARCHAR(250)")
+            .IsRequired(false);
+
+        builder.Property(cr => cr.CustomerFullName)
+            .HasMaxLength(250)
+            .HasColumnType("VARCHAR(250)")
+            .IsRequired();
+
+        builder.Property(cr => cr.DocumentNumber)
+            .HasMaxLength(50)
+            .HasColumnType("VARCHAR(50)")
+            .IsRequired();
+
+        builder.Property(cr => cr.CustomerEmail)
+            .HasMaxLength(150)
+            .HasColumnType("VARCHAR(150)")
+            .IsRequired();
+
+        builder.Property(cr => cr.Phone1)
+            .HasMaxLength(30)
+            .HasColumnType("VARCHAR(30)")
+            .IsRequired(false);
+
+        builder.Property(cr => cr.Phone2)
+            .HasMaxLength(30)
+            .HasColumnType("VARCHAR(30)")
+            .IsRequired(false);
     }
 }

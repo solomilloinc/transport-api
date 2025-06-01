@@ -738,3 +738,61 @@ GO
 COMMIT;
 GO
 
+BEGIN TRANSACTION;
+GO
+
+ALTER TABLE [CustomerReserve] ADD [CustomerEmail] VARCHAR(150) NOT NULL DEFAULT '';
+GO
+
+ALTER TABLE [CustomerReserve] ADD [CustomerFullName] VARCHAR(250) NOT NULL DEFAULT '';
+GO
+
+ALTER TABLE [CustomerReserve] ADD [DestinationCityName] VARCHAR(100) NOT NULL DEFAULT '';
+GO
+
+ALTER TABLE [CustomerReserve] ADD [DocumentNumber] VARCHAR(50) NOT NULL DEFAULT '';
+GO
+
+ALTER TABLE [CustomerReserve] ADD [DriverName] VARCHAR(100) NULL;
+GO
+
+ALTER TABLE [CustomerReserve] ADD [DropoffAddress] VARCHAR(250) NULL;
+GO
+
+ALTER TABLE [CustomerReserve] ADD [OriginCityName] VARCHAR(100) NOT NULL DEFAULT '';
+GO
+
+ALTER TABLE [CustomerReserve] ADD [Phone1] VARCHAR(30) NULL;
+GO
+
+ALTER TABLE [CustomerReserve] ADD [Phone2] VARCHAR(30) NULL;
+GO
+
+ALTER TABLE [CustomerReserve] ADD [PickupAddress] VARCHAR(250) NULL;
+GO
+
+ALTER TABLE [CustomerReserve] ADD [ServiceName] VARCHAR(250) NOT NULL DEFAULT '';
+GO
+
+ALTER TABLE [CustomerReserve] ADD [VehicleInternalNumber] VARCHAR(20) NOT NULL DEFAULT '';
+GO
+
+UPDATE [Role] SET [CreatedDate] = '2025-06-01T20:42:32.3185202Z'
+WHERE [RoleId] = 1;
+SELECT @@ROWCOUNT;
+
+GO
+
+UPDATE [Role] SET [CreatedDate] = '2025-06-01T20:42:32.3185206Z'
+WHERE [RoleId] = 2;
+SELECT @@ROWCOUNT;
+
+GO
+
+INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+VALUES (N'20250601204232_DesnormalizarCustomerReserveParaReportes', N'8.0.14');
+GO
+
+COMMIT;
+GO
+
