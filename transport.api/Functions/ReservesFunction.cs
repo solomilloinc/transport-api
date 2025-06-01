@@ -89,7 +89,7 @@ public class ReservesFunction : FunctionBase
     [OpenApiRequestBody("application/json", typeof(PagedReportRequestDto<CustomerReserveReportFilterRequestDto>), Required = true)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(PagedReportResponseDto<CustomerReserveReportResponseDto>), Summary = "Customer Reserve Report")]
     public async Task<HttpResponseData> GetCustomerReserveReport(
-    [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "customer-reserve-report/{reserveId:int}")] HttpRequestData req,
+    [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "customer-reserve-report/{reserveId:int}")] HttpRequestData req,
     int reserveId)
     {
         var filter = await req.ReadFromJsonAsync<PagedReportRequestDto<CustomerReserveReportFilterRequestDto>>();
