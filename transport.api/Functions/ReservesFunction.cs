@@ -110,7 +110,7 @@ public class ReservesFunction : FunctionBase
     [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(Result<bool>), Summary = "Reserve updated successfully")]
     [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Summary = "Reserve not found")]
     public async Task<HttpResponseData> UpdateReserve(
-    [HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "reserves/{reserveId:int}")] HttpRequestData req,
+    [HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "reserve-update/{reserveId:int}")] HttpRequestData req,
     int reserveId)
     {
         var dto = await req.ReadFromJsonAsync<ReserveUpdateRequestDto>();

@@ -269,7 +269,7 @@ public class ServiceBusiness : IServiceBusiness
                         IsHoliday = schedule.IsHoliday,
                         ServiceName = service.Name,
                         OriginName = service.Origin.Name,
-                        DestinationName = service.Destination.Name,                        
+                        DestinationName = service.Destination.Name,                         
                     };
 
                     _context.Reserves.Add(reserve);
