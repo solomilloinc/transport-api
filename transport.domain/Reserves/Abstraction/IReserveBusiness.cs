@@ -15,4 +15,6 @@ public interface IReserveBusiness
     GetReserveReport(DateTime reserveDate, PagedReportRequestDto<ReserveReportFilterRequestDto> requestDto);
 
     Task<Result<PagedReportResponseDto<CustomerReserveReportResponseDto>>> GetReserveCustomerReport(int reserveId, PagedReportRequestDto<CustomerReserveReportFilterRequestDto> requestDto);
+
+    Task<Result<bool>> UpdateReserveAsync(int reserveId, ReserveUpdateRequestDto request);
 }

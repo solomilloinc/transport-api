@@ -37,6 +37,25 @@ public class ReserveConfiguration : IEntityTypeConfiguration<Reserve>
                .HasColumnType("VARCHAR(20)")
                .IsRequired();
 
+
+        builder.Property(r => r.OriginName)
+               .HasColumnType("VARCHAR(100)")
+               .IsRequired();
+
+        builder.Property(r => r.DestinationName)
+                .HasColumnType("VARCHAR(100)")
+                .IsRequired();
+
+        builder.Property(r => r.ServiceName)
+               .HasColumnType("VARCHAR(250)")
+               .IsRequired();
+
+        builder.Property(s => s.DepartureHour)
+               .IsRequired();
+
+        builder.Property(s => s.IsHoliday)
+               .IsRequired();
+
         builder.HasOne(r => r.ServiceSchedule)
        .WithMany()
        .HasForeignKey(r => r.ServiceScheduleId)

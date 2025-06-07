@@ -14,6 +14,11 @@ public class Reserve: Entity, IAuditable
     public int ServiceId { get; set;}
     public int ServiceScheduleId { get; set; }
     public ReserveStatusEnum Status { get; set; }
+    public string ServiceName { get; set; }
+    public string OriginName { get; set; }
+    public string DestinationName { get; set; }
+    public TimeSpan DepartureHour { get; set; }
+    public bool IsHoliday { get; set; }
 
     public Vehicle Vehicle { get; set; } = null!;
     public Driver? Driver { get; set; }

@@ -287,7 +287,7 @@ public class ServiceBusinessTests : TestBase
         result.IsSuccess.Should().BeFalse();
         result.Error.Should().Be(ServiceError.ServiceNotFound);
     }
-  
+
     [Fact]
     public async Task Update_ShouldSucceed_WhenServiceExists()
     {
@@ -350,7 +350,9 @@ public class ServiceBusinessTests : TestBase
             Vehicle = vehicle,
             VehicleId = vehicle.VehicleId,
             OriginId = 1,
+            Origin = new City() { CityId = 1, Name = "Origin City" },
             DestinationId = 2,
+            Destination = new City() { CityId = 2, Name = "Destination City" },
             ReservePrices = new List<ReservePrice>
         {
             new ReservePrice
@@ -480,6 +482,10 @@ public class ServiceBusinessTests : TestBase
             EstimatedDuration = TimeSpan.FromHours(2),
             VehicleId = vehicle.VehicleId,
             Vehicle = vehicle,
+            OriginId = 1,
+            Origin = new City() { CityId = 1, Name = "Origin City" },
+            DestinationId = 2,
+            Destination = new City() { CityId = 2, Name = "Destination City" },
             Schedules = new List<ServiceSchedule>
         {
             new ServiceSchedule
@@ -542,6 +548,10 @@ public class ServiceBusinessTests : TestBase
             EstimatedDuration = TimeSpan.FromHours(2),
             VehicleId = vehicle.VehicleId,
             Vehicle = vehicle,
+            OriginId = 1,
+            Origin = new City() { CityId = 1, Name = "Origin City" },
+            DestinationId = 2,
+            Destination = new City() { CityId = 2, Name = "Destination City" },
             Schedules = new List<ServiceSchedule>
         {
             new ServiceSchedule
@@ -640,7 +650,7 @@ public class ServiceBusinessTests : TestBase
         // Assert
         Assert.Empty(reserves);
     }
-   
+
     [Fact]
     public async Task UpdatePricesByPercentageAsync_ShouldUpdatePrices_WhenValidRequestDto()
     {

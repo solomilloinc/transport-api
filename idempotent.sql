@@ -796,3 +796,40 @@ GO
 COMMIT;
 GO
 
+BEGIN TRANSACTION;
+GO
+
+ALTER TABLE [Reserve] ADD [DepartureHour] time NOT NULL DEFAULT '00:00:00';
+GO
+
+ALTER TABLE [Reserve] ADD [DestinationName] VARCHAR(100) NOT NULL DEFAULT '';
+GO
+
+ALTER TABLE [Reserve] ADD [IsHoliday] bit NOT NULL DEFAULT CAST(0 AS bit);
+GO
+
+ALTER TABLE [Reserve] ADD [OriginName] VARCHAR(100) NOT NULL DEFAULT '';
+GO
+
+ALTER TABLE [Reserve] ADD [ServiceName] VARCHAR(250) NOT NULL DEFAULT '';
+GO
+
+UPDATE [Role] SET [CreatedDate] = '2025-06-07T01:18:11.3747054Z'
+WHERE [RoleId] = 1;
+SELECT @@ROWCOUNT;
+
+GO
+
+UPDATE [Role] SET [CreatedDate] = '2025-06-07T01:18:11.3747058Z'
+WHERE [RoleId] = 2;
+SELECT @@ROWCOUNT;
+
+GO
+
+INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+VALUES (N'20250607011811_AddColumnsInReserve', N'8.0.14');
+GO
+
+COMMIT;
+GO
+
