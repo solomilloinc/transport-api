@@ -59,6 +59,8 @@ public class ReserveReportBusinessTest : TestBase
             Status = ReserveStatusEnum.Confirmed,
             ServiceSchedule = schedule,
             Service = service,
+            OriginName = "Buenos Aires",
+            DestinationName = "Córdoba",
             CustomerReserves = new List<CustomerReserve>
             {
                 new CustomerReserve
@@ -75,7 +77,8 @@ public class ReserveReportBusinessTest : TestBase
                         Email = "ana@example.com",
                         Phone1 = "111",
                         Phone2 = "222"
-                    }
+                    },
+                    CustomerFullName = "Ana López"
                 }
             }
         }
@@ -135,6 +138,8 @@ public class ReserveReportBusinessTest : TestBase
                 Vehicle = new Vehicle { AvailableQuantity = 2 },
                 Schedules = new List<ServiceSchedule> { schedule }
             },
+            OriginName = "Rosario",
+            DestinationName = "Santa Fe",
             CustomerReserves = new List<CustomerReserve>()
         },
         new Reserve
@@ -150,6 +155,8 @@ public class ReserveReportBusinessTest : TestBase
                 Vehicle = new Vehicle { AvailableQuantity = 5 },
                 Schedules = new List<ServiceSchedule> { schedule }
             },
+            OriginName = "Mendoza",
+            DestinationName = "San Juan",
             CustomerReserves = new List<CustomerReserve>()
         }
     };
