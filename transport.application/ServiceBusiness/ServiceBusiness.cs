@@ -184,7 +184,7 @@ public class ServiceBusiness : IServiceBusiness
                     EndDay = scheduleDto.EndDay,
                     DepartureHour = scheduleDto.DepartureHour,
                     IsHoliday = scheduleDto.IsHoliday,
-                    Status = EntityStatusEnum.Active
+                    Status = EntityStatusEnum.Active,
                 };
 
                 _context.ServiceSchedules.Add(newSchedule);
@@ -237,6 +237,8 @@ public class ServiceBusiness : IServiceBusiness
             .Where(s => s.Status == EntityStatusEnum.Active && s.ReservePrices.Any())
             .Include(p => p.Reserves.Where(p => p.Status != ReserveStatusEnum.Expired))
             .Include(s => s.Schedules.Where(p => p.Status == EntityStatusEnum.Active))
+            .Include(s => s.Origin)
+            .Include(s => s.Destination)
             .ToListAsync();
 
         foreach (var service in services)
@@ -262,7 +264,12 @@ public class ServiceBusiness : IServiceBusiness
                         ServiceId = service.ServiceId,
                         VehicleId = service.VehicleId,
                         Status = ReserveStatusEnum.Confirmed,
-                        ServiceScheduleId = schedule.ServiceScheduleId
+                        ServiceScheduleId = schedule.ServiceScheduleId,
+                        DepartureHour = schedule.DepartureHour,
+                        IsHoliday = schedule.IsHoliday,
+                        ServiceName = service.Name,
+                        OriginName = service.Origin.Name,
+                        DestinationName = service.Destination.Name,                        
                     };
 
                     _context.Reserves.Add(reserve);

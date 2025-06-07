@@ -3,8 +3,10 @@ using System.Linq.Expressions;
 using Transport.Business.Data;
 using Transport.Domain.Customers;
 using Transport.Domain.Directions;
+using Transport.Domain.Drivers;
 using Transport.Domain.Reserves;
 using Transport.Domain.Reserves.Abstraction;
+using Transport.Domain.Vehicles;
 using Transport.SharedKernel;
 using Transport.SharedKernel.Contracts.Customer;
 using Transport.SharedKernel.Contracts.Reserve;
@@ -238,12 +240,9 @@ public class ReserveBusiness : IReserveBusiness
     PagedReportRequestDto<ReserveReportFilterRequestDto> requestDto)
     {
         var query = _context.Reserves
-            .Include(rp => rp.Service).ThenInclude(s => s.Origin)
-            .Include(rp => rp.Service).ThenInclude(s => s.Destination)
             .Include(rp => rp.Service).ThenInclude(s => s.Vehicle)
-            .Include(rp => rp.CustomerReserves).ThenInclude(cr => cr.Customer)
+            .Include(rp => rp.CustomerReserves)
             .Where(rp => rp.Status == ReserveStatusEnum.Confirmed);
-
 
         var date = reserveDate.Date;
         query = query.Where(rp => rp.ReserveDate.Date == date);
@@ -259,19 +258,19 @@ public class ReserveBusiness : IReserveBusiness
             requestDto,
             selector: rp => new ReserveReportResponseDto(
                 rp.ReserveId,
-                rp.Service.Origin.Name,
-                rp.Service.Destination.Name,
+                rp.OriginName,
+                rp.DestinationName,
                 rp.Service.Vehicle.AvailableQuantity,
                 rp.CustomerReserves.Count,
-                rp.ServiceSchedule.DepartureHour.ToString(@"hh\:mm"),
+                rp.DepartureHour.ToString(@"hh\:mm"),
                 rp.CustomerReserves
                   .Select(p => new CustomerReserveReportResponseDto(
                       p.CustomerReserveId,
                       p.CustomerId,
-                      $"{p.Customer.FirstName} {p.Customer.LastName}",
-                      p.Customer.DocumentNumber,
-                      p.Customer.Email,
-                      $"{p.Customer.Phone1} {p.Customer.Phone1}",
+                      $"{p.CustomerFullName}",
+                      p.DocumentNumber,
+                      p.CustomerEmail,
+                      $"{p.Phone1} {p.Phone2}",
                       p.ReserveId,
                       p.DropoffLocationId!.Value,
                       p.PickupLocationId!.Value))
@@ -333,4 +332,41 @@ public class ReserveBusiness : IReserveBusiness
         return Result.Success(pagedResult);
     }
 
+    public async Task<Result<bool>> UpdateReserveAsync(int reserveId, ReserveUpdateRequestDto request)
+    {
+        var reserve = await _context.Reserves
+            .FirstOrDefaultAsync(r => r.ReserveId == reserveId);
+
+        if (reserve is null)
+            return Result.Failure<bool>(ReserveError.NotFound);
+
+        if (request.VehicleId != null)
+        {
+            var vehicle = await _context.Vehicles.FindAsync(request.VehicleId);
+            if (vehicle is null)
+                return Result.Failure<bool>(VehicleError.VehicleNotFound);
+            reserve.VehicleId = request.VehicleId.Value;
+        }
+
+        if (request.DriverId != null)
+        {
+            var driver = await _context.Drivers.FindAsync(request.DriverId);
+            if (driver is null)
+                return Result.Failure<bool>(DriverError.DriverNotFound);
+            reserve.DriverId = request.DriverId.Value;
+        }
+
+        reserve.ReserveDate = request.ReserveDate ?? reserve.ReserveDate;
+        reserve.DepartureHour = request.DepartureHour ?? reserve.DepartureHour;
+
+        if (request.Status != null)
+        {
+            reserve.Status = (ReserveStatusEnum)request.Status;
+        }
+
+        _context.Reserves.Update(reserve);
+        await _context.SaveChangesWithOutboxAsync();
+
+        return Result.Success(true);
+    }
 }
