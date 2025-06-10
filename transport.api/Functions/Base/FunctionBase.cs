@@ -51,36 +51,42 @@ public abstract class FunctionBase
     }
 
     protected async Task<HttpResponseData> MatchResultAsync(
-    HttpRequestData req,
-    Result result)
+     HttpRequestData req,
+     Result result)
     {
-        return result.Match(
-            onSuccess: () => req.CreateResponse(HttpStatusCode.NoContent),
-            onFailure: error => CreateProblemResponse(req, error));
+        return await result.Match(
+            onSuccess: async () =>
+            {
+                var response = req.CreateResponse(HttpStatusCode.NoContent);
+                return response;
+            },
+            onFailure: async error => await CreateProblemResponse(req, error));
     }
 
     protected async Task<HttpResponseData> MatchResultAsync<T>(
-        HttpRequestData req,
-        Result<T> result)
+     HttpRequestData req,
+     Result<T> result)
     {
-        return result.Match(
-            onSuccess: value =>
+        return await result.Match(
+            onSuccess: async value =>
             {
                 var response = req.CreateResponse(HttpStatusCode.OK);
-                response.WriteAsJsonAsync(value);
+                await response.WriteAsJsonAsync(value); 
                 return response;
             },
-            onFailure: error => CreateProblemResponse(req, error));
+            onFailure: async error =>
+            {
+                return await CreateProblemResponse(req, error);
+            });
     }
 
-    private HttpResponseData CreateProblemResponse(HttpRequestData req, Result error)
+    private async Task<HttpResponseData> CreateProblemResponse(HttpRequestData req, Result error)
     {
         var problemDetails = CustomResults.ToProblemDetails(error);
 
-        var response = req.CreateResponse((HttpStatusCode)problemDetails.Status!.Value);
-        response.WriteAsJsonAsync(problemDetails); // Esto ya setea el header correcto
+        var response = req.CreateResponse();
+        await response.WriteAsJsonAsync(problemDetails);
+        response.StatusCode = (HttpStatusCode)problemDetails.Status!.Value;
         return response;
     }
-
-
 }
