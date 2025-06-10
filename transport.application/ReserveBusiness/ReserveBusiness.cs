@@ -10,6 +10,7 @@ using Transport.Domain.Vehicles;
 using Transport.SharedKernel;
 using Transport.SharedKernel.Contracts.Customer;
 using Transport.SharedKernel.Contracts.Reserve;
+using Transport.SharedKernel.Contracts.Service;
 
 namespace Transport.Business.ReserveBusiness;
 
@@ -239,10 +240,7 @@ public class ReserveBusiness : IReserveBusiness
     public async Task<Result<PagedReportResponseDto<ReserveReportResponseDto>>> GetReserveReport(DateTime reserveDate,
     PagedReportRequestDto<ReserveReportFilterRequestDto> requestDto)
     {
-        var query = _context.Reserves
-            .Include(rp => rp.Service).ThenInclude(s => s.Vehicle)
-            .Include(rp => rp.CustomerReserves)
-            .Where(rp => rp.Status == ReserveStatusEnum.Confirmed);
+        var query = _context.Reserves.Where(rp => rp.Status == ReserveStatusEnum.Confirmed);
 
         var date = reserveDate.Date;
         query = query.Where(rp => rp.ReserveDate.Date == date);
@@ -274,7 +272,8 @@ public class ReserveBusiness : IReserveBusiness
                       p.ReserveId,
                       p.DropoffLocationId!.Value,
                       p.PickupLocationId!.Value))
-                  .ToList()
+                  .ToList(),
+                rp.Service.ReservePrices.Select(p => new ReservePriceReport((int)p.ReserveTypeId, p.Price)).ToList()
             ),
             sortMappings: sortMappings
         );
