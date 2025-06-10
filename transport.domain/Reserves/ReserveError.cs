@@ -8,16 +8,16 @@ public static class ReserveError
         "Reserve.NotFound",
         "La reserva no fue encontrada.");
 
-    public static readonly Error NotAvailable = Error.Conflict(
+    public static readonly Error NotAvailable = Error.NotFound(
         "Reserve.NotAvailable",
         "La reserva no está disponible.");
 
-    public static readonly Error PriceNotAvailable = Error.Problem(
+    public static readonly Error PriceNotAvailable = Error.Validation(
         "Reserve.PriceNotAvailable",
         "No se encontró un precio válido para el tipo de reserva.");
 
     public static Error VehicleQuantityNotAvailable(int existing, int incoming, int capacity) =>
-      Error.Problem(
+      Error.Validation(
           "Reserve.VehicleNotAvailable",
           $"No hay suficientes asientos disponibles. Ya reservados: {existing}, nuevos: {incoming}, capacidad: {capacity}."
       );
