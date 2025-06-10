@@ -1,4 +1,6 @@
-﻿namespace Transport.SharedKernel.Contracts.Reserve;
+﻿using Transport.SharedKernel.Contracts.Service;
+
+namespace Transport.SharedKernel.Contracts.Reserve;
 
 public record ReserveReportResponseDto(int ReserveId, 
     string OriginName, 
@@ -6,4 +8,5 @@ public record ReserveReportResponseDto(int ReserveId,
     int AvailableQuantity,
     int ReservedQuantity,
     string DepartureHour,
-    List<CustomerReserveReportResponseDto> Passengers);
+    List<CustomerReserveReportResponseDto> Passengers,
+    List<ReservePriceReport> Prices);
