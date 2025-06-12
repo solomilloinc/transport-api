@@ -21,4 +21,11 @@ public static class ServiceError
             "La fecha desde no puede ser mayor a la fecha hasta",
             ErrorType.Validation
         );
+
+    public static Error ScheduleConflict(DayOfWeek startDay, DayOfWeek endDay, TimeSpan departureHour) =>
+          new Error(
+              "Service.ScheduleConflict",
+              $"Hay conflictos de días y horarios en el servicio para el día {startDay} y {endDay} a las {departureHour}.",
+              ErrorType.Validation
+          );
 }

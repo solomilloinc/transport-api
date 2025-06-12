@@ -52,15 +52,61 @@ public class ServiceBusiness : IServiceBusiness
             Status = EntityStatusEnum.Active
         };
 
-        _context.Services.Add(service);
-        await _context.SaveChangesWithOutboxAsync();
-
         if (requestDto.Schedules?.Any() == true)
         {
+            for (int i = 0; i < requestDto.Schedules.Count; i++)
+            {
+                var current = requestDto.Schedules[i];
+
+                if (current.StartDay > current.EndDay)
+                    return Result.Failure<int>(ServiceError.InvalidDayRange);
+
+                for (int j = i + 1; j < requestDto.Schedules.Count; j++)
+                {
+                    var compare = requestDto.Schedules[j];
+
+                    bool overlap =
+                        current.IsHoliday == compare.IsHoliday &&
+                        current.DepartureHour == compare.DepartureHour &&
+                        current.StartDay <= compare.EndDay &&
+                        current.EndDay >= compare.StartDay;
+
+                    if (overlap)
+                    {
+                        return Result.Failure<int>(
+                            ServiceError.ScheduleConflict(
+                                current.StartDay,
+                                current.EndDay,
+                                current.DepartureHour
+                            )
+                        );
+                    }
+                }
+            }
+
             foreach (var scheduleDto in requestDto.Schedules)
             {
                 if (scheduleDto.StartDay > scheduleDto.EndDay)
                     return Result.Failure<int>(ServiceError.InvalidDayRange);
+
+                var overlappingSchedules = await _context.ServiceSchedules
+                    .Include(s => s.Service)
+                    .Where(s =>
+                        s.Status == EntityStatusEnum.Active &&
+                        s.IsHoliday == scheduleDto.IsHoliday &&
+                        scheduleDto.StartDay <= s.EndDay &&
+                        scheduleDto.EndDay >= s.StartDay &&
+                        s.DepartureHour == scheduleDto.DepartureHour)
+                    .ToListAsync();
+
+                if (overlappingSchedules.Any())
+                    return Result.Failure<int>(
+                   ServiceError.ScheduleConflict(
+                       scheduleDto.StartDay,
+                       scheduleDto.EndDay,
+                       scheduleDto.DepartureHour
+                   ));
+
 
                 var schedule = new ServiceSchedule
                 {
@@ -72,11 +118,12 @@ public class ServiceBusiness : IServiceBusiness
                     Status = EntityStatusEnum.Active
                 };
 
-                _context.ServiceSchedules.Add(schedule);
+                service.Schedules.Add(schedule);
             }
-
-            await _context.SaveChangesWithOutboxAsync();
         }
+
+        await _context.Services.AddAsync(service);
+        await _context.SaveChangesWithOutboxAsync();
 
         return Result.Success(service.ServiceId);
     }
@@ -166,17 +213,70 @@ public class ServiceBusiness : IServiceBusiness
         service.EstimatedDuration = dto.EstimatedDuration;
         service.VehicleId = dto.VehicleId;
 
-        _context.Services.Update(service);
-
-        if (dto.Schedules != null)
+        if (dto.Schedules?.Any() == true)
         {
-            _context.ServiceSchedules.RemoveRange(service.Schedules);
+            for (int i = 0; i < dto.Schedules.Count; i++)
+            {
+                var current = dto.Schedules[i];
+
+                if (current.StartDay > current.EndDay)
+                    return Result.Failure<bool>(ServiceError.InvalidDayRange);
+
+                for (int j = i + 1; j < dto.Schedules.Count; j++)
+                {
+                    var compare = dto.Schedules[j];
+
+                    bool overlap =
+                        current.IsHoliday == compare.IsHoliday &&
+                        current.DepartureHour == compare.DepartureHour &&
+                        current.StartDay <= compare.EndDay &&
+                        current.EndDay >= compare.StartDay;
+
+                    if (overlap)
+                    {
+                        return Result.Failure<bool>(
+                            ServiceError.ScheduleConflict(
+                                current.StartDay,
+                                current.EndDay,
+                                current.DepartureHour
+                            )
+                        );
+                    }
+                }
+            }
 
             foreach (var scheduleDto in dto.Schedules)
             {
                 if (scheduleDto.StartDay > scheduleDto.EndDay)
                     return Result.Failure<bool>(ServiceError.InvalidDayRange);
 
+                var overlappingSchedules = await _context.ServiceSchedules
+                    .Include(s => s.Service)
+                    .Where(s =>
+                        s.ServiceId != serviceId &&
+                        s.Status == EntityStatusEnum.Active &&
+                        s.IsHoliday == scheduleDto.IsHoliday &&
+                        scheduleDto.StartDay <= s.EndDay &&
+                        scheduleDto.EndDay >= s.StartDay &&
+                        s.DepartureHour == scheduleDto.DepartureHour)
+                    .ToListAsync();
+
+                if (overlappingSchedules.Any())
+                {
+                    return Result.Failure<bool>(
+                        ServiceError.ScheduleConflict(
+                            scheduleDto.StartDay,
+                            scheduleDto.EndDay,
+                            scheduleDto.DepartureHour
+                        )
+                    );
+                }
+            }
+
+            _context.ServiceSchedules.RemoveRange(service.Schedules);
+
+            foreach (var scheduleDto in dto.Schedules)
+            {
                 var newSchedule = new ServiceSchedule
                 {
                     ServiceId = serviceId,
@@ -191,10 +291,12 @@ public class ServiceBusiness : IServiceBusiness
             }
         }
 
+        _context.Services.Update(service);
         await _context.SaveChangesWithOutboxAsync();
 
         return Result.Success(true);
     }
+
 
     public async Task<Result<bool>> Delete(int serviceId)
     {
@@ -269,7 +371,7 @@ public class ServiceBusiness : IServiceBusiness
                         IsHoliday = schedule.IsHoliday,
                         ServiceName = service.Name,
                         OriginName = service.Origin.Name,
-                        DestinationName = service.Destination.Name,                         
+                        DestinationName = service.Destination.Name,
                     };
 
                     _context.Reserves.Add(reserve);
