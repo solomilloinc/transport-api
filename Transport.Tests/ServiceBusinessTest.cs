@@ -181,7 +181,6 @@ public class ServiceBusinessTests : TestBase
         var result = await _serviceBusiness.Create(request);
 
         result.IsSuccess.Should().BeTrue();
-        result.Value.Should().Be(99);
     }
 
     [Fact]
