@@ -261,6 +261,8 @@ public class ReserveBusiness : IReserveBusiness
                 rp.Service.Vehicle.AvailableQuantity,
                 rp.CustomerReserves.Count,
                 rp.DepartureHour.ToString(@"hh\:mm"),
+                rp.VehicleId,
+                rp.DriverId.GetValueOrDefault(),
                 rp.CustomerReserves
                   .Select(p => new CustomerReserveReportResponseDto(
                       p.CustomerReserveId,

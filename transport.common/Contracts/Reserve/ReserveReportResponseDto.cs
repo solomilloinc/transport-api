@@ -8,5 +8,7 @@ public record ReserveReportResponseDto(int ReserveId,
     int AvailableQuantity,
     int ReservedQuantity,
     string DepartureHour,
+    int VehicleId, 
+    int DriverId,
     List<CustomerReserveReportResponseDto> Passengers,
     List<ReservePriceReport> Prices);
