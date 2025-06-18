@@ -28,5 +28,6 @@ public interface IApplicationDbContext
     DbSet<ReservePrice> ReservePrices { get; }
     DbSet<CustomerReserve> CustomerReserves { get; }
     DbSet<ServiceSchedule> ServiceSchedules { get; }
+    DbSet<ReservePayment> ReservePayments { get; }
     Task<int> SaveChangesWithOutboxAsync(CancellationToken cancellationToken = default);
 }

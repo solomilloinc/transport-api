@@ -36,6 +36,8 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<ReservePrice> ReservePrices { get; set; }
     public DbSet<CustomerReserve> CustomerReserves { get; set; }
     public DbSet<ServiceSchedule> ServiceSchedules { get; set; }
+    public DbSet<ReservePayment> ReservePayments { get; set; }
+
 
     private readonly IUserContext _userContext;
 

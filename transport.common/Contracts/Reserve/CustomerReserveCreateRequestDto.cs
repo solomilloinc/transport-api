@@ -10,6 +10,4 @@ public record CustomerReserveCreateRequestDto(int reserveId,
     int? DropoffLocationId,
     bool HasTraveled,
     decimal price,
-    int StatusPaymentId,
-    int PaymentMethodId,
     CustomerCreateRequestDto? CustomerCreate);

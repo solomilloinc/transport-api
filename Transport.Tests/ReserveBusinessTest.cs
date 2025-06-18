@@ -7,6 +7,14 @@ using Transport.Domain.Vehicles;
 using Transport.Domain.Drivers;
 using Transport.SharedKernel.Contracts.Reserve;
 using Xunit;
+using static Google.Protobuf.Reflection.SourceCodeInfo.Types;
+using Transport.Domain.Cities;
+using Transport.Domain.Customers;
+using Transport.Domain.Services;
+using Transport.SharedKernel.Contracts.Customer;
+using Transport.SharedKernel;
+using Transport.Domain.Directions;
+using System.Data;
 
 namespace Transport.Tests.ReserveBusinessTests;
 
@@ -99,4 +107,124 @@ public class ReserveBusinessTests : TestBase
         reserve.DepartureHour.Should().Be(TimeSpan.FromHours(10));
         reserve.Status.Should().Be(ReserveStatusEnum.Confirmed);
     }
+
+    [Theory]
+    [InlineData(1, 1)]
+    [InlineData(1, 2)]
+    [InlineData(2, 1)]
+    [InlineData(2, 2)]
+    [InlineData(2, 3)]
+    public async Task CreatePassengerReserves_Payments_ParentChildLogic_Works(int reserveCount, int paymentCount)
+    {
+        // Arrange
+
+        var reservesList = Enumerable.Range(1, reserveCount).Select(i => new Reserve
+        {
+            ReserveId = i,
+            Status = ReserveStatusEnum.Confirmed,
+            CustomerReserves = new List<CustomerReserve>(),
+            VehicleId = 1,
+            ServiceId = 1,
+            Driver = new Driver { FirstName = "John", LastName = "Doe" }
+        }).ToList();
+
+        var vehicle = new Vehicle { VehicleId = 1, AvailableQuantity = 10 };
+        var service = new Service
+        {
+            ServiceId = 1,
+            ReservePrices = new List<ReservePrice> { new ReservePrice { ReserveTypeId = ReserveTypeIdEnum.IdaVuelta, Price = 100 } },
+            Origin = new City { Name = "CityA" },
+            Destination = new City { Name = "CityB" }
+        };
+        var customer = new Customer
+        {
+            CustomerId = 1,
+            FirstName = "Jane",
+            LastName = "Smith",
+            DocumentNumber = "123456",
+            Email = "jane@example.com"
+        };
+
+
+        var origin = new Direction { DirectionId = 10, Name = "PickupLocation" };
+        var destination = new Direction { DirectionId = 20, Name = "DropoffLocation" };
+
+
+        // Mock DbSets con identidad para ReservePayment
+        var reservePaymentsList = new List<ReservePayment>();
+        var reservePaymentsDbSet = GetMockDbSetWithIdentity(reservePaymentsList);
+        _contextMock.Setup(c => c.ReservePayments).Returns(reservePaymentsDbSet.Object);
+
+        _contextMock.Setup(c => c.Reserves).Returns(GetMockDbSetWithIdentity(reservesList).Object);
+        _contextMock.Setup(c => c.Vehicles.FindAsync(It.IsAny<int>())).ReturnsAsync(vehicle);
+        _contextMock.Setup(c => c.Services).Returns(GetMockDbSetWithIdentity(new List<Service> { service }).Object);
+        _contextMock.Setup(c => c.Customers.FindAsync(It.IsAny<int>())).ReturnsAsync(customer);
+        _contextMock.Setup(c => c.Directions.FindAsync(It.IsAny<int>())).ReturnsAsync(destination);
+        _contextMock.Setup(c => c.Directions.FindAsync(It.IsAny<int>())).ReturnsAsync(origin);
+
+        // Setup SaveChanges
+        SetupSaveChangesWithOutboxAsync(_contextMock);
+
+        // Setup ExecuteInTransactionAsync para ejecutar el delegado normalmente
+        _unitOfWorkMock
+    .Setup(uow => uow.ExecuteInTransactionAsync<Result<bool>>(It.IsAny<Func<Task<Result<bool>>>>(), It.IsAny<IsolationLevel>()))
+    .Returns<Func<Task<Result<bool>>>, IsolationLevel>(async (func, _) => await func());
+
+        // Construir pasajeros para cada reserva
+        var passengers = Enumerable.Range(1, reserveCount).Select(i =>
+            new CustomerReserveCreateRequestDto(
+                reserveId: i,
+                ReserveTypeId: (int)ReserveTypeIdEnum.IdaVuelta,
+                CustomerId: 1,
+                IsPayment: true,
+                PickupLocationId: 1,
+                DropoffLocationId: 2,
+                HasTraveled: false,
+                price: 100,
+                CustomerCreate: null
+            )
+        ).ToList();
+
+        // Crear lista de pagos con paymentCount medios, sumando el total esperado
+        var totalAmount = 100m * reserveCount;
+        var payments = new List<CreatePaymentRequestDto>();
+
+        if (paymentCount == 1)
+        {
+            payments.Add(new CreatePaymentRequestDto(totalAmount, 1));
+        }
+        else
+        {
+            var partialAmount = totalAmount / paymentCount;
+            for (int i = 0; i < paymentCount; i++)
+            {
+                payments.Add(new CreatePaymentRequestDto(partialAmount, 1));
+            }
+        }
+
+        var request = new CustomerReserveCreateRequestWrapperDto(payments, passengers);
+
+        // Act
+        var result = await _reserveBusiness.CreatePassengerReserves(request);
+
+        // Assert
+        Assert.True(result.IsSuccess);
+
+        // Debe haber tantos pagos como paymentCount
+        Assert.Equal(paymentCount, reservePaymentsList.Count);
+
+        var parent = reservePaymentsList.First();
+
+        // El parent debe tener el monto del primer pago y ParentReservePaymentId null
+        Assert.Equal(payments[0].TransactionAmount, parent.Amount);
+        Assert.Null(parent.ParentReservePaymentId);
+
+        // Los hijos tienen monto 0 y apuntan al padre
+        foreach (var child in reservePaymentsList.Skip(1))
+        {
+            Assert.Equal(0, child.Amount);
+            Assert.Equal(parent.ReservePaymentId, child.ParentReservePaymentId);
+        }
+    }
+
 }

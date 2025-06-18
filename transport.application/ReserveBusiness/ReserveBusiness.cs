@@ -29,21 +29,16 @@ public class ReserveBusiness : IReserveBusiness
     {
         return await _unitOfWork.ExecuteInTransactionAsync(async () =>
         {
+            decimal totalExpectedAmount = 0m;
+            Customer? customer = null;
+
+            var mainReserveId = customerReserves.Items.Min(i => i.reserveId);
+
             foreach (var passenger in customerReserves.Items)
             {
                 var reserve = await _context.Reserves
                     .Include(r => r.CustomerReserves)
                     .SingleOrDefaultAsync(r => r.ReserveId == passenger.reserveId);
-
-                var service = await _context.Services
-                    .Include(s => s.ReservePrices)
-                    .Include(s => s.Origin)
-                    .Include(s => s.Destination)
-                    .Include(s => s.ReservePrices)
-                    .SingleOrDefaultAsync(s => s.ServiceId == reserve.ServiceId);
-
-                var vehicle = await _context.Vehicles
-                    .FindAsync(reserve.VehicleId);
 
                 if (reserve is null)
                     return Result.Failure<bool>(ReserveError.NotFound);
@@ -51,31 +46,30 @@ public class ReserveBusiness : IReserveBusiness
                 if (reserve.Status != ReserveStatusEnum.Confirmed)
                     return Result.Failure<bool>(ReserveError.NotAvailable);
 
+                var service = await _context.Services
+                    .Include(s => s.ReservePrices)
+                    .Include(s => s.Origin)
+                    .Include(s => s.Destination)
+                    .SingleOrDefaultAsync(s => s.ServiceId == reserve.ServiceId);
+
+                var vehicle = await _context.Vehicles.FindAsync(reserve.VehicleId);
+
                 var existingPassengerCount = reserve.CustomerReserves.Count;
-                var newPassengerCount = customerReserves.Items.Count;
-                var totalAfterInsert = existingPassengerCount + newPassengerCount;
-                var vehicleCapacity = vehicle.AvailableQuantity;
+                var totalAfterInsert = existingPassengerCount + customerReserves.Items.Count;
 
-                if (totalAfterInsert > vehicleCapacity)
-                {
+                if (totalAfterInsert > vehicle.AvailableQuantity)
                     return Result.Failure<bool>(
-                        ReserveError.VehicleQuantityNotAvailable(existingPassengerCount, newPassengerCount, vehicleCapacity)
-                    );
-                }
+                        ReserveError.VehicleQuantityNotAvailable(existingPassengerCount, customerReserves.Items.Count, vehicle.AvailableQuantity));
 
-                var reservePrice = service.ReservePrices.Single(p => p.ReserveTypeId == (ReserveTypeIdEnum)passenger.ReserveTypeId);
-                if (reservePrice is null)
+                var reservePrice = service.ReservePrices.SingleOrDefault(p => p.ReserveTypeId == (ReserveTypeIdEnum)passenger.ReserveTypeId);
+                if (reservePrice is null || passenger.price != reservePrice.Price)
                     return Result.Failure<bool>(ReserveError.PriceNotAvailable);
-
-                if (passenger.price != reservePrice.Price)
-                    return Result.Failure<bool>(ReserveError.PriceNotAvailable);
-
 
                 var customerResult = await GetOrCreateCustomerAsync(passenger);
                 if (!customerResult.IsSuccess)
                     return Result.Failure<bool>(customerResult.Error);
 
-                var customer = customerResult.Value;
+                customer = customerResult.Value;
 
                 if (reserve.CustomerReserves.Any(cr => cr.CustomerId == customer.CustomerId))
                     return Result.Failure<bool>(ReserveError.CustomerAlreadyExists(customer.DocumentNumber));
@@ -86,9 +80,6 @@ public class ReserveBusiness : IReserveBusiness
                 var dropoffResult = await GetDirectionAsync(passenger.DropoffLocationId, "Dropoff");
                 if (dropoffResult.IsFailure) return Result.Failure<bool>(dropoffResult.Error);
 
-                var pickUpDirection = pickupResult.Value;
-                var dropOffDirection = dropoffResult.Value;
-
                 var newCustomerReserve = new CustomerReserve
                 {
                     Customer = customer,
@@ -98,14 +89,12 @@ public class ReserveBusiness : IReserveBusiness
                     HasTraveled = passenger.HasTraveled,
                     Price = reservePrice.Price,
                     IsPayment = passenger.IsPayment,
-                    StatusPayment = (StatusPaymentEnum)passenger.StatusPaymentId,
-                    PaymentMethod = (PaymentMethodEnum)passenger.PaymentMethodId,
                     CustomerFullName = $"{customer.FirstName} {customer.LastName}",
                     DestinationCityName = service.Destination.Name,
                     OriginCityName = service.Origin.Name,
-                    DriverName = reserve.Driver is not null ? $"{reserve.Driver?.FirstName} {reserve.Driver.LastName}" : null,
-                    PickupAddress = pickUpDirection?.Name,
-                    DropoffAddress = dropOffDirection?.Name,
+                    DriverName = reserve.Driver != null ? $"{reserve.Driver.FirstName} {reserve.Driver.LastName}" : null,
+                    PickupAddress = pickupResult.Value?.Name,
+                    DropoffAddress = dropoffResult.Value?.Name,
                     ServiceName = service.Name,
                     VehicleInternalNumber = vehicle.InternalNumber,
                     CustomerEmail = customer.Email,
@@ -115,15 +104,58 @@ public class ReserveBusiness : IReserveBusiness
                 };
 
                 reserve.CustomerReserves.Add(newCustomerReserve);
-
                 reserve.Raise(new CustomerReserveCreatedEvent(newCustomerReserve.CustomerReserveId));
-
                 _context.Reserves.Update(reserve);
+
+                totalExpectedAmount += reservePrice.Price;
+            }
+
+            var totalProvidedAmount = customerReserves.Payments.Sum(p => p.TransactionAmount);
+            if (totalExpectedAmount != totalProvidedAmount)
+                return Result.Failure<bool>(ReserveError.InvalidPaymentAmount(totalExpectedAmount, totalProvidedAmount));
+
+            var parentPaymentDto = customerReserves.Payments.First();
+
+            var parentPayment = new ReservePayment
+            {
+                ReserveId = customerReserves.Items.First().reserveId, // o alguna lógica fija (ida)
+                CustomerId = customer!.CustomerId,
+                Amount = parentPaymentDto.TransactionAmount,
+                Method = (PaymentMethodEnum)parentPaymentDto.PaymentMethod,
+                Status = StatusPaymentEnum.Paid
+            };
+
+            _context.ReservePayments.Add(parentPayment);
+            await _context.SaveChangesWithOutboxAsync();
+
+            var parentId = parentPayment.ReservePaymentId;
+
+            var remainingPayments = customerReserves.Payments.Skip(1).ToList();
+            var reserveIds = customerReserves.Items.Select(i => i.reserveId).Distinct().ToList();
+
+            for (int i = 0; i < remainingPayments.Count; i++)
+            {
+                var paymentDto = remainingPayments[i];
+
+                var reserveId = reserveIds.ElementAtOrDefault(i + 1) != 0 ? reserveIds.ElementAtOrDefault(i + 1) : reserveIds.First();
+
+                var childPayment = new ReservePayment
+                {
+                    ReserveId = reserveId,
+                    CustomerId = customer.CustomerId,
+                    Amount = 0,
+                    Method = (PaymentMethodEnum)paymentDto.PaymentMethod,
+                    Status = StatusPaymentEnum.Paid,
+                    ParentReservePaymentId = parentId
+                };
+
+                _context.ReservePayments.Add(childPayment);
             }
 
             await _context.SaveChangesWithOutboxAsync();
             return Result.Success(true);
         });
+
     }
 
     private async Task<Result<Direction?>> GetDirectionAsync(int? locationId, string type)

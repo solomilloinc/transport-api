@@ -13,7 +13,6 @@ public class CustomerReserveConfiguration : IEntityTypeConfiguration<CustomerRes
         builder.HasKey(cr => cr.CustomerReserveId);
 
         builder.Property(cr => cr.IsPayment).IsRequired();
-        builder.Property(cr => cr.StatusPayment).HasMaxLength(50).IsRequired();
         builder.Property(cr => cr.Price).HasColumnType("decimal(10,2)").IsRequired();
         builder.Property(cr => cr.HasTraveled).HasDefaultValue(false);
 
@@ -34,11 +33,6 @@ public class CustomerReserveConfiguration : IEntityTypeConfiguration<CustomerRes
                .WithMany(d => d.DropoffCustomerReserves)
                .HasForeignKey(cr => cr.DropoffLocationId)
                .OnDelete(DeleteBehavior.NoAction);
-
-        builder.Property(r => r.PaymentMethod)
-               .HasConversion<string>()
-               .HasColumnType("VARCHAR(20)")
-               .IsRequired(false);
 
         builder.Property(cr => cr.ServiceName)
                 .HasMaxLength(250)

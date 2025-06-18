@@ -833,3 +833,74 @@ GO
 COMMIT;
 GO
 
+BEGIN TRANSACTION;
+GO
+
+DECLARE @var8 sysname;
+SELECT @var8 = [d].[name]
+FROM [sys].[default_constraints] [d]
+INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
+WHERE ([d].[parent_object_id] = OBJECT_ID(N'[CustomerReserve]') AND [c].[name] = N'PaymentMethod');
+IF @var8 IS NOT NULL EXEC(N'ALTER TABLE [CustomerReserve] DROP CONSTRAINT [' + @var8 + '];');
+ALTER TABLE [CustomerReserve] DROP COLUMN [PaymentMethod];
+GO
+
+DECLARE @var9 sysname;
+SELECT @var9 = [d].[name]
+FROM [sys].[default_constraints] [d]
+INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
+WHERE ([d].[parent_object_id] = OBJECT_ID(N'[CustomerReserve]') AND [c].[name] = N'StatusPayment');
+IF @var9 IS NOT NULL EXEC(N'ALTER TABLE [CustomerReserve] DROP CONSTRAINT [' + @var9 + '];');
+ALTER TABLE [CustomerReserve] DROP COLUMN [StatusPayment];
+GO
+
+ALTER TABLE [CustomerReserve] ADD [ReferencePaymentId] int NULL;
+GO
+
+CREATE TABLE [ReservePayment] (
+    [ReservePaymentId] int NOT NULL IDENTITY,
+    [ReserveId] int NOT NULL,
+    [Method] VARCHAR(20) NOT NULL,
+    [Status] VARCHAR(20) NOT NULL,
+    [CustomerId] int NOT NULL,
+    [Amount] decimal(18,2) NOT NULL,
+    [ParentReservePaymentId] int NULL,
+    [CreatedBy] VARCHAR(256) NOT NULL DEFAULT 'System',
+    [UpdatedBy] VARCHAR(256) NULL,
+    [CreatedDate] datetime2 NOT NULL DEFAULT (GETDATE()),
+    [UpdatedDate] datetime2 NULL,
+    CONSTRAINT [PK_ReservePayment] PRIMARY KEY ([ReservePaymentId]),
+    CONSTRAINT [FK_ReservePayment_Customer_CustomerId] FOREIGN KEY ([CustomerId]) REFERENCES [Customer] ([CustomerId]) ON DELETE CASCADE,
+    CONSTRAINT [FK_ReservePayment_ReservePayment_ParentReservePaymentId] FOREIGN KEY ([ParentReservePaymentId]) REFERENCES [ReservePayment] ([ReservePaymentId]) ON DELETE NO ACTION,
+    CONSTRAINT [FK_ReservePayment_Reserve_ReserveId] FOREIGN KEY ([ReserveId]) REFERENCES [Reserve] ([ReserveId]) ON DELETE CASCADE
+);
+GO
+
+UPDATE [Role] SET [CreatedDate] = '2025-06-18T04:36:00.1032752Z'
+WHERE [RoleId] = 1;
+SELECT @@ROWCOUNT;
+
+GO
+
+UPDATE [Role] SET [CreatedDate] = '2025-06-18T04:36:00.1032754Z'
+WHERE [RoleId] = 2;
+SELECT @@ROWCOUNT;
+
+GO
+
+CREATE INDEX [IX_ReservePayment_CustomerId] ON [ReservePayment] ([CustomerId]);
+GO
+
+CREATE INDEX [IX_ReservePayment_ParentReservePaymentId] ON [ReservePayment] ([ParentReservePaymentId]);
+GO
+
+CREATE INDEX [IX_ReservePayment_ReserveId] ON [ReservePayment] ([ReserveId]);
+GO
+
+INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+VALUES (N'20250618043600_AddReservePayment', N'8.0.14');
+GO
+
+COMMIT;
+GO
+

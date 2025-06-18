@@ -2,11 +2,16 @@
 
 namespace Transport.SharedKernel.Contracts.Customer;
 
-public record CustomerReserveCreateRequestWrapperDto(List<CustomerReserveCreateRequestDto> Items);
+//Admin
+public record CustomerReserveCreateRequestWrapperDto(List<CreatePaymentRequestDto> Payments, List<CustomerReserveCreateRequestDto> Items);
 
-public record CustomerCreateRequestDto(string FirstName, 
-    string LastName, 
-    string Email, 
-    string DocumentNumber, 
-    string Phone1, 
+//ReservePayment
+public record CreatePaymentRequestDto(decimal TransactionAmount,
+    int PaymentMethod);
+
+public record CustomerCreateRequestDto(string FirstName,
+    string LastName,
+    string Email,
+    string DocumentNumber,
+    string Phone1,
     string? Phone2);
