@@ -9,14 +9,13 @@ public class CustomerReserve: IAuditable
     public int? UserId { get; set; }
     public int CustomerId { get; set; }
     public int ReserveId { get; set; }
-    public PaymentMethodEnum? PaymentMethod { get; set; }
     public bool IsPayment { get; set; }
-    public StatusPaymentEnum StatusPayment { get; set; }
     public ReserveStatusEnum Status { get; set; }
     public decimal Price { get; set; }
     public int? PickupLocationId { get; set; }
     public int? DropoffLocationId { get; set; }
     public bool HasTraveled { get; set; }
+    public int? ReferencePaymentId { get; set; }
 
     public string CreatedBy { get; set; } = null!;
     public string? UpdatedBy { get; set; }

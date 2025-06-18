@@ -26,4 +26,10 @@ public static class ReserveError
         Error.Validation(
             "Reserve.CustomerAlreadyExists",
             $"El pasajero con documento {documentNumber} ya existe en la reserva.");
+
+    public static Error InvalidPaymentAmount(decimal expected, decimal provided) =>
+    Error.Validation(
+        "Reserve.InvalidPaymentAmount",
+        $"El monto total pagado (${provided}) no coincide con el precio esperado (${expected})."
+    );
 }
