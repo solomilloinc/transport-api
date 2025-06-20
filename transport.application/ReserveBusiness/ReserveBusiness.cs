@@ -6,6 +6,7 @@ using Transport.Domain.Directions;
 using Transport.Domain.Drivers;
 using Transport.Domain.Reserves;
 using Transport.Domain.Reserves.Abstraction;
+using Transport.Domain.Services;
 using Transport.Domain.Vehicles;
 using Transport.SharedKernel;
 using Transport.SharedKernel.Contracts.Customer;
@@ -443,6 +444,26 @@ public class ReserveBusiness : IReserveBusiness
                 var duplicatedList = string.Join(", ", duplicatedMethods);
                 return Result.Failure<bool>(Error.Validation("Payments.DuplicatedMethod", $"Los métodos de pago no deben repetirse. Duplicados: {duplicatedList}"));
             }
+
+            var service = await _context.Services
+                                        .Include(s => s.ReservePrices)
+                                        .SingleOrDefaultAsync(s => s.ServiceId == reserve.ServiceId);
+
+            if (service == null)
+                return Result.Failure<bool>(ServiceError.ServiceNotFound);
+
+            var reservePrice = service.ReservePrices
+                .FirstOrDefault(p => p.ReserveTypeId == ReserveTypeIdEnum.Ida);
+
+            if (reservePrice == null)
+                return Result.Failure<bool>(ReserveError.PriceNotAvailable);
+
+            var expectedAmount = reservePrice.Price;
+            var providedAmount = payments.Sum(p => p.TransactionAmount);
+
+            if (expectedAmount != providedAmount)
+                return Result.Failure<bool>(
+                    ReserveError.InvalidPaymentAmount(expectedAmount, providedAmount));
 
             foreach (var payment in payments)
             {

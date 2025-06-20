@@ -322,11 +322,13 @@ public class ReserveBusinessTests : TestBase
     public async Task CreatePaymentsAsync_ShouldSucceed_WhenValidPaymentsProvided()
     {
         var paymentsDb = new List<ReservePayment>();
-        var reserve = new Reserve { ReserveId = 1 };
+        var reserve = new Reserve { ReserveId = 1, ServiceId = 1 };
         var customer = new Customer { CustomerId = 1 };
+        var service = new Service { ServiceId = 1, ReservePrices = new List<ReservePrice> { new ReservePrice { ReserveTypeId = ReserveTypeIdEnum.Ida, Price = 100 } } };
 
         _contextMock.Setup(c => c.Reserves.FindAsync(1)).ReturnsAsync(reserve);
         _contextMock.Setup(c => c.Customers.FindAsync(1)).ReturnsAsync(customer);
+        _contextMock.Setup(c => c.Services).Returns(GetMockDbSetWithIdentity(new List<Service> { service }).Object);
 
         var reservePaymentsDbSet = GetMockDbSetWithIdentity(paymentsDb);
         _contextMock.Setup(c => c.ReservePayments).Returns(reservePaymentsDbSet.Object);
@@ -338,15 +340,69 @@ public class ReserveBusinessTests : TestBase
 
         var result = await _reserveBusiness.CreatePaymentsAsync(1, 1, new List<CreatePaymentRequestDto>
     {
-        new CreatePaymentRequestDto(1500, 1),
-        new CreatePaymentRequestDto(3000, 2)
+        new CreatePaymentRequestDto(50, 1),
+        new CreatePaymentRequestDto(50, 2)
     });
 
         result.IsSuccess.Should().BeTrue();
         paymentsDb.Should().HaveCount(2);
-        paymentsDb[0].Amount.Should().Be(1500);
-        paymentsDb[1].Amount.Should().Be(3000);
+        paymentsDb[0].Amount.Should().Be(50);
+        paymentsDb[1].Amount.Should().Be(50);
         paymentsDb.All(p => p.ReserveId == 1 && p.CustomerId == 1).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task CreatePaymentsAsync_ShouldFail_WhenTotalAmountDoesNotMatchExpected()
+    {
+        // Arrange
+        var reserveId = 1;
+        var customerId = 1;
+        var reserve = new Reserve
+        {
+            ReserveId = reserveId,
+            ServiceId = 1,
+        };
+
+        var customer = new Customer { CustomerId = customerId };
+
+        var service = new Service
+        {
+            ServiceId = 1,
+            ReservePrices = new List<ReservePrice>
+        {
+            new ReservePrice
+            {
+                ReserveTypeId = ReserveTypeIdEnum.Ida,
+                Price = 5000m
+            }
+        }
+        };
+
+        var payments = new List<CreatePaymentRequestDto>
+    {
+        new CreatePaymentRequestDto(3000m, 1), 
+        new CreatePaymentRequestDto(1000m, 2) 
+    };
+
+        _contextMock.Setup(c => c.Reserves.FindAsync(reserveId))
+            .ReturnsAsync(reserve);
+        _contextMock.Setup(c => c.Customers.FindAsync(customerId))
+            .ReturnsAsync(customer);
+        _contextMock.Setup(c => c.Services)
+            .Returns(GetMockDbSetWithIdentity(new List<Service> { service }).Object);
+
+        _unitOfWorkMock
+            .Setup(uow => uow.ExecuteInTransactionAsync<Result<bool>>(It.IsAny<Func<Task<Result<bool>>>>(), It.IsAny<IsolationLevel>()))
+            .Returns<Func<Task<Result<bool>>>, IsolationLevel>(async (func, _) => await func());
+
+        // Act
+        var result = await _reserveBusiness.CreatePaymentsAsync(reserveId, customerId, payments);
+
+        // Assert
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be(ReserveError.InvalidPaymentAmount(5000, 4000).Code);
+        result.Error.Description.Should().Contain("5000");
+        result.Error.Description.Should().Contain("4000");
     }
 
 
