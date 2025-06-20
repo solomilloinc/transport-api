@@ -17,4 +17,8 @@ public interface IReserveBusiness
     Task<Result<PagedReportResponseDto<CustomerReserveReportResponseDto>>> GetReserveCustomerReport(int reserveId, PagedReportRequestDto<CustomerReserveReportFilterRequestDto> requestDto);
 
     Task<Result<bool>> UpdateReserveAsync(int reserveId, ReserveUpdateRequestDto request);
+    Task<Result<bool>> CreatePaymentsAsync(
+    int reserveId,
+    int customerId,
+    List<CreatePaymentRequestDto> payments);
 }

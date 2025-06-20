@@ -118,7 +118,7 @@ public class ReserveBusiness : IReserveBusiness
 
             var parentPayment = new ReservePayment
             {
-                ReserveId = customerReserves.Items.First().reserveId, // o alguna lógica fija (ida)
+                ReserveId = customerReserves.Items.First().reserveId,
                 CustomerId = customer!.CustomerId,
                 Amount = parentPaymentDto.TransactionAmount,
                 Method = (PaymentMethodEnum)parentPaymentDto.PaymentMethod,
@@ -401,5 +401,65 @@ public class ReserveBusiness : IReserveBusiness
         await _context.SaveChangesWithOutboxAsync();
 
         return Result.Success(true);
+    }
+
+    public async Task<Result<bool>> CreatePaymentsAsync(
+    int reserveId,
+    int customerId,
+    List<CreatePaymentRequestDto> payments)
+    {
+        return await _unitOfWork.ExecuteInTransactionAsync(async () =>
+        {
+            var reserve = await _context.Reserves.FindAsync(reserveId);
+            if (reserve is null)
+                return Result.Failure<bool>(ReserveError.NotFound);
+
+            var customer = await _context.Customers.FindAsync(customerId);
+            if (customer is null)
+                return Result.Failure<bool>(CustomerError.NotFound);
+
+            if (payments == null || !payments.Any())
+                return Result.Failure<bool>(Error.Validation("Payments.Empty", "Debe proporcionar al menos un pago."));
+
+            var invalidAmounts = payments
+                .Select((p, i) => new { Index = i + 1, Amount = p.TransactionAmount })
+                .Where(p => p.Amount <= 0)
+                .ToList();
+
+            if (invalidAmounts.Any())
+            {
+                var errorMsg = string.Join(", ", invalidAmounts.Select(p => $"Pago #{p.Index} tiene monto inválido: {p.Amount}"));
+                return Result.Failure<bool>(Error.Validation("Payments.InvalidAmount", errorMsg));
+            }
+
+            var duplicatedMethods = payments
+                .GroupBy(p => p.PaymentMethod)
+                .Where(g => g.Count() > 1)
+                .Select(g => g.Key)
+                .ToList();
+
+            if (duplicatedMethods.Any())
+            {
+                var duplicatedList = string.Join(", ", duplicatedMethods);
+                return Result.Failure<bool>(Error.Validation("Payments.DuplicatedMethod", $"Los métodos de pago no deben repetirse. Duplicados: {duplicatedList}"));
+            }
+
+            foreach (var payment in payments)
+            {
+                var newPayment = new ReservePayment
+                {
+                    ReserveId = reserveId,
+                    CustomerId = customerId,
+                    Amount = payment.TransactionAmount,
+                    Method = (PaymentMethodEnum)payment.PaymentMethod,
+                    Status = StatusPaymentEnum.Paid
+                };
+
+                _context.ReservePayments.Add(newPayment);
+            }
+
+            await _context.SaveChangesWithOutboxAsync();
+            return Result.Success(true);
+        });
     }
 }

@@ -121,5 +121,30 @@ public class ReservesFunction : FunctionBase
         return await MatchResultAsync(req, result);
     }
 
+    [Function("CreateReservePayments")]
+    [Authorize("Admin")]
+    [OpenApiOperation(
+    operationId: "reserve-create-payments",
+    tags: new[] { "ReservePayments" },
+    Summary = "Create Payments for a Reserve",
+    Description = "Creates one or more payments associated to a reserve and customer.",
+    Visibility = OpenApiVisibilityType.Important)]
+    [OpenApiRequestBody("application/json", typeof(List<CreatePaymentRequestDto>), Required = true)]
+    [OpenApiParameter(name: "reserveId", In = ParameterLocation.Path, Required = true, Type = typeof(int), Summary = "The ID of the reserve")]
+    [OpenApiParameter(name: "customerId", In = ParameterLocation.Path, Required = true, Type = typeof(int), Summary = "The ID of the customer")]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(Result<bool>), Summary = "Payments created successfully")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Summary = "Invalid request")]
+    public async Task<HttpResponseData> CreateReservePayments(
+    [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "reserve-payments-create/{reserveId:int}/{customerId:int}")] HttpRequestData req,
+    int reserveId,
+    int customerId)
+    {
+        var payments = await req.ReadFromJsonAsync<List<CreatePaymentRequestDto>>();
 
+        if (payments == null || !payments.Any())
+            return req.CreateResponse(HttpStatusCode.BadRequest);
+
+        var result = await _reserveBusiness.CreatePaymentsAsync(reserveId, customerId, payments);
+        return await MatchResultAsync(req, result);
+    }
 }

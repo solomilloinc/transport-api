@@ -227,4 +227,127 @@ public class ReserveBusinessTests : TestBase
         }
     }
 
+    [Fact]
+    public async Task CreatePaymentsAsync_ShouldFail_WhenReserveNotFound()
+    {
+        _contextMock.Setup(c => c.Reserves.FindAsync(1)).ReturnsAsync((Reserve)null);
+
+        _unitOfWorkMock.Setup(uow => uow.ExecuteInTransactionAsync<Result<bool>>(It.IsAny<Func<Task<Result<bool>>>>(), It.IsAny<IsolationLevel>()))
+                       .Returns<Func<Task<Result<bool>>>, IsolationLevel>(async (func, _) => await func());
+
+        var result = await _reserveBusiness.CreatePaymentsAsync(1, 1, new List<CreatePaymentRequestDto>
+    {
+        new CreatePaymentRequestDto(1000, 1)
+    });
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Be(ReserveError.NotFound);
+    }
+
+    [Fact]
+    public async Task CreatePaymentsAsync_ShouldFail_WhenCustomerNotFound()
+    {
+        _contextMock.Setup(c => c.Reserves.FindAsync(1)).ReturnsAsync(new Reserve { ReserveId = 1 });
+        _contextMock.Setup(c => c.Customers.FindAsync(1)).ReturnsAsync((Customer)null);
+
+        _unitOfWorkMock.Setup(uow => uow.ExecuteInTransactionAsync<Result<bool>>(It.IsAny<Func<Task<Result<bool>>>>(), It.IsAny<IsolationLevel>()))
+                       .Returns<Func<Task<Result<bool>>>, IsolationLevel>(async (func, _) => await func());
+
+
+        var result = await _reserveBusiness.CreatePaymentsAsync(1, 1, new List<CreatePaymentRequestDto>
+    {
+        new CreatePaymentRequestDto(1000, 1)
+    });
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Be(CustomerError.NotFound);
+    }
+
+    [Fact]
+    public async Task CreatePaymentsAsync_ShouldFail_WhenPaymentsListIsEmpty()
+    {
+        _contextMock.Setup(c => c.Reserves.FindAsync(1)).ReturnsAsync(new Reserve { ReserveId = 1 });
+        _contextMock.Setup(c => c.Customers.FindAsync(1)).ReturnsAsync(new Customer { CustomerId = 1 });
+
+        _unitOfWorkMock.Setup(uow => uow.ExecuteInTransactionAsync<Result<bool>>(It.IsAny<Func<Task<Result<bool>>>>(), It.IsAny<IsolationLevel>()))
+               .Returns<Func<Task<Result<bool>>>, IsolationLevel>(async (func, _) => await func());
+
+        var result = await _reserveBusiness.CreatePaymentsAsync(1, 1, new List<CreatePaymentRequestDto>());
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Payments.Empty");
+    }
+
+    [Fact]
+    public async Task CreatePaymentsAsync_ShouldFail_WhenTransactionAmountIsInvalid()
+    {
+        _contextMock.Setup(c => c.Reserves.FindAsync(1)).ReturnsAsync(new Reserve { ReserveId = 1 });
+        _contextMock.Setup(c => c.Customers.FindAsync(1)).ReturnsAsync(new Customer { CustomerId = 1 });
+
+        _unitOfWorkMock.Setup(uow => uow.ExecuteInTransactionAsync<Result<bool>>(It.IsAny<Func<Task<Result<bool>>>>(), It.IsAny<IsolationLevel>()))
+               .Returns<Func<Task<Result<bool>>>, IsolationLevel>(async (func, _) => await func());
+
+        var result = await _reserveBusiness.CreatePaymentsAsync(1, 1, new List<CreatePaymentRequestDto>
+    {
+        new CreatePaymentRequestDto(0, 1),
+        new CreatePaymentRequestDto(-100, 2)
+    });
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Payments.InvalidAmount");
+        result.Error.Description.Should().Contain("Pago #1").And.Contain("Pago #2");
+    }
+
+    [Fact]
+    public async Task CreatePaymentsAsync_ShouldFail_WhenPaymentMethodsAreDuplicated()
+    {
+        _contextMock.Setup(c => c.Reserves.FindAsync(1)).ReturnsAsync(new Reserve { ReserveId = 1 });
+        _contextMock.Setup(c => c.Customers.FindAsync(1)).ReturnsAsync(new Customer { CustomerId = 1 });
+
+        _unitOfWorkMock.Setup(uow => uow.ExecuteInTransactionAsync<Result<bool>>(It.IsAny<Func<Task<Result<bool>>>>(), It.IsAny<IsolationLevel>()))
+               .Returns<Func<Task<Result<bool>>>, IsolationLevel>(async (func, _) => await func());
+
+        var result = await _reserveBusiness.CreatePaymentsAsync(1, 1, new List<CreatePaymentRequestDto>
+    {
+        new CreatePaymentRequestDto(1000, 1),
+        new CreatePaymentRequestDto(2000, 1)
+    });
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Payments.DuplicatedMethod");
+        result.Error.Description.Should().Contain("Duplicados: 1");
+    }
+
+    [Fact]
+    public async Task CreatePaymentsAsync_ShouldSucceed_WhenValidPaymentsProvided()
+    {
+        var paymentsDb = new List<ReservePayment>();
+        var reserve = new Reserve { ReserveId = 1 };
+        var customer = new Customer { CustomerId = 1 };
+
+        _contextMock.Setup(c => c.Reserves.FindAsync(1)).ReturnsAsync(reserve);
+        _contextMock.Setup(c => c.Customers.FindAsync(1)).ReturnsAsync(customer);
+
+        var reservePaymentsDbSet = GetMockDbSetWithIdentity(paymentsDb);
+        _contextMock.Setup(c => c.ReservePayments).Returns(reservePaymentsDbSet.Object);
+        SetupSaveChangesWithOutboxAsync(_contextMock);
+
+        _unitOfWorkMock
+            .Setup(u => u.ExecuteInTransactionAsync<Result<bool>>(It.IsAny<Func<Task<Result<bool>>>>(), It.IsAny<IsolationLevel>()))
+            .Returns<Func<Task<Result<bool>>>, IsolationLevel>(async (func, _) => await func());
+
+        var result = await _reserveBusiness.CreatePaymentsAsync(1, 1, new List<CreatePaymentRequestDto>
+    {
+        new CreatePaymentRequestDto(1500, 1),
+        new CreatePaymentRequestDto(3000, 2)
+    });
+
+        result.IsSuccess.Should().BeTrue();
+        paymentsDb.Should().HaveCount(2);
+        paymentsDb[0].Amount.Should().Be(1500);
+        paymentsDb[1].Amount.Should().Be(3000);
+        paymentsDb.All(p => p.ReserveId == 1 && p.CustomerId == 1).Should().BeTrue();
+    }
+
+
 }
