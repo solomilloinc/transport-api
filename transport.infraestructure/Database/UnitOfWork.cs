@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore.Storage;
 using System.Data;
 using Transport.Business.Data;
 using Transport.Infraestructure.Database.Helpers;
+using Transport.SharedKernel;
 
 namespace Transport.Infraestructure.Database;
 
@@ -30,29 +31,29 @@ public class UnitOfWork : IUnitOfWork
         dbContext.Database.RollbackTransaction();
     }
 
-    public IDbContextTransaction GetCurrentTransaction()
+    public IDbContextTransaction? GetCurrentTransaction()
     {
         return dbContext.Database.CurrentTransaction;
     }
 
-    public void ExecuteInTransaction(Action action)
+    public Result ExecuteInTransaction(Func<Result> action)
     {
-        dbContext.ExecuteInTransaction(action);
+        return dbContext.ExecuteInTransaction(action);
     }
 
-    public T ExecuteInTransaction<T>(Func<T> action)
+    public Result<T> ExecuteInTransaction<T>(Func<Result<T>> action)
     {
-        return dbContext.ExecuteInTransaction<T>(action);
+        return dbContext.ExecuteInTransaction(action);
     }
 
-    public async Task ExecuteInTransactionAsync(Func<Task> action, IsolationLevel isolationLevel = IsolationLevel.ReadCommitted)
+    public Task<Result> ExecuteInTransactionAsync(Func<Task<Result>> action, IsolationLevel isolationLevel = IsolationLevel.ReadCommitted)
     {
-        await dbContext.ExecuteInTransactionAsync(action, isolationLevel);
+        return dbContext.ExecuteInTransactionAsync(action, isolationLevel);
     }
 
-    public async Task<T> ExecuteInTransactionAsync<T>(Func<Task<T>> action, IsolationLevel isolationLevel = IsolationLevel.ReadCommitted)
+    public Task<Result<T>> ExecuteInTransactionAsync<T>(Func<Task<Result<T>>> action, IsolationLevel isolationLevel = IsolationLevel.ReadCommitted)
     {
-        return await dbContext.ExecuteInTransactionAsync(action, isolationLevel);
+        return dbContext.ExecuteInTransactionAsync(action, isolationLevel);
     }
 
     public async Task<int> SaveChanges(CancellationToken cancellationToken = default)
@@ -65,4 +66,8 @@ public class UnitOfWork : IUnitOfWork
         dbContext.RejectAllChanges();
     }
 
+    public Task ExecuteInTransactionAsync(Func<Task> action, IsolationLevel isolationLevel = IsolationLevel.ReadCommitted)
+    {
+        return dbContext.ExecuteInTransactionAsync(action, isolationLevel);
+    }
 }
