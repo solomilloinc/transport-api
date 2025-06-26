@@ -53,7 +53,7 @@ public class ReservesFunction : FunctionBase
     }
 
     [Function("CreatePassengerReserveExternal")]
-    [Authorize("Cliente")]
+    [Authorize("User")]
     [OpenApiOperation(
     operationId: "passenger-reserves-create",
     tags: new[] { "Reserve" },

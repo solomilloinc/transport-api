@@ -1,5 +1,6 @@
 ﻿using FluentValidation;
 using Transport.SharedKernel.Contracts.Customer;
+using Transport.Domain.Reserves;
 
 namespace Transport.Business.ReserveBusiness.Validation;
 
@@ -23,13 +24,14 @@ public class CreatePaymentExternalRequestValidator : AbstractValidator<CreatePay
             .NotEmpty().WithMessage("The payer email cannot be empty.")
             .EmailAddress().WithMessage("The payer email must be a valid email address.");
 
-        RuleFor(x => x.ReserveTypeId).IsInEnum()
-            .WithMessage("The reserve type ID must be a valid enum value.");
+        RuleFor(x => x.ReserveTypeId)
+            .Must(value => Enum.IsDefined(typeof(ReserveTypeIdEnum), value))
+            .WithMessage("The ReserveTypeId is not valid. Allowed values are 1 (Ida) and 2 (IdaVuelta).");
 
-        RuleFor(x => x.IdentificationType).NotEmpty()
-            .WithMessage("The identification type cannot be empty.");
+        RuleFor(x => x.IdentificationType)
+            .NotEmpty().WithMessage("The identification type cannot be empty.");
 
-        RuleFor(x => x.IdentificationNumber).NotEmpty()
-            .WithMessage("The identification number cannot be empty.");
+        RuleFor(x => x.IdentificationNumber)
+            .NotEmpty().WithMessage("The identification number cannot be empty.");
     }
 }
