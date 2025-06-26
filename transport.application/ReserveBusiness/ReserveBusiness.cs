@@ -111,6 +111,11 @@ public class ReserveBusiness : IReserveBusiness
                 totalExpectedAmount += reservePrice.Price;
             }
 
+            if (!customerReserves.Payments.Any())
+            {
+                return Result.Success(true);
+            }
+
             var totalProvidedAmount = customerReserves.Payments.Sum(p => p.TransactionAmount);
             if (totalExpectedAmount != totalProvidedAmount)
                 return Result.Failure<bool>(ReserveError.InvalidPaymentAmount(totalExpectedAmount, totalProvidedAmount));
