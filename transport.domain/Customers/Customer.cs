@@ -4,7 +4,7 @@ using Transport.SharedKernel;
 
 namespace Transport.Domain.Customers;
 
-public class Customer: Entity, IAuditable
+public class Customer : Entity, IAuditable
 {
     public int CustomerId { get; set; }
     public string FirstName { get; set; } = null!;
@@ -15,6 +15,7 @@ public class Customer: Entity, IAuditable
     public string? Phone2 { get; set; }
     public EntityStatusEnum Status { get; set; } = EntityStatusEnum.Active;
     public User? User { get; set; }
+    public decimal CurrentBalance { get; set; }
 
     public string CreatedBy { get; set; } = null!;
     public string? UpdatedBy { get; set; }
@@ -23,4 +24,5 @@ public class Customer: Entity, IAuditable
 
     public ICollection<ServiceCustomer> Services { get; set; } = new List<ServiceCustomer>();
     public ICollection<CustomerReserve> CustomerReserves { get; set; } = new List<CustomerReserve>();
+    public ICollection<CustomerAccountTransaction> AccountTransactions { get; set; } = new List<CustomerAccountTransaction>();
 }

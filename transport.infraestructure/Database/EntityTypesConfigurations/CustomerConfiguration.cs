@@ -19,5 +19,9 @@ public class CustomerConfiguration : IEntityTypeConfiguration<Customer>
         builder.Property(c => c.Phone1).HasMaxLength(20).IsRequired();
         builder.Property(c => c.Phone2).HasMaxLength(20);
         builder.Property(r => r.Status).IsRequired();
+        builder.Property(r => r.CurrentBalance)
+            .HasColumnType("decimal(18,2)")
+            .IsRequired()
+            .HasDefaultValue(0);
     }
 }

@@ -904,3 +904,63 @@ GO
 COMMIT;
 GO
 
+BEGIN TRANSACTION;
+GO
+
+ALTER TABLE [Customer] ADD [CurrentBalance] decimal(18,2) NOT NULL DEFAULT 0.0;
+GO
+
+CREATE TABLE [CustomerAccountTransactions] (
+    [CustomerAccountTransactionId] int NOT NULL IDENTITY,
+    [CustomerId] int NOT NULL,
+    [Date] datetime2 NOT NULL,
+    [Type] nvarchar(20) NOT NULL,
+    [Amount] decimal(18,2) NOT NULL,
+    [Description] nvarchar(250) NULL,
+    [RelatedReserveId] int NULL,
+    [ReservePaymentId] int NULL,
+    [CreatedBy] VARCHAR(256) NOT NULL DEFAULT 'System',
+    [UpdatedBy] VARCHAR(256) NULL,
+    [CreatedDate] datetime2 NOT NULL DEFAULT (GETDATE()),
+    [UpdatedDate] datetime2 NULL,
+    CONSTRAINT [PK_CustomerAccountTransactions] PRIMARY KEY ([CustomerAccountTransactionId]),
+    CONSTRAINT [FK_CustomerAccountTransactions_Customer_CustomerId] FOREIGN KEY ([CustomerId]) REFERENCES [Customer] ([CustomerId]) ON DELETE CASCADE,
+    CONSTRAINT [FK_CustomerAccountTransactions_ReservePayment_ReservePaymentId] FOREIGN KEY ([ReservePaymentId]) REFERENCES [ReservePayment] ([ReservePaymentId]) ON DELETE NO ACTION,
+    CONSTRAINT [FK_CustomerAccountTransactions_Reserve_RelatedReserveId] FOREIGN KEY ([RelatedReserveId]) REFERENCES [Reserve] ([ReserveId]) ON DELETE SET NULL
+);
+GO
+
+UPDATE [Role] SET [CreatedDate] = '2025-06-27T22:28:21.0110427Z'
+WHERE [RoleId] = 1;
+SELECT @@ROWCOUNT;
+
+GO
+
+UPDATE [Role] SET [CreatedDate] = '2025-06-27T22:28:21.0110429Z'
+WHERE [RoleId] = 2;
+SELECT @@ROWCOUNT;
+
+GO
+
+CREATE INDEX [IX_CustomerAccountTransactions_CustomerId] ON [CustomerAccountTransactions] ([CustomerId]);
+GO
+
+CREATE INDEX [IX_CustomerAccountTransactions_Date] ON [CustomerAccountTransactions] ([Date]);
+GO
+
+CREATE INDEX [IX_CustomerAccountTransactions_RelatedReserveId] ON [CustomerAccountTransactions] ([RelatedReserveId]);
+GO
+
+CREATE INDEX [IX_CustomerAccountTransactions_ReservePaymentId] ON [CustomerAccountTransactions] ([ReservePaymentId]);
+GO
+
+CREATE INDEX [IX_CustomerAccountTransactions_Type] ON [CustomerAccountTransactions] ([Type]);
+GO
+
+INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+VALUES (N'20250627222821_AddCtaCte', N'8.0.14');
+GO
+
+COMMIT;
+GO
+
