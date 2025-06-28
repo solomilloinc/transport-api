@@ -80,4 +80,19 @@ public sealed class CustomerFunction : FunctionBase
         var result = await _customerBusiness.GetCustomerReport(filter);
         return await MatchResultAsync(req, result);
     }
+
+    [Function("GetCustomerAccountSummary")]
+    [Authorize("Admin")]
+    [OpenApiOperation(operationId: "customer-account-summary", tags: new[] { "Customer" }, Summary = "Get customer account summary", Description = "Returns the account summary and transactions of a customer", Visibility = OpenApiVisibilityType.Important)]
+    [OpenApiParameter("customerId", In = ParameterLocation.Path, Required = true, Type = typeof(int), Description = "Customer ID")]
+    [OpenApiRequestBody("application/json", typeof(PagedReportRequestDto<CustomerTransactionReportFilterRequestDto>), Required = true)]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(CustomerAccountSummaryDto), Summary = "Customer account summary with transactions")]
+    public async Task<HttpResponseData> GetCustomerAccountSummary(
+    [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "customer-account-summary/{customerId:int}")] HttpRequestData req,
+    int customerId)
+    {
+        var dto = await req.ReadFromJsonAsync<PagedReportRequestDto<CustomerTransactionReportFilterRequestDto>>();
+        var result = await _customerBusiness.GetCustomerAccountSummaryAsync(customerId, dto);
+        return await MatchResultAsync(req, result);
+    }
 }

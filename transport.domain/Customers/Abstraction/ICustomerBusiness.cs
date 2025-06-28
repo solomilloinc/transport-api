@@ -10,4 +10,5 @@ public interface ICustomerBusiness
     Task<Result<PagedReportResponseDto<CustomerReportResponseDto>>> GetCustomerReport(PagedReportRequestDto<CustomerReportFilterRequestDto> requestDto);
     Task<Result<bool>> Update(int customerId, CustomerUpdateRequestDto dto);
     Task<Result<bool>> UpdateStatus(int customerId, EntityStatusEnum status);
+    Task<Result<CustomerAccountSummaryDto>> GetCustomerAccountSummaryAsync(int customerId, PagedReportRequestDto<CustomerTransactionReportFilterRequestDto> requestDto);
 }

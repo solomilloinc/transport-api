@@ -8,4 +8,5 @@ public record CustomerReportResponseDto(
     string DocumentNumber,
     string Phone1,
     string? Phone2,
-    DateTime CreatedDate);
+    DateTime CreatedDate,
+    decimal CurrentBalance);

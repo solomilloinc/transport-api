@@ -35,8 +35,8 @@ public class CustomerAccountTransaction : Entity, IAuditable
 
 public enum TransactionType
 {
-    Charge,
-    Payment,
-    Adjustment,
-    Refund
+    Charge = 1,
+    Payment = 2,
+    Adjustment = 3,
+    Refund = 4
 }

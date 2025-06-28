@@ -84,7 +84,7 @@ public class CustomerBusiness : ICustomerBusiness
 
         var pagedResult = await query.ToPagedReportAsync<CustomerReportResponseDto, Customer, CustomerReportFilterRequestDto>(
             requestDto,
-            selector: c => new CustomerReportResponseDto(c.CustomerId, c.FirstName, c.LastName, c.Email, c.DocumentNumber, c.Phone1, c.Phone2, c.CreatedDate),
+            selector: c => new CustomerReportResponseDto(c.CustomerId, c.FirstName, c.LastName, c.Email, c.DocumentNumber, c.Phone1, c.Phone2, c.CreatedDate, c.CurrentBalance),
             sortMappings: sortMappings
         );
 
@@ -126,4 +126,53 @@ public class CustomerBusiness : ICustomerBusiness
 
         return Result.Success(true);
     }
+
+    public async Task<Result<CustomerAccountSummaryDto>> GetCustomerAccountSummaryAsync(int customerId, PagedReportRequestDto<CustomerTransactionReportFilterRequestDto> requestDto)
+    {
+        var customer = await _context.Customers
+            .AsNoTracking()
+            .FirstOrDefaultAsync(c => c.CustomerId == customerId);
+
+        if (customer is null)
+            return Result.Failure<CustomerAccountSummaryDto>(CustomerError.NotFound);
+
+        var query = _context.CustomerAccountTransactions
+            .AsNoTracking()
+            .Where(t => t.CustomerId == customerId);
+
+        if (requestDto.Filters.FromDate.HasValue)
+            query = query.Where(t => t.Date >= requestDto.Filters.FromDate.Value);
+
+        if (requestDto.Filters.ToDate.HasValue)
+            query = query.Where(t => t.Date <= requestDto.Filters.ToDate.Value);
+
+        if (requestDto.Filters.TransactionType != null)
+        {
+            query = query.Where(t => t.Type == (TransactionType)requestDto.Filters.TransactionType);
+        }
+
+        var sortMappings = new Dictionary<string, Expression<Func<CustomerAccountTransaction, object>>>
+        {
+            ["date"] = t => t.Date,
+            ["description"] = t => t.Description,
+            ["amount"] = t => t.Amount,
+            ["transactiontype"] = t => t.Type
+        };
+
+        var pagedResult = await query.ToPagedReportAsync<CustomerTransactionDto, CustomerAccountTransaction, CustomerTransactionReportFilterRequestDto>(
+            requestDto,
+            selector: t => new CustomerTransactionDto(t.CustomerAccountTransactionId, t.CustomerId, t.Description, t.Type.ToString(), t.Amount, t.Date),
+            sortMappings: sortMappings
+        );
+
+        var result = new CustomerAccountSummaryDto(
+            CustomerId: customer.CustomerId,
+            CustomerFullName: $"{customer.FirstName} {customer.LastName}",
+            CurrentBalance: customer.CurrentBalance,
+            Transactions: pagedResult
+        );
+
+        return Result.Success(result);
+    }
+
 }
