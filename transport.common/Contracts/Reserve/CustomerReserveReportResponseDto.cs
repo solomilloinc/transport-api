@@ -11,4 +11,5 @@ public record CustomerReserveReportResponseDto(
     int DropoffLocationId,
     string? DropoffLocationName,
     int PickupLocationId,
-    string? PickupLocationName);
+    string? PickupLocationName,
+    decimal CurrentBalance);
