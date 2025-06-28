@@ -382,7 +382,8 @@ public class ReserveBusiness : IReserveBusiness
                       p.DropoffLocationId!.Value,
                       p.DropoffAddress,
                       p.PickupLocationId!.Value,
-                      p.PickupAddress))
+                      p.PickupAddress,
+                      p.Customer.CurrentBalance))
                   .ToList(),
                 rp.Service.ReservePrices.Select(p => new ReservePriceReport((int)p.ReserveTypeId, p.Price)).ToList()
             ),
@@ -437,7 +438,8 @@ public class ReserveBusiness : IReserveBusiness
                 cr.DropoffLocationId!.Value,
                 cr.DropoffAddress,
                 cr.PickupLocationId!.Value,
-                cr.PickupAddress),
+                cr.PickupAddress,
+                cr.Customer.CurrentBalance),
             sortMappings: sortMappings
         );
 
