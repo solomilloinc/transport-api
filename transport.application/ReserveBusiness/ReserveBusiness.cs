@@ -35,10 +35,15 @@ public class ReserveBusiness : IReserveBusiness
 
             var mainReserveId = customerReserves.Items.Min(i => i.reserveId);
 
+            var servicesCache = new Dictionary<int, Service>();
+
+            var reserveMap = new Dictionary<int, Reserve>();
+
             foreach (var passenger in customerReserves.Items)
             {
                 var reserve = await _context.Reserves
                     .Include(r => r.CustomerReserves)
+                    .Include(r => r.Driver)
                     .SingleOrDefaultAsync(r => r.ReserveId == passenger.reserveId);
 
                 if (reserve is null)
@@ -47,11 +52,18 @@ public class ReserveBusiness : IReserveBusiness
                 if (reserve.Status != ReserveStatusEnum.Confirmed)
                     return Result.Failure<bool>(ReserveError.NotAvailable);
 
-                var service = await _context.Services
-                    .Include(s => s.ReservePrices)
-                    .Include(s => s.Origin)
-                    .Include(s => s.Destination)
-                    .SingleOrDefaultAsync(s => s.ServiceId == reserve.ServiceId);
+                reserveMap[reserve.ReserveId] = reserve;
+
+                if (!servicesCache.TryGetValue(reserve.ServiceId, out var service))
+                {
+                    service = await _context.Services
+                        .Include(s => s.ReservePrices)
+                        .Include(s => s.Origin)
+                        .Include(s => s.Destination)
+                        .SingleOrDefaultAsync(s => s.ServiceId == reserve.ServiceId);
+
+                    servicesCache[reserve.ServiceId] = service;
+                }
 
                 var vehicle = await _context.Vehicles.FindAsync(reserve.VehicleId);
 
@@ -59,8 +71,7 @@ public class ReserveBusiness : IReserveBusiness
                 var totalAfterInsert = existingPassengerCount + customerReserves.Items.Count;
 
                 if (totalAfterInsert > vehicle.AvailableQuantity)
-                    return Result.Failure<bool>(
-                        ReserveError.VehicleQuantityNotAvailable(existingPassengerCount, customerReserves.Items.Count, vehicle.AvailableQuantity));
+                    return Result.Failure<bool>(ReserveError.VehicleQuantityNotAvailable(existingPassengerCount, customerReserves.Items.Count, vehicle.AvailableQuantity));
 
                 var reservePrice = service.ReservePrices.SingleOrDefault(p => p.ReserveTypeId == (ReserveTypeIdEnum)passenger.ReserveTypeId);
                 if (reservePrice is null || passenger.price != reservePrice.Price)
@@ -111,21 +122,65 @@ public class ReserveBusiness : IReserveBusiness
                 totalExpectedAmount += reservePrice.Price;
             }
 
+            var reserveIds = customerReserves.Items.Select(i => i.reserveId).Distinct().ToList();
+
+            string BuildDescription()
+            {
+                if (reserveIds.Count == 1)
+                {
+                    var rid = reserveIds[0];
+                    var reserve = reserveMap[rid];
+                    var service = servicesCache[reserve.ServiceId];
+                    var type = customerReserves.Items.First(i => i.reserveId == rid).ReserveTypeId == (int)ReserveTypeIdEnum.IdaVuelta
+                        ? "Ida y vuelta"
+                        : "Ida";
+                    return $"Reserva: {type} #{rid} - {service.Origin.Name} - {service.Destination.Name} {reserve.ReserveDate:HH:mm}";
+                }
+
+                var rid1 = reserveIds[0];
+                var rid2 = reserveIds[1];
+                var reserve1 = reserveMap[rid1];
+                var reserve2 = reserveMap[rid2];
+                var service1 = servicesCache[reserve1.ServiceId];
+                var service2 = servicesCache[reserve2.ServiceId];
+
+                var desc1 = $"Ida #{rid1} - {service1.Origin.Name} - {service1.Destination.Name} {reserve1.ReserveDate:HH:mm}";
+                var desc2 = $"Vuelta #{rid2} - {service2.Destination.Name} - {service2.Origin.Name} {reserve2.ReserveDate:HH:mm}";
+
+                return $"Reserva(s): {desc1}; {desc2}";
+            }
+
+            var description = BuildDescription();
+
+            var chargeTransaction = new CustomerAccountTransaction
+            {
+                CustomerId = customer!.CustomerId,
+                Date = DateTime.UtcNow,
+                Type = TransactionType.Charge,
+                Amount = totalExpectedAmount,
+                Description = description,
+                RelatedReserveId = mainReserveId
+            };
+            _context.CustomerAccountTransactions.Add(chargeTransaction);
+
             if (!customerReserves.Payments.Any())
             {
+                customer.CurrentBalance += totalExpectedAmount;
+                _context.Customers.Update(customer);
+                await _context.SaveChangesWithOutboxAsync();
                 return Result.Success(true);
             }
 
             var totalProvidedAmount = customerReserves.Payments.Sum(p => p.TransactionAmount);
-            if (totalExpectedAmount != totalProvidedAmount)
-                return Result.Failure<bool>(ReserveError.InvalidPaymentAmount(totalExpectedAmount, totalProvidedAmount));
+            //if (totalExpectedAmount != totalProvidedAmount)
+            //    return Result.Failure<bool>(ReserveError.InvalidPaymentAmount(totalExpectedAmount, totalProvidedAmount));
 
             var parentPaymentDto = customerReserves.Payments.First();
 
             var parentPayment = new ReservePayment
             {
                 ReserveId = customerReserves.Items.First().reserveId,
-                CustomerId = customer!.CustomerId,
+                CustomerId = customer.CustomerId,
                 Amount = parentPaymentDto.TransactionAmount,
                 Method = (PaymentMethodEnum)parentPaymentDto.PaymentMethod,
                 Status = StatusPaymentEnum.Paid
@@ -137,12 +192,10 @@ public class ReserveBusiness : IReserveBusiness
             var parentId = parentPayment.ReservePaymentId;
 
             var remainingPayments = customerReserves.Payments.Skip(1).ToList();
-            var reserveIds = customerReserves.Items.Select(i => i.reserveId).Distinct().ToList();
 
             for (int i = 0; i < remainingPayments.Count; i++)
             {
                 var paymentDto = remainingPayments[i];
-
                 var reserveId = reserveIds.ElementAtOrDefault(i + 1) != 0 ? reserveIds.ElementAtOrDefault(i + 1) : reserveIds.First();
 
                 var childPayment = new ReservePayment
@@ -158,11 +211,27 @@ public class ReserveBusiness : IReserveBusiness
                 _context.ReservePayments.Add(childPayment);
             }
 
+            var paymentTransaction = new CustomerAccountTransaction
+            {
+                CustomerId = customer.CustomerId,
+                Date = DateTime.UtcNow,
+                Type = TransactionType.Payment,
+                Amount = -totalProvidedAmount,
+                Description = $"Pago aplicado a {description}",
+                RelatedReserveId = mainReserveId,
+                ReservePaymentId = parentId
+            };
+            _context.CustomerAccountTransactions.Add(paymentTransaction);
+
+            customer.CurrentBalance += (totalExpectedAmount - totalProvidedAmount);
+            _context.Customers.Update(customer);
+
             await _context.SaveChangesWithOutboxAsync();
             return Result.Success(true);
         });
-
     }
+
+
 
     private async Task<Result<Direction?>> GetDirectionAsync(int? locationId, string type)
     {
@@ -311,7 +380,9 @@ public class ReserveBusiness : IReserveBusiness
                       $"{p.Phone1} {p.Phone2}",
                       p.ReserveId,
                       p.DropoffLocationId!.Value,
-                      p.PickupLocationId!.Value))
+                      p.DropoffAddress,
+                      p.PickupLocationId!.Value,
+                      p.PickupAddress))
                   .ToList(),
                 rp.Service.ReservePrices.Select(p => new ReservePriceReport((int)p.ReserveTypeId, p.Price)).ToList()
             ),
@@ -364,7 +435,9 @@ public class ReserveBusiness : IReserveBusiness
                 $"{cr.Phone1} {cr.Phone2}",
                 cr.ReserveId,
                 cr.DropoffLocationId!.Value,
-                cr.PickupLocationId!.Value),
+                cr.DropoffAddress,
+                cr.PickupLocationId!.Value,
+                cr.PickupAddress),
             sortMappings: sortMappings
         );
 

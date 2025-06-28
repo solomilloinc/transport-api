@@ -117,7 +117,6 @@ public class ReserveBusinessTests : TestBase
     public async Task CreatePassengerReserves_Payments_ParentChildLogic_Works(int reserveCount, int paymentCount)
     {
         // Arrange
-
         var reservesList = Enumerable.Range(1, reserveCount).Select(i => new Reserve
         {
             ReserveId = i,
@@ -136,43 +135,45 @@ public class ReserveBusinessTests : TestBase
             Origin = new City { Name = "CityA" },
             Destination = new City { Name = "CityB" }
         };
+
         var customer = new Customer
         {
             CustomerId = 1,
             FirstName = "Jane",
             LastName = "Smith",
             DocumentNumber = "123456",
-            Email = "jane@example.com"
+            Email = "jane@example.com",
+            CurrentBalance = 0
         };
-
 
         var origin = new Direction { DirectionId = 10, Name = "PickupLocation" };
         var destination = new Direction { DirectionId = 20, Name = "DropoffLocation" };
 
-
-        // Mock DbSets con identidad para ReservePayment
         var reservePaymentsList = new List<ReservePayment>();
-        var reservePaymentsDbSet = GetMockDbSetWithIdentity(reservePaymentsList);
-        _contextMock.Setup(c => c.ReservePayments).Returns(reservePaymentsDbSet.Object);
+        _contextMock.Setup(c => c.ReservePayments).Returns(GetMockDbSetWithIdentity(reservePaymentsList).Object);
+
+        var accountTransactionsList = new List<CustomerAccountTransaction>();
+        _contextMock.Setup(c => c.CustomerAccountTransactions).Returns(GetMockDbSetWithIdentity(accountTransactionsList).Object);
 
         _contextMock.Setup(c => c.Reserves).Returns(GetMockDbSetWithIdentity(reservesList).Object);
         _contextMock.Setup(c => c.Vehicles.FindAsync(It.IsAny<int>())).ReturnsAsync(vehicle);
         _contextMock.Setup(c => c.Services).Returns(GetMockDbSetWithIdentity(new List<Service> { service }).Object);
         _contextMock.Setup(c => c.Customers.FindAsync(It.IsAny<int>())).ReturnsAsync(customer);
-        _contextMock.Setup(c => c.Directions.FindAsync(It.IsAny<int>())).ReturnsAsync(destination);
         _contextMock.Setup(c => c.Directions.FindAsync(It.IsAny<int>())).ReturnsAsync(origin);
 
-        // Setup SaveChanges
+        _contextMock.Setup(c => c.Customers.Update(It.IsAny<Customer>())).Callback<Customer>(c =>
+        {
+            customer.CurrentBalance = c.CurrentBalance;
+        });
+
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
-        // Setup ExecuteInTransactionAsync para ejecutar el delegado normalmente
         _unitOfWorkMock
             .Setup(uow => uow.ExecuteInTransactionAsync<bool>(
                 It.IsAny<Func<Task<Result<bool>>>>(),
                 It.IsAny<IsolationLevel>()))
             .Returns<Func<Task<Result<bool>>>, IsolationLevel>((func, _) => func());
 
-        // Construir pasajeros para cada reserva
         var passengers = Enumerable.Range(1, reserveCount).Select(i =>
             new CustomerReserveCreateRequestDto(
                 reserveId: i,
@@ -187,7 +188,6 @@ public class ReserveBusinessTests : TestBase
             )
         ).ToList();
 
-        // Crear lista de pagos con paymentCount medios, sumando el total esperado
         var totalAmount = 100m * reserveCount;
         var payments = new List<CreatePaymentRequestDto>();
 
@@ -211,23 +211,38 @@ public class ReserveBusinessTests : TestBase
 
         // Assert
         Assert.True(result.IsSuccess);
-
-        // Debe haber tantos pagos como paymentCount
         Assert.Equal(paymentCount, reservePaymentsList.Count);
 
         var parent = reservePaymentsList.First();
-
-        // El parent debe tener el monto del primer pago y ParentReservePaymentId null
         Assert.Equal(payments[0].TransactionAmount, parent.Amount);
         Assert.Null(parent.ParentReservePaymentId);
 
-        // Los hijos tienen monto 0 y apuntan al padre
         foreach (var child in reservePaymentsList.Skip(1))
         {
             Assert.Equal(0, child.Amount);
             Assert.Equal(parent.ReservePaymentId, child.ParentReservePaymentId);
         }
+
+        // ✅ Validación de CustomerAccountTransactions
+        Assert.Equal(2, accountTransactionsList.Count);
+
+        var charge = accountTransactionsList.FirstOrDefault(x => x.Type == TransactionType.Charge);
+        var payment = accountTransactionsList.FirstOrDefault(x => x.Type == TransactionType.Payment);
+
+        Assert.NotNull(charge);
+        Assert.Equal(totalAmount, charge!.Amount);
+        Assert.Equal(customer.CustomerId, charge.CustomerId);
+        Assert.Contains("Reserva", charge.Description ?? string.Empty);
+
+        Assert.NotNull(payment);
+        Assert.Equal(-totalAmount, payment!.Amount);
+        Assert.Equal(customer.CustomerId, payment.CustomerId);
+        Assert.Contains("Pago", payment.Description ?? string.Empty);
+
+        // ✅ Verificación de saldo actualizado
+        Assert.Equal(0, customer.CurrentBalance);
     }
+
 
     [Fact]
     public async Task CreatePaymentsAsync_ShouldFail_WhenReserveNotFound()

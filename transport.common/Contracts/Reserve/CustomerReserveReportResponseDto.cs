@@ -9,4 +9,6 @@ public record CustomerReserveReportResponseDto(
     string FullPhone,
     int ReserveId,
     int DropoffLocationId,
-    int PickupLocationId);
+    string? DropoffLocationName,
+    int PickupLocationId,
+    string? PickupLocationName);
