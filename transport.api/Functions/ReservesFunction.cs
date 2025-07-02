@@ -147,4 +147,29 @@ public class ReservesFunction : FunctionBase
         var result = await _reserveBusiness.CreatePaymentsAsync(reserveId, customerId, payments);
         return await MatchResultAsync(req, result);
     }
+
+    [Function("UpdateCustomerReserve")]
+    [Authorize("Admin")]
+    [OpenApiOperation(
+    operationId: "customer-reserve-update",
+    tags: new[] { "CustomerReserve" },
+    Summary = "Update a Customer Reserve",
+    Description = "Updates the specified customer reserve with new pickup/dropoff locations or travel status.",
+    Visibility = OpenApiVisibilityType.Important)]
+    [OpenApiRequestBody("application/json", typeof(CustomerReserveUpdateRequestDto), Required = true)]
+    [OpenApiParameter(name: "customerReserveId", In = ParameterLocation.Path, Required = true, Type = typeof(int), Summary = "ID of the customer reserve")]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(Result<bool>), Summary = "Customer reserve updated successfully.")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Summary = "Customer reserve not found.")]
+    public async Task<HttpResponseData> UpdateCustomerReserve(
+    [HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "customer-reserve-update/{customerReserveId:int}")] HttpRequestData req,
+    int customerReserveId)
+    {
+        var dto = await req.ReadFromJsonAsync<CustomerReserveUpdateRequestDto>();
+
+        var result = await ValidateAndMatchAsync(req, dto, GetValidator<CustomerReserveUpdateRequestDto>())
+                        .BindAsync(update => _reserveBusiness.UpdateCustomerReserveAsync(customerReserveId, update));
+
+        return await MatchResultAsync(req, result);
+    }
+
 }
