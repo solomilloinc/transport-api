@@ -563,4 +563,49 @@ public class ReserveBusiness : IReserveBusiness
             return Result.Success(true);
         });
     }
+
+    public async Task<Result<bool>> UpdateCustomerReserveAsync(int customerReserveId, CustomerReserveUpdateRequestDto request)
+    {
+        var reserve = await _context.CustomerReserves
+            .SingleOrDefaultAsync(cr => cr.CustomerReserveId == customerReserveId);
+
+        if (reserve == null)
+            return Result.Failure<bool>(ReserveError.NotFound);
+
+        if (request.PickupLocationId.HasValue)
+        {
+            var pickup = await _context.Directions.FindAsync(request.PickupLocationId);
+            if (pickup == null)
+                return Result.Failure<bool>(Error.NotFound("Pickup.NotFound", "Pickup location not found"));
+
+            reserve.PickupLocationId = pickup.DirectionId;
+            reserve.PickupAddress = pickup.Name;
+
+            _context.Entry(reserve).Property(r => r.PickupLocationId).IsModified = true;
+            _context.Entry(reserve).Property(r => r.PickupAddress).IsModified = true;
+        }
+
+        if (request.DropoffLocationId.HasValue)
+        {
+            var dropoff = await _context.Directions.FindAsync(request.DropoffLocationId);
+            if (dropoff == null)
+                return Result.Failure<bool>(Error.NotFound("Dropoff.NotFound", "Dropoff location not found"));
+
+            reserve.DropoffLocationId = dropoff.DirectionId;
+            reserve.DropoffAddress = dropoff.Name;
+
+            _context.Entry(reserve).Property(r => r.DropoffLocationId).IsModified = true;
+            _context.Entry(reserve).Property(r => r.DropoffAddress).IsModified = true;
+        }
+
+        if (request.HasTraveled.HasValue)
+        {
+            reserve.HasTraveled = request.HasTraveled.Value;
+            _context.Entry(reserve).Property(r => r.HasTraveled).IsModified = true;
+        }
+
+        await _context.SaveChangesWithOutboxAsync();
+        return Result.Success(true);
+    }
+
 }

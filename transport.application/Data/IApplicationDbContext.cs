@@ -30,5 +30,6 @@ public interface IApplicationDbContext
     DbSet<ServiceSchedule> ServiceSchedules { get; }
     DbSet<ReservePayment> ReservePayments { get; }
     DbSet<CustomerAccountTransaction> CustomerAccountTransactions { get; }
+    EntityEntry<TEntity> Entry<TEntity>(TEntity entity) where TEntity : class;
     Task<int> SaveChangesWithOutboxAsync(CancellationToken cancellationToken = default);
 }

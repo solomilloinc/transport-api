@@ -106,4 +106,6 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
         return result;
     }
 
+    public EntityEntry<TEntity> Entry<TEntity>(TEntity entity) where TEntity : class
+            => base.Entry(entity);
 }
