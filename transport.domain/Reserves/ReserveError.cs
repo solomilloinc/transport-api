@@ -17,10 +17,10 @@ public static class ReserveError
         "No se encontró un precio válido para el tipo de reserva.");
 
     public static Error VehicleQuantityNotAvailable(int existing, int incoming, int capacity) =>
-      Error.Validation(
-          "Reserve.VehicleNotAvailable",
-          $"No hay suficientes asientos disponibles. Ya reservados: {existing}, nuevos: {incoming}, capacidad: {capacity}."
-      );
+        Error.Validation(
+            "Reserve.VehicleNotAvailable",
+            $"No hay suficientes asientos disponibles. Ya reservados: {existing}, nuevos: {incoming}, capacidad: {capacity}."
+        );
 
     public static Error CustomerAlreadyExists(string documentNumber) =>
         Error.Validation(
@@ -28,8 +28,14 @@ public static class ReserveError
             $"El pasajero con documento {documentNumber} ya existe en la reserva.");
 
     public static Error InvalidPaymentAmount(decimal expected, decimal provided) =>
-    Error.Validation(
-        "Reserve.InvalidPaymentAmount",
-        $"El monto total pagado (${provided}) no coincide con el precio esperado (${expected})."
-    );
+        Error.Validation(
+            "Reserve.InvalidPaymentAmount",
+            $"El monto total pagado (${provided}) no coincide con el precio esperado (${expected})."
+        );
+
+    public static Error InvalidReserveCombination(string description) =>
+        Error.Validation(
+            "Reserve.InvalidReserveCombination",
+            description
+        );
 }

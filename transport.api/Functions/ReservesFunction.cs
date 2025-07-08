@@ -52,6 +52,27 @@ public class ReservesFunction : FunctionBase
         return await MatchResultAsync(req, result);
     }
 
+    [Function("CreatePassengerReserveExternal")]
+    [Authorize("User")]
+    [OpenApiOperation(
+    operationId: "passenger-reserves-create",
+    tags: new[] { "Reserve" },
+    Summary = "Create Passenger Reserves external",
+    Description = "Creates customer reserves for passengers, creating customers if needed in user final",
+    Visibility = OpenApiVisibilityType.Important)]
+    [OpenApiRequestBody("application/json", typeof(CustomerReserveCreateRequestWrapperExternalDto), Required = true)]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(Result<bool>), Summary = "Passenger reserves created successfully.")]
+    public async Task<HttpResponseData> CreatePassengerReserveExternal(
+    [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "passenger-reserves-create-external")] HttpRequestData req)
+    {
+        var dto = await req.ReadFromJsonAsync<CustomerReserveCreateRequestWrapperExternalDto>();
+
+        var result = await ValidateAndMatchAsync(req, dto, GetValidator<CustomerReserveCreateRequestWrapperExternalDto>())
+                        .BindAsync(_reserveBusiness.CreatePassengerReservesExternal);
+
+        return await MatchResultAsync(req, result);
+    }
+
 
     [Function("GetReservePriceReport")]
     [Authorize("Admin")]

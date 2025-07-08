@@ -8,8 +8,8 @@ public class CustomerReserveCreateRequestDtoValidator : AbstractValidator<Custom
 {
     public CustomerReserveCreateRequestDtoValidator()
     {
-        RuleFor(x => x.reserveId).GreaterThan(0);
-        RuleFor(x => x.price).GreaterThan(0);
+        RuleFor(x => x.ReserveId).GreaterThan(0);
+        RuleFor(x => x.Price).GreaterThan(0);
 
         When(x => x.CustomerId == null, () =>
         {

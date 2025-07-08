@@ -13,6 +13,13 @@ public class AuthorizationMiddleware : IFunctionsWorkerMiddleware
 {
     private readonly IAuthorizationService service;
     private readonly ITokenProvider tokenProvider;
+
+    private static readonly HashSet<string> ExcludedPaths = new()
+        {
+            "MPWebhook",
+            "RenderSwaggerUI",
+            "RenderSwaggerDocument"
+        };
     public AuthorizationMiddleware(IAuthorizationService service, ITokenProvider tokenProvider)
     {
         this.service = service;
@@ -20,7 +27,9 @@ public class AuthorizationMiddleware : IFunctionsWorkerMiddleware
     }
     public async Task Invoke(FunctionContext context, FunctionExecutionDelegate next)
     {
-        if (context.FunctionDefinition.Name == "RenderSwaggerUI" || context.FunctionDefinition.Name == "RenderSwaggerDocument")
+        var functionName = context.FunctionDefinition.Name;
+
+        if (ExcludedPaths.Contains(functionName))
         {
             await next(context);
             return;

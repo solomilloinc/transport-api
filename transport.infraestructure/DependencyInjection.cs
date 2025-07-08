@@ -13,6 +13,8 @@ using Transport.Business.Authentication;
 using Transport.Infraestructure.Authorization;
 using Transport.Business.Authorization;
 using Transport.Business.Data;
+using Transport.Business.Services.Payment;
+using Transport.Infraestructure.Services.Payment;
 
 namespace Transport.Infraestructure;
 
@@ -31,6 +33,7 @@ public static class DependencyInjection
     private static IServiceCollection AddServices(this IServiceCollection services)
     {
         services.AddSingleton<IDateTimeProvider, DateTimeProvider>();
+        services.AddScoped<IMercadoPagoPaymentGateway, MercadoPagoPaymentGateway>();
 
         return services;
     }
