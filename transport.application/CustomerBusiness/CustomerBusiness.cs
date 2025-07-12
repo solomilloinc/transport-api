@@ -5,6 +5,8 @@ using Transport.Domain.Customers;
 using Transport.Domain.Customers.Abstraction;
 using Transport.SharedKernel.Contracts.Customer;
 using System.Linq.Expressions;
+using Transport.Domain.Reserves;
+using Transport.SharedKernel.Contracts.Reserve;
 
 namespace Transport.Business.CustomerBusiness;
 
@@ -126,6 +128,51 @@ public class CustomerBusiness : ICustomerBusiness
 
         return Result.Success(true);
     }
+
+    public async Task<Result<Customer>> GetOrCreateFromPassengerAsync(CustomerReserveCreateRequestDto dto)
+    {
+        if (dto.CustomerId is null)
+        {
+            var existing = await _context.Customers
+                .SingleOrDefaultAsync(c => c.DocumentNumber == dto.CustomerCreate.DocumentNumber);
+
+            if (existing != null)
+            {
+                return Result.Failure<Customer>(ReserveError.CustomerAlreadyExists(existing.DocumentNumber));
+            }
+
+            var newCustomer = new Customer
+            {
+                FirstName = dto.CustomerCreate.FirstName,
+                LastName = dto.CustomerCreate.LastName,
+                DocumentNumber = dto.CustomerCreate.DocumentNumber,
+                Email = dto.CustomerCreate.Email,
+                Phone1 = dto.CustomerCreate.Phone1,
+                Phone2 = dto.CustomerCreate.Phone2
+            };
+
+            _context.Customers.Add(newCustomer);
+            await _context.SaveChangesWithOutboxAsync();
+
+            return Result.Success(newCustomer);
+        }
+        else
+        {
+            var customer = await _context.Customers.FindAsync(dto.CustomerId);
+            if (customer is null)
+            {
+                return Result.Failure<Customer>(CustomerError.NotFound);
+            }
+
+            if (customer.Status != EntityStatusEnum.Active)
+            {
+                return Result.Failure<Customer>(ReserveError.CustomerAlreadyExists(customer.DocumentNumber));
+            }
+
+            return Result.Success(customer);
+        }
+    }
+
 
     public async Task<Result<CustomerAccountSummaryDto>> GetCustomerAccountSummaryAsync(int customerId, PagedReportRequestDto<CustomerTransactionReportFilterRequestDto> requestDto)
     {

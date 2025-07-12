@@ -8,6 +8,8 @@ public interface IReserveBusiness
 {
     Task<Result<bool>> CreatePassengerReserves(CustomerReserveCreateRequestWrapperDto dto);
 
+    Task<Result<string>> CreatePassengerReservesExternal(CustomerReserveCreateRequestWrapperExternalDto dto);
+
     Task<Result<PagedReportResponseDto<ReservePriceReportResponseDto>>>
      GetReservePriceReport(PagedReportRequestDto<ReservePriceReportFilterRequestDto> requestDto);
 
@@ -23,4 +25,5 @@ public interface IReserveBusiness
     List<CreatePaymentRequestDto> payments);
 
     Task<Result<bool>> UpdateCustomerReserveAsync(int customerReserveId, CustomerReserveUpdateRequestDto request);
+    Task<Result<bool>> UpdateReservePaymentsByExternalId(string externalId);
 }

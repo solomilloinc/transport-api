@@ -131,7 +131,7 @@ public static class DbContextExtensions
 
                 return result;
             }
-            catch
+            catch(Exception ex)
             {
                 await transaction.RollbackAsync();
                 dbContext.RejectAllChanges();

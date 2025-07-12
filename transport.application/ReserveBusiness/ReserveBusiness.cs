@@ -1,12 +1,20 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using MercadoPago.Client.Common;
+using MercadoPago.Client.Payment;
+using MercadoPago.Resource.Payment;
+using Microsoft.EntityFrameworkCore;
+using Newtonsoft.Json;
 using System.Linq.Expressions;
+using Transport.Business.Authentication;
 using Transport.Business.Data;
+using Transport.Business.Services.Payment;
 using Transport.Domain.Customers;
+using Transport.Domain.Customers.Abstraction;
 using Transport.Domain.Directions;
 using Transport.Domain.Drivers;
 using Transport.Domain.Reserves;
 using Transport.Domain.Reserves.Abstraction;
 using Transport.Domain.Services;
+using Transport.Domain.Users;
 using Transport.Domain.Vehicles;
 using Transport.SharedKernel;
 using Transport.SharedKernel.Contracts.Customer;
@@ -19,11 +27,22 @@ public class ReserveBusiness : IReserveBusiness
 {
     private readonly IApplicationDbContext _context;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IMercadoPagoPaymentGateway _paymentGateway;
+    private readonly IUserContext _userContext;
+    private readonly ICustomerBusiness _customerBusiness;
 
-    public ReserveBusiness(IApplicationDbContext context, IUnitOfWork unitOfWork)
+
+    public ReserveBusiness(IApplicationDbContext context,
+        IUnitOfWork unitOfWork,
+        IUserContext userContext,
+        IMercadoPagoPaymentGateway paymentGateway,
+        ICustomerBusiness customerBusiness)
     {
         _context = context;
         _unitOfWork = unitOfWork;
+        _userContext = userContext;
+        _paymentGateway = paymentGateway;
+        _customerBusiness = customerBusiness;
     }
 
     public async Task<Result<bool>> CreatePassengerReserves(CustomerReserveCreateRequestWrapperDto customerReserves)
@@ -33,7 +52,7 @@ public class ReserveBusiness : IReserveBusiness
             decimal totalExpectedAmount = 0m;
             Customer? customer = null;
 
-            var mainReserveId = customerReserves.Items.Min(i => i.reserveId);
+            var mainReserveId = customerReserves.Items.Min(i => i.ReserveId);
 
             var servicesCache = new Dictionary<int, Service>();
 
@@ -44,7 +63,7 @@ public class ReserveBusiness : IReserveBusiness
                 var reserve = await _context.Reserves
                     .Include(r => r.CustomerReserves)
                     .Include(r => r.Driver)
-                    .SingleOrDefaultAsync(r => r.ReserveId == passenger.reserveId);
+                    .SingleOrDefaultAsync(r => r.ReserveId == passenger.ReserveId);
 
                 if (reserve is null)
                     return Result.Failure<bool>(ReserveError.NotFound);
@@ -74,10 +93,10 @@ public class ReserveBusiness : IReserveBusiness
                     return Result.Failure<bool>(ReserveError.VehicleQuantityNotAvailable(existingPassengerCount, customerReserves.Items.Count, vehicle.AvailableQuantity));
 
                 var reservePrice = service.ReservePrices.SingleOrDefault(p => p.ReserveTypeId == (ReserveTypeIdEnum)passenger.ReserveTypeId);
-                if (reservePrice is null || passenger.price != reservePrice.Price)
+                if (reservePrice is null || passenger.Price != reservePrice.Price)
                     return Result.Failure<bool>(ReserveError.PriceNotAvailable);
 
-                var customerResult = await GetOrCreateCustomerAsync(passenger);
+                var customerResult = await _customerBusiness.GetOrCreateFromPassengerAsync(passenger);
                 if (!customerResult.IsSuccess)
                     return Result.Failure<bool>(customerResult.Error);
 
@@ -112,7 +131,8 @@ public class ReserveBusiness : IReserveBusiness
                     CustomerEmail = customer.Email,
                     DocumentNumber = customer.DocumentNumber,
                     Phone1 = customer.Phone1,
-                    Phone2 = customer.Phone2
+                    Phone2 = customer.Phone2,
+                    Status = CustomerReserveStatusEnum.Confirmed
                 };
 
                 reserve.CustomerReserves.Add(newCustomerReserve);
@@ -122,7 +142,7 @@ public class ReserveBusiness : IReserveBusiness
                 totalExpectedAmount += reservePrice.Price;
             }
 
-            var reserveIds = customerReserves.Items.Select(i => i.reserveId).Distinct().ToList();
+            var reserveIds = customerReserves.Items.Select(i => i.ReserveId).Distinct().ToList();
 
             string BuildDescription()
             {
@@ -131,7 +151,7 @@ public class ReserveBusiness : IReserveBusiness
                     var rid = reserveIds[0];
                     var reserve = reserveMap[rid];
                     var service = servicesCache[reserve.ServiceId];
-                    var type = customerReserves.Items.First(i => i.reserveId == rid).ReserveTypeId == (int)ReserveTypeIdEnum.IdaVuelta
+                    var type = customerReserves.Items.First(i => i.ReserveId == rid).ReserveTypeId == (int)ReserveTypeIdEnum.IdaVuelta
                         ? "Ida y vuelta"
                         : "Ida";
                     return $"Reserva: {type} #{rid} - {service.Origin.Name} - {service.Destination.Name} {reserve.ReserveDate:HH:mm}";
@@ -179,7 +199,7 @@ public class ReserveBusiness : IReserveBusiness
 
             var parentPayment = new ReservePayment
             {
-                ReserveId = customerReserves.Items.First().reserveId,
+                ReserveId = customerReserves.Items.First().ReserveId,
                 CustomerId = customer.CustomerId,
                 Amount = parentPaymentDto.TransactionAmount,
                 Method = (PaymentMethodEnum)parentPaymentDto.PaymentMethod,
@@ -232,7 +252,6 @@ public class ReserveBusiness : IReserveBusiness
     }
 
 
-
     private async Task<Result<Direction?>> GetDirectionAsync(int? locationId, string type)
     {
         if (locationId is null)
@@ -251,50 +270,6 @@ public class ReserveBusiness : IReserveBusiness
         }
 
         return Result.Success<Direction?>(direction);
-    }
-
-    private async Task<Result<Customer>> GetOrCreateCustomerAsync(CustomerReserveCreateRequestDto passenger)
-    {
-        if (passenger.CustomerId is null)
-        {
-            var existing = await _context.Customers
-                .SingleOrDefaultAsync(c => c.DocumentNumber == passenger.CustomerCreate.DocumentNumber);
-
-            if (existing != null)
-            {
-                return Result.Failure<Customer>(ReserveError.CustomerAlreadyExists(existing.DocumentNumber));
-            }
-
-            var newCustomer = new Customer
-            {
-                FirstName = passenger.CustomerCreate.FirstName,
-                LastName = passenger.CustomerCreate.LastName,
-                DocumentNumber = passenger.CustomerCreate.DocumentNumber,
-                Email = passenger.CustomerCreate.Email,
-                Phone1 = passenger.CustomerCreate.Phone1,
-                Phone2 = passenger.CustomerCreate.Phone2
-            };
-
-            _context.Customers.Add(newCustomer);
-            await _context.SaveChangesWithOutboxAsync();
-
-            return Result.Success(newCustomer);
-        }
-        else
-        {
-            var customer = await _context.Customers.FindAsync(passenger.CustomerId);
-            if (customer is null)
-            {
-                return Result.Failure<Customer>(CustomerError.NotFound);
-            }
-
-            if (customer.Status != EntityStatusEnum.Active)
-            {
-                return Result.Failure<Customer>(ReserveError.CustomerAlreadyExists(customer.DocumentNumber));
-            }
-
-            return Result.Success(customer);
-        }
     }
 
 
@@ -608,4 +583,381 @@ public class ReserveBusiness : IReserveBusiness
         return Result.Success(true);
     }
 
+
+    public async Task<Result<string>> CreatePassengerReservesExternal(CustomerReserveCreateRequestWrapperExternalDto dto)
+    {
+        var validationResult = ValidateUserReserveCombination(dto.Items);
+        if (validationResult.IsFailure)
+            return Result.Failure<string>(validationResult.Error);
+
+        int userIdLogged = _userContext.UserId != 0
+            ? _userContext.UserId
+            : throw new InvalidOperationException("User context is not set. Ensure the user is authenticated.");
+
+        User userLogged = await _context.Users.FindAsync(userIdLogged)
+                         ?? throw new InvalidOperationException("User Logged is not Found");
+
+        List<Reserve> reserves = new List<Reserve>();
+
+        return await _unitOfWork.ExecuteInTransactionAsync(async () =>
+        {
+            decimal totalExpectedAmount = 0m;
+            Customer? customer = null;
+
+            foreach (var passenger in dto.Items)
+            {
+                var reserve = await _context.Reserves
+                   .Include(r => r.CustomerReserves)
+                   .SingleOrDefaultAsync(r => r.ReserveId == passenger.ReserveId);
+
+                if (reserve is null)
+                    return Result.Failure<string>(ReserveError.NotFound);
+
+                if (reserve.Status != ReserveStatusEnum.Confirmed)
+                    return Result.Failure<string>(ReserveError.NotAvailable);
+
+                var service = await _context.Services
+                    .Include(s => s.ReservePrices)
+                    .Include(s => s.Origin)
+                    .Include(s => s.Destination)
+                    .SingleOrDefaultAsync(s => s.ServiceId == reserve.ServiceId);
+
+                var vehicle = await _context.Vehicles.FindAsync(reserve.VehicleId);
+
+                var existingPassengerCount = reserve.CustomerReserves.Count;
+                var totalAfterInsert = existingPassengerCount + dto.Items.Count;
+
+                if (totalAfterInsert > vehicle.AvailableQuantity)
+                    return Result.Failure<string>(
+                        ReserveError.VehicleQuantityNotAvailable(existingPassengerCount, dto.Items.Count, vehicle.AvailableQuantity));
+
+                var reservePrice = service.ReservePrices.SingleOrDefault(p => p.ReserveTypeId == (ReserveTypeIdEnum)passenger.ReserveTypeId);
+                if (reservePrice is null || passenger.Price != reservePrice.Price)
+                    return Result.Failure<string>(ReserveError.PriceNotAvailable);
+
+                var customerResult = await _customerBusiness.GetOrCreateFromPassengerAsync(passenger);
+                if (!customerResult.IsSuccess)
+                    return Result.Failure<string>(customerResult.Error);
+
+                customer = customerResult.Value;
+
+                if (reserve.CustomerReserves.Any(cr => cr.CustomerId == customer.CustomerId))
+                    return Result.Failure<string>(ReserveError.CustomerAlreadyExists(customer.DocumentNumber));
+
+                var pickupResult = await GetDirectionAsync(passenger.PickupLocationId, "Pickup");
+                if (pickupResult.IsFailure) return Result.Failure<string>(pickupResult.Error);
+
+                var dropoffResult = await GetDirectionAsync(passenger.DropoffLocationId, "Dropoff");
+                if (dropoffResult.IsFailure) return Result.Failure<string>(dropoffResult.Error);
+
+                var newCustomerReserve = new CustomerReserve
+                {
+                    UserId = userLogged.CustomerId == customer.CustomerId ?
+                                                      userLogged.UserId : null,
+                    CustomerId = customer.CustomerId,
+                    ReserveId = reserve.ReserveId,
+                    DropoffLocationId = passenger.DropoffLocationId,
+                    PickupLocationId = passenger.PickupLocationId,
+                    HasTraveled = passenger.HasTraveled,
+                    Price = reservePrice.Price,
+                    IsPayment = passenger.IsPayment,
+                    CustomerFullName = $"{customer.FirstName} {customer.LastName}",
+                    DestinationCityName = service.Destination.Name,
+                    OriginCityName = service.Origin.Name,
+                    DriverName = reserve.Driver != null ? $"{reserve.Driver.FirstName} {reserve.Driver.LastName}" : null,
+                    PickupAddress = pickupResult.Value?.Name,
+                    DropoffAddress = dropoffResult.Value?.Name,
+                    ServiceName = service.Name,
+                    VehicleInternalNumber = vehicle.InternalNumber,
+                    CustomerEmail = customer.Email,
+                    DocumentNumber = customer.DocumentNumber,
+                    Phone1 = customer.Phone1,
+                    Phone2 = customer.Phone2
+                };
+
+                reserve.CustomerReserves.Add(newCustomerReserve);
+                reserve.Raise(new CustomerReserveCreatedEvent(newCustomerReserve.CustomerReserveId));
+                _context.Reserves.Update(reserve);
+
+                reserves.Add(reserve);
+
+                totalExpectedAmount += reservePrice.Price;
+            }
+
+            if (dto.Payment is null)
+            {
+                foreach (var reserve in reserves)
+                {
+                    foreach (var cr in reserve.CustomerReserves)
+                    {
+                        cr.Status = CustomerReserveStatusEnum.PendingPayment;
+                    }
+                }
+
+                var resultPayment = await CreatePendingPayment(totalExpectedAmount, reserves);
+                if (resultPayment.IsFailure) return Result.Failure<string>(resultPayment.Error);
+
+                string preferenceId = await _paymentGateway.CreatePreferenceAsync(
+                    resultPayment.Value.ToString(),
+                    totalExpectedAmount,
+                    dto.Items
+                );
+
+                return Result.Success(preferenceId);
+            }
+            else
+            {
+                var totalProvidedAmount = dto.Payment.TransactionAmount;
+
+                if (totalExpectedAmount != totalProvidedAmount)
+                    return Result.Failure<string>(ReserveError.InvalidPaymentAmount(totalExpectedAmount, totalProvidedAmount));
+
+                var resultPayment = await CreatePayment(dto.Payment, reserves);
+                if (resultPayment.IsFailure) return Result.Failure<string>(resultPayment.Error);
+            }
+
+            await _context.SaveChangesWithOutboxAsync();
+            return Result.Success(string.Empty);
+        });
+    }
+
+    private Result ValidateUserReserveCombination(List<CustomerReserveCreateRequestDto> items)
+    {
+        var distinctReserveIds = items.Select(x => x.ReserveId).Distinct().ToList();
+        if (distinctReserveIds.Count > 2)
+            return Result.Failure(ReserveError.InvalidReserveCombination("Solo se permite reservar hasta 2 reservas: ida y vuelta."));
+
+        var types = items.Select(x => (ReserveTypeIdEnum)x.ReserveTypeId).ToList();
+
+        if (types.Count > 2)
+            return Result.Failure(ReserveError.InvalidReserveCombination("Solo se permite reservar como máximo ida y vuelta."));
+
+        if (types.Count == 2 && !(types.Contains(ReserveTypeIdEnum.Ida) && types.Contains(ReserveTypeIdEnum.IdaVuelta)))
+            return Result.Failure(ReserveError.InvalidReserveCombination("La combinación válida es Ida + IdaVuelta únicamente."));
+
+        if (types.Count == 1 && types.First() == ReserveTypeIdEnum.IdaVuelta)
+            return Result.Failure(ReserveError.InvalidReserveCombination("No se puede reservar únicamente la vuelta sin haber reservado ida."));
+
+        return Result.Success();
+    }
+
+
+    private async Task<Result<bool>> CreatePayment(CreatePaymentExternalRequestDto paymentData, List<Reserve> reserves)
+    {
+        var paymentRequest = new PaymentCreateRequest
+        {
+            TransactionAmount = paymentData.TransactionAmount,
+            Token = paymentData.Token,
+            Description = paymentData.Description,
+            Installments = paymentData.Installments,
+            PaymentMethodId = paymentData.PaymentMethodId,
+            Payer = new PaymentPayerRequest
+            {
+                Email = paymentData.PayerEmail,
+                Identification = new IdentificationRequest
+                {
+                    Type = paymentData.IdentificationType,
+                    Number = paymentData.IdentificationNumber
+                }
+            }
+        };
+
+        var result = await _paymentGateway.CreatePaymentAsync(paymentRequest);
+
+        var isPendingApproval = result.Status == "pending" || result.Status == "in_process";
+
+        var statusPaymentInternal = GetPaymentStatusFromExternal(result.Status);
+
+        if (statusPaymentInternal is null)
+        {
+            return Result.Failure<bool>(
+                Error.Validation("Payment.StatusMappingError", $"El estado de pago externo '{result.Status}' no pudo ser interpretado correctamente.")
+            );
+        }
+
+        var allCustomerReserves = reserves.SelectMany(r => r.CustomerReserves).ToList();
+
+        var payingCustomerReserve = allCustomerReserves
+            .FirstOrDefault(cr => cr.DocumentNumber == paymentData.IdentificationNumber)
+            ?? allCustomerReserves.First();
+
+        var reserveStatus = isPendingApproval ? CustomerReserveStatusEnum.PendingPayment :
+                       statusPaymentInternal == StatusPaymentEnum.Paid ? CustomerReserveStatusEnum.Confirmed :
+                       CustomerReserveStatusEnum.Cancelled;
+
+        foreach (var reserve in reserves)
+        {
+            foreach (var cr in reserve.CustomerReserves)
+            {
+                cr.Status = reserveStatus;
+            }
+        }
+
+        var parentPayment = new ReservePayment
+        {
+            PaymentExternalId = result.Id,
+            Amount = paymentData.TransactionAmount,
+            ReserveId = payingCustomerReserve.ReserveId,
+            CustomerId = payingCustomerReserve.CustomerId,
+            Method = PaymentMethodEnum.Online,
+            Status = statusPaymentInternal.Value,
+            StatusDetail = result.StatusDetail,
+            ResultApiExternalRawJson = JsonConvert.SerializeObject(result),
+        };
+
+        _context.ReservePayments.Add(parentPayment);
+        await _context.SaveChangesWithOutboxAsync();
+
+        var parentId = parentPayment.ReservePaymentId;
+
+        foreach (var reserve in allCustomerReserves.Where(cr => cr.CustomerId != payingCustomerReserve.CustomerId))
+        {
+            var childPayment = new ReservePayment
+            {
+                PaymentExternalId = result.Id,
+                Amount = 0,
+                ReserveId = reserve.ReserveId,
+                CustomerId = reserve.CustomerId,
+                Method = PaymentMethodEnum.Online,
+                Status = statusPaymentInternal.Value,
+                StatusDetail = result.StatusDetail,
+                ParentReservePaymentId = parentId
+            };
+
+            _context.ReservePayments.Add(childPayment);
+        }
+
+        await _context.SaveChangesWithOutboxAsync();
+
+        return true;
+    }
+
+    private async Task<Result<int>> CreatePendingPayment(decimal amount, List<Reserve> reserves)
+    {
+        var allCustomerReserves = reserves.SelectMany(r => r.CustomerReserves).ToList();
+
+        var payingCustomerReserve = allCustomerReserves.First();
+
+        var parentPayment = new ReservePayment
+        {
+            Amount = amount,
+            ReserveId = payingCustomerReserve.ReserveId,
+            CustomerId = payingCustomerReserve.CustomerId,
+            Method = PaymentMethodEnum.Online,
+            Status = StatusPaymentEnum.Pending,
+            StatusDetail = "wallet_pending",
+            ResultApiExternalRawJson = null
+        };
+
+        _context.ReservePayments.Add(parentPayment);
+        await _context.SaveChangesWithOutboxAsync();
+
+        var parentId = parentPayment.ReservePaymentId;
+
+        foreach (var reserve in allCustomerReserves.Where(cr => cr.CustomerId != payingCustomerReserve.CustomerId))
+        {
+            var childPayment = new ReservePayment
+            {
+                Amount = 0,
+                ReserveId = reserve.ReserveId,
+                CustomerId = reserve.CustomerId,
+                Method = PaymentMethodEnum.Online,
+                Status = StatusPaymentEnum.Pending,
+                StatusDetail = "wallet_pending",
+                ParentReservePaymentId = parentId
+            };
+
+            _context.ReservePayments.Add(childPayment);
+        }
+
+        await _context.SaveChangesWithOutboxAsync();
+        return parentId;
+    }
+
+
+    private StatusPaymentEnum? GetPaymentStatusFromExternal(string externalStatusPayment)
+    {
+        return externalStatusPayment?.ToLower() switch
+        {
+            "pending" => StatusPaymentEnum.Pending,
+            "approved" => StatusPaymentEnum.Paid,
+            "authorized" => StatusPaymentEnum.Paid,
+            "in_process" => StatusPaymentEnum.Pending,
+            "in_mediation" => StatusPaymentEnum.Pending,
+            "rejected" => StatusPaymentEnum.Cancelled,
+            "cancelled" => StatusPaymentEnum.Cancelled,
+            "refunded" => StatusPaymentEnum.Cancelled,
+            "charged_back" => StatusPaymentEnum.Cancelled,
+            _ => null
+        };
+    }
+
+    public async Task<Result<bool>> UpdateReservePaymentsByExternalId(string externalPaymentId)
+    {
+        if (_context.ReservePayments.Any(p => p.PaymentExternalId == long.Parse(externalPaymentId)
+        && p.Status != StatusPaymentEnum.Pending))
+        {
+            return Result.Success(true);
+        }
+
+        var reservePayments = _context.ReservePayments.ToList();
+
+        Payment mpPayment = await _paymentGateway.GetPaymentAsync(externalPaymentId);
+
+        return await _unitOfWork.ExecuteInTransactionAsync(async () =>
+        {
+            // Buscar el pago padre por externalId
+            var parentPayment = await _context.ReservePayments
+                .FirstOrDefaultAsync(rp => rp.ReservePaymentId == int.Parse(mpPayment.ExternalReference));
+
+            if (parentPayment == null)
+                return Result.Failure<bool>(Error.NotFound("Payment.NotFound", "No se encontró el pago con el ID externo proporcionado"));
+
+            // Determinar el estado interno
+            var internalStatus = GetPaymentStatusFromExternal(mpPayment.Status);
+            if (internalStatus == null)
+                return Result.Failure<bool>(Error.Validation("Payment.InvalidStatus", "Estado de pago no reconocido"));
+
+            // Actualizar todos los pagos relacionados (padre e hijos)
+            var relatedPayments = await _context.ReservePayments
+                .Where(rp => rp.ParentReservePaymentId == parentPayment.ReservePaymentId ||
+                             rp.ReservePaymentId == parentPayment.ReservePaymentId)
+                .ToListAsync();
+
+            foreach (var payment in relatedPayments)
+            {
+                payment.Status = internalStatus.Value;
+                payment.StatusDetail = parentPayment.StatusDetail;
+                payment.PaymentExternalId = mpPayment?.Id;
+                payment.ResultApiExternalRawJson = JsonConvert.SerializeObject(payment);
+
+                _context.ReservePayments.Update(payment);
+                await _context.SaveChangesWithOutboxAsync();
+            }
+
+            // Obtener todas las CustomerReserves asociadas a estos pagos
+            var reserveIds = relatedPayments.Select(rp => rp.ReserveId).Distinct().ToList();
+            var reserves = await _context.Reserves.Include(p => p.CustomerReserves).Where(p => reserveIds.Contains(p.ReserveId))
+                .ToListAsync();
+
+            // Actualizar el estado de las CustomerReserves según el resultado del pago
+            var newReserveStatus = internalStatus.Value == StatusPaymentEnum.Paid
+                ? CustomerReserveStatusEnum.Confirmed
+                : CustomerReserveStatusEnum.Cancelled;
+
+            foreach (var reserve in reserves)
+            {
+                foreach (var cr in reserve.CustomerReserves)
+                {
+                    cr.Status = newReserveStatus;
+                    _context.CustomerReserves.Update(cr);
+                }
+
+                await _context.SaveChangesWithOutboxAsync();
+            }
+
+            await _context.SaveChangesWithOutboxAsync();
+            return Result.Success(true);
+        });
+    }
 }

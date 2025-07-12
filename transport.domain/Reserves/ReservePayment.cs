@@ -3,15 +3,17 @@ using Transport.SharedKernel;
 
 namespace Transport.Domain.Reserves;
 
-public class ReservePayment: Entity, IAuditable
+public class ReservePayment : Entity, IAuditable
 {
     public int ReservePaymentId { get; set; }
     public int ReserveId { get; set; }
     public PaymentMethodEnum Method { get; set; }
     public StatusPaymentEnum Status { get; set; }
+    public string StatusDetail { get; set; }
+    public string ResultApiExternalRawJson { get; set; }
     public int CustomerId { get; set; }
     public decimal Amount { get; set; }
-
+    public long? PaymentExternalId { get; set; }
     public Reserve Reserve { get; set; } = null!;
     public Customer Customer { get; set; } = null!;
 

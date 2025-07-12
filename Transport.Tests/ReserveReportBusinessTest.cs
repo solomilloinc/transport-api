@@ -9,7 +9,9 @@ using Transport.SharedKernel.Contracts.Reserve;
 using Xunit;
 using Transport.Domain.Vehicles;
 using Transport.Domain.Cities;
-using static Google.Protobuf.Reflection.SourceCodeInfo.Types;
+using Transport.Business.Authentication;
+using Transport.Business.Services.Payment;
+using Transport.Domain.Customers.Abstraction;
 
 namespace Transport.Tests;
 
@@ -17,13 +19,19 @@ public class ReserveReportBusinessTest : TestBase
 {
     private readonly Mock<IApplicationDbContext> _contextMock;
     private readonly Mock<IUnitOfWork> _unitOfWorkMock;
+    private readonly Mock<IUserContext> _userContextMock;
+    private readonly Mock<IMercadoPagoPaymentGateway> _mercadoPagoPaymentGatewayMock;
+    private readonly Mock<ICustomerBusiness> _customerBusinessMock;
     private readonly ReserveBusiness _reserveBusiness;
 
     public ReserveReportBusinessTest()
     {
         _contextMock = new Mock<IApplicationDbContext>();
         _unitOfWorkMock = new Mock<IUnitOfWork>();
-        _reserveBusiness = new ReserveBusiness(_contextMock.Object, _unitOfWorkMock.Object);
+        _userContextMock = new Mock<IUserContext>();
+        _mercadoPagoPaymentGatewayMock = new Mock<IMercadoPagoPaymentGateway>();
+        _customerBusinessMock = new Mock<ICustomerBusiness>();
+        _reserveBusiness = new ReserveBusiness(_contextMock.Object, _unitOfWorkMock.Object, _userContextMock.Object, _mercadoPagoPaymentGatewayMock.Object, _customerBusinessMock.Object);
     }
 
     [Fact]
