@@ -24,6 +24,8 @@ internal class ReservePaymentConfiguration : IEntityTypeConfiguration<ReservePay
             .HasColumnType("VARCHAR(20)")
             .IsRequired();
 
+        builder.Property(r => r.ResultApiExternalRawJson).IsRequired(false);
+
         builder
             .HasOne(p => p.ParentReservePayment)
             .WithMany(p => p.ChildPayments)

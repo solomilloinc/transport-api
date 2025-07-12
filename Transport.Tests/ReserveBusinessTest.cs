@@ -309,12 +309,16 @@ public class ReserveBusinessTests : TestBase
         };
 
         var reservePaymentsList = new List<ReservePayment>();
+        var customerReservesList = new List<CustomerReserve>();
+        var reservesList = new List<Reserve> { reserve1, reserve2 };
+
         _contextMock.Setup(c => c.ReservePayments).Returns(GetMockDbSetWithIdentity(reservePaymentsList).Object);
-        _contextMock.Setup(c => c.Reserves).Returns(GetMockDbSetWithIdentity(new List<Reserve> { reserve1, reserve2 }).Object);
         _contextMock.Setup(c => c.Vehicles.FindAsync(It.IsAny<int>())).ReturnsAsync(vehicle);
         _contextMock.Setup(c => c.Services).Returns(GetMockDbSetWithIdentity(new List<Service> { service }).Object);
         _contextMock.Setup(c => c.Directions.FindAsync(It.IsAny<int>())).ReturnsAsync(destination);
         _contextMock.Setup(c => c.Directions.FindAsync(It.IsAny<int>())).ReturnsAsync(origin);
+        _contextMock.Setup(c => c.CustomerReserves).Returns(GetMockDbSetWithIdentity(customerReservesList).Object);
+        _contextMock.Setup(c => c.Reserves).Returns(GetMockDbSetWithIdentity(reservesList).Object);
 
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
@@ -330,45 +334,52 @@ public class ReserveBusinessTests : TestBase
             {
                 Id = 987654321,
                 Status = "approved",
-                StatusDetail = "accredited"
+                StatusDetail = "accredited",
+                ExternalReference = "12345"
+            });
+
+        paymentGatewayMock
+            .Setup(x => x.GetPaymentAsync(It.IsAny<string>()))
+            .ReturnsAsync(new Payment
+            {
+                Id = 987654321,
+                Status = "approved",
+                StatusDetail = "accredited",
+                ExternalReference = "12345"
             });
 
         _customerBusinessMock
-      .Setup(x => x.GetOrCreateFromPassengerAsync(It.IsAny<CustomerReserveCreateRequestDto>()))
-      .ReturnsAsync((CustomerReserveCreateRequestDto dto) =>
-      {
-          if (dto.CustomerCreate.DocumentNumber == "32145678")
-          {
-              return Result.Success(new Customer
-              {
-                  CustomerId = 123,
-                  FirstName = "Pepe",
-                  LastName = "Argento",
-                  DocumentNumber = "32145678",
-                  Email = "pepe@example.com"
-              });
-          }
+            .Setup(x => x.GetOrCreateFromPassengerAsync(It.IsAny<CustomerReserveCreateRequestDto>()))
+            .ReturnsAsync((CustomerReserveCreateRequestDto dto) =>
+            {
+                if (dto.CustomerCreate.DocumentNumber == "32145678")
+                {
+                    return Result.Success(new Customer
+                    {
+                        CustomerId = 123,
+                        FirstName = "Pepe",
+                        LastName = "Argento",
+                        DocumentNumber = "32145678",
+                        Email = "pepe@example.com"
+                    });
+                }
 
-          return Result.Success(new Customer
-          {
-              CustomerId = 124,
-              FirstName = "Lionel",
-              LastName = "Messi",
-              DocumentNumber = "32145679",
-              Email = "liomessi@example.com"
-          });
-      });
+                return Result.Success(new Customer
+                {
+                    CustomerId = 124,
+                    FirstName = "Lionel",
+                    LastName = "Messi",
+                    DocumentNumber = "32145679",
+                    Email = "liomessi@example.com"
+                });
+            });
 
-        var reserveBusinessMock = new Mock<ReserveBusiness>(
-    _contextMock.Object,
-    _unitOfWorkMock.Object,
-    _userContextMock.Object,
-    paymentGatewayMock.Object,
-    _customerBusinessMock.Object)
-        {
-            CallBase = true
-        };
-
+        var reserveBusiness = new ReserveBusiness(
+            _contextMock.Object,
+            _unitOfWorkMock.Object,
+            _userContextMock.Object,
+            paymentGatewayMock.Object,
+            _customerBusinessMock.Object);
 
         var passengers = new List<CustomerReserveCreateRequestDto>
     {
@@ -411,26 +422,107 @@ public class ReserveBusinessTests : TestBase
         var request = new CustomerReserveCreateRequestWrapperExternalDto(paymentDto, passengers);
 
         _unitOfWorkMock
-    .Setup(uow => uow.ExecuteInTransactionAsync<bool>(
-        It.IsAny<Func<Task<Result<bool>>>>(),
-        It.IsAny<IsolationLevel>()))
-    .Returns<Func<Task<Result<bool>>>, IsolationLevel>((func, _) => func());
+        .Setup(uow => uow.ExecuteInTransactionAsync<string>(
+            It.IsAny<Func<Task<Result<string>>>>(),
+            It.IsAny<IsolationLevel>()))
+        .Returns<Func<Task<Result<string>>>, IsolationLevel>((func, _) => func());
 
-        // Act
-        var result = await reserveBusinessMock.Object.CreatePassengerReservesExternal(request);
+        _unitOfWorkMock
+            .Setup(uow => uow.ExecuteInTransactionAsync<bool>(
+                It.IsAny<Func<Task<Result<bool>>>>(),
+                It.IsAny<IsolationLevel>()))
+            .Returns<Func<Task<Result<bool>>>, IsolationLevel>(async (func, _) => await func());
 
-        // Assert
+        // Act - Prueba con pago directo
+        var result = await reserveBusiness.CreatePassengerReservesExternal(request);
+
+        // Assert - Verificaciones para pago directo
         Assert.True(result.IsSuccess);
         Assert.Equal(2, reservePaymentsList.Count);
+        Assert.Equal(2, reserve1.CustomerReserves.Count + reserve2.CustomerReserves.Count);
 
-        var parent = reservePaymentsList[0];
-        var child = reservePaymentsList[1];
+        var parentPayment = reservePaymentsList[0];
+        var childPayment = reservePaymentsList[1];
 
-        Assert.Equal(200m, parent.Amount);
-        Assert.Null(parent.ParentReservePaymentId);
-        Assert.Equal(0m, child.Amount);
-        Assert.Equal(parent.ReservePaymentId, child.ParentReservePaymentId);
-        Assert.Equal(987654321, parent.PaymentExternalId);
+        // Verificar pagos
+        Assert.Equal(200m, parentPayment.Amount);
+        Assert.Null(parentPayment.ParentReservePaymentId);
+        Assert.Equal(0m, childPayment.Amount);
+        Assert.Equal(parentPayment.ReservePaymentId, childPayment.ParentReservePaymentId);
+        Assert.Equal(987654321, parentPayment.PaymentExternalId);
+        Assert.Equal(StatusPaymentEnum.Paid, parentPayment.Status);
+        Assert.Equal(StatusPaymentEnum.Paid, childPayment.Status);
+
+        // Verificar estados de las reservas
+        Assert.All(reserve1.CustomerReserves, cr =>
+            Assert.Equal(CustomerReserveStatusEnum.Confirmed, cr.Status));
+
+        Assert.All(reserve2.CustomerReserves, cr =>
+    Assert.Equal(CustomerReserveStatusEnum.Confirmed, cr.Status));
+
+
+        // Limpiar para prueba con wallet
+        reservePaymentsList.Clear();
+        reserve1.CustomerReserves.Clear();
+        reserve2.CustomerReserves.Clear();
+
+        _contextMock.Setup(c => c.CustomerReserves.Add(It.IsAny<CustomerReserve>()))
+        .Callback<CustomerReserve>(cr => {
+            customerReservesList.Add(cr);
+            // También agregar a la reserva correspondiente
+            var reserve = reservesList.FirstOrDefault(r => r.ReserveId == cr.ReserveId);
+            if (reserve != null)
+            {
+                reserve.CustomerReserves.Add(cr);
+            }
+        });
+
+        // Act - Prueba con wallet (sin pago directo)
+        var walletRequest = new CustomerReserveCreateRequestWrapperExternalDto(null, passengers);
+        var walletResult = await reserveBusiness.CreatePassengerReservesExternal(walletRequest);
+
+        // Assert - Verificaciones para wallet
+        Assert.True(walletResult.IsSuccess);
+        Assert.Equal(2, reservePaymentsList.Count);
+        Assert.Equal(2, reserve1.CustomerReserves.Count + reserve2.CustomerReserves.Count);
+
+        var walletParentPayment = reservePaymentsList[0];
+        var walletChildPayment = reservePaymentsList[1];
+
+        // Verificar pagos
+        Assert.Equal(200m, walletParentPayment.Amount);
+        Assert.Null(walletParentPayment.ParentReservePaymentId);
+        Assert.Equal(0m, walletChildPayment.Amount);
+        Assert.Equal(walletParentPayment.ReservePaymentId, walletChildPayment.ParentReservePaymentId);
+        Assert.Null(walletParentPayment.PaymentExternalId); // Aún no tiene ID externo
+        Assert.Equal(StatusPaymentEnum.Pending, walletParentPayment.Status);
+        Assert.Equal(StatusPaymentEnum.Pending, walletChildPayment.Status);
+
+        // Verificar estados de las reservas
+        Assert.All(reserve1.CustomerReserves, cr =>
+           Assert.Equal(CustomerReserveStatusEnum.PendingPayment, cr.Status));
+
+        Assert.All(reserve2.CustomerReserves, cr =>
+    Assert.Equal(CustomerReserveStatusEnum.PendingPayment, cr.Status));
+
+        paymentGatewayMock
+        .Setup(x => x.GetPaymentAsync("987654321"))
+        .ReturnsAsync(new Payment
+        {
+            Id = 987654321,
+            Status = "approved",
+            StatusDetail = "accredited",
+            ExternalReference = walletParentPayment.ReservePaymentId.ToString()
+        });
+
+        // Simular notificación de pago para wallet
+        var updateResult = await reserveBusiness.UpdateReservePaymentsByExternalId("987654321");
+        Assert.True(updateResult.IsSuccess);
+
+        // Verificar actualización después de notificación
+        Assert.Equal(987654321, walletParentPayment.PaymentExternalId);
+        Assert.Equal(StatusPaymentEnum.Paid, walletParentPayment.Status);
+        Assert.Equal(StatusPaymentEnum.Paid, walletChildPayment.Status);
     }
 
 

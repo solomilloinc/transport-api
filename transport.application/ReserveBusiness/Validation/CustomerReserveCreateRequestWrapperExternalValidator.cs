@@ -7,7 +7,7 @@ internal class CustomerReserveCreateRequestWrapperExternalValidator : AbstractVa
 {
     public CustomerReserveCreateRequestWrapperExternalValidator()
     {
-        RuleFor(x => x.payment).SetValidator(new CreatePaymentExternalRequestValidator());
+        RuleFor(x => x.Payment).SetValidator(new CreatePaymentExternalRequestValidator());
         RuleForEach(x => x.Items).SetValidator(new CustomerReserveCreateRequestDtoValidator());
     }
 }

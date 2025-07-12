@@ -1,84 +1,28 @@
 ﻿using System.Net;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
-using System.Security.Cryptography.Xml;
 using System.Text;
-using Azure.Core;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
-using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using Newtonsoft.Json.Serialization;
-using Transport.SharedKernel.Contracts.Payment; // Asegurate de tener este DTO creado
+using Transport.Domain.Reserves.Abstraction;
+using Transport.SharedKernel.Configuration;
 
 public class PaymentIntegrationFunction
 {
     private readonly ILogger _logger;
+    private readonly IReserveBusiness _reserveBusiness;
+    private readonly IMpIntegrationOption _mpIntegrationOption;
+    private readonly string _mpWebhookSecret;
 
-    public PaymentIntegrationFunction(ILogger<PaymentIntegrationFunction> logger)
+    public PaymentIntegrationFunction(ILogger<PaymentIntegrationFunction> logger,
+        IReserveBusiness reserveBusiness, 
+        IMpIntegrationOption mpIntegrationOption)
     {
         _logger = logger;
-    }
-
-    [Function("CreatePreference")]
-    public async Task<HttpResponseData> CreatePreference(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "mp-create-preference")] HttpRequestData req)
-    {
-        var dto = await req.ReadFromJsonAsync<CreatePreferenceRequestDto>();
-
-        // Validación básica del DTO (podés agregar FluentValidation o similares)
-        if (dto is null || dto.Items is null || !dto.Items.Any())
-        {
-            var badResponse = req.CreateResponse(HttpStatusCode.BadRequest);
-            await badResponse.WriteStringAsync("Datos inválidos o incompletos.");
-            return badResponse;
-        }
-
-        // Armar JSON para Mercado Pago
-        var mpPayload = new
-        {
-            items = dto.Items.Select(x => new
-            {
-                id = x.Id,
-                title = x.Title,
-                description = x.Description,
-                quantity = x.Quantity,
-                unit_price = x.UnitPrice
-            }),
-            external_reference = dto.ExternalReference,
-            purpose = "wallet_purchase"
-        };
-
-        var json = JsonConvert.SerializeObject(mpPayload, new JsonSerializerSettings
-        {
-            ContractResolver = new DefaultContractResolver
-            {
-                NamingStrategy = new SnakeCaseNamingStrategy()
-            }
-        });
-        
-        var client = new HttpClient();
-        var request = new HttpRequestMessage(HttpMethod.Post, "https://api.mercadopago.com/checkout/preferences");
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", "");
-        request.Content = new StringContent(json, Encoding.UTF8, "application/json");
-
-        var response = await client.SendAsync(request);
-        var responseContent = await response.Content.ReadAsStringAsync();
-
-        if (!response.IsSuccessStatusCode)
-        {
-            var errorResp = req.CreateResponse(response.StatusCode);
-            await errorResp.WriteStringAsync(responseContent);
-            return errorResp;
-        }
-
-        var mpResponse = JsonConvert.DeserializeObject<JObject>(responseContent);
-        var preferenceId = mpResponse?["id"]?.ToString();
-
-        var successResp = req.CreateResponse(HttpStatusCode.OK);
-        await successResp.WriteAsJsonAsync(new { preference_id = preferenceId });
-        return successResp;
+        _mpIntegrationOption = mpIntegrationOption;
+        _reserveBusiness = reserveBusiness;
     }
 
     [Function("MPWebhook")]
@@ -96,10 +40,9 @@ public class PaymentIntegrationFunction
 
         var signature = sigs?.FirstOrDefault();
         var requestId = requestIds?.FirstOrDefault();
-        string secret = "";
 
         // Verificamos firma HMAC-SHA256  
-        if (!IsValidMercadoPagoHmacSignature(req, signature, requestId, dataId, secret))
+        if (!IsValidMercadoPagoHmacSignature(req, signature, requestId, dataId, _mpIntegrationOption.WebhookSecret))
         {
             _logger.LogWarning("Firma inválida de MercadoPago");
             var unauthorized = req.CreateResponse(HttpStatusCode.Unauthorized);
@@ -114,31 +57,8 @@ public class PaymentIntegrationFunction
 
         if (type == "payment" && !string.IsNullOrEmpty(id))
         {
-            string accessToken = "";
-            var client = new HttpClient();
-            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
-
-            var mpResponse = await client.GetAsync($"https://api.mercadopago.com/v1/payments/{id}");
-            string mpJson = await mpResponse.Content.ReadAsStringAsync();
-
-            _logger.LogInformation("Respuesta completa de MP: {json}", mpJson);
-
-            if (!mpResponse.IsSuccessStatusCode)
-            {
-                _logger.LogError("Error consultando pago: {json}", mpJson);
-                var failResp = req.CreateResponse(HttpStatusCode.BadRequest);
-                await failResp.WriteStringAsync("Error consultando pago.");
-                return failResp;
-            }
-
-            var paymentData = JObject.Parse(mpJson);
-            string? externalRef = paymentData["external_reference"]?.ToString();
-            string? status = paymentData["status"]?.ToString();
-
-            _logger.LogInformation("Pago recibido: ID={id}, Estado={status}, Ref={ref}", id, status, externalRef);
-
-            // ⚠️ Acá hacés tu lógica de negocio  
-            // Ej: await _paymentService.MarkReservationAsPaid(externalRef, status);  
+            await _reserveBusiness.UpdateReservePaymentsByExternalId(id);
+            _logger.LogInformation("Evento de pago recibido: ID={id}, Tipo={type}", id, type);           
 
             var successResp = req.CreateResponse(HttpStatusCode.OK);
             await successResp.WriteStringAsync("Webhook procesado correctamente.");

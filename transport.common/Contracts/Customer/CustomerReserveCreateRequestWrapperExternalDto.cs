@@ -3,4 +3,4 @@
 namespace Transport.SharedKernel.Contracts.Customer;
 
 //Usuario
-public record CustomerReserveCreateRequestWrapperExternalDto(CreatePaymentExternalRequestDto payment, List<CustomerReserveCreateRequestDto> Items);
+public record CustomerReserveCreateRequestWrapperExternalDto(CreatePaymentExternalRequestDto? Payment, List<CustomerReserveCreateRequestDto> Items);

@@ -1,6 +1,6 @@
 ﻿using MercadoPago.Client.Common;
 using MercadoPago.Client.Payment;
-using MercadoPago.Config;
+using MercadoPago.Resource.Payment;
 using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
 using System.Linq.Expressions;
@@ -17,7 +17,6 @@ using Transport.Domain.Services;
 using Transport.Domain.Users;
 using Transport.Domain.Vehicles;
 using Transport.SharedKernel;
-using Transport.SharedKernel.Configuration;
 using Transport.SharedKernel.Contracts.Customer;
 using Transport.SharedKernel.Contracts.Reserve;
 using Transport.SharedKernel.Contracts.Service;
@@ -132,7 +131,8 @@ public class ReserveBusiness : IReserveBusiness
                     CustomerEmail = customer.Email,
                     DocumentNumber = customer.DocumentNumber,
                     Phone1 = customer.Phone1,
-                    Phone2 = customer.Phone2
+                    Phone2 = customer.Phone2,
+                    Status = CustomerReserveStatusEnum.Confirmed
                 };
 
                 reserve.CustomerReserves.Add(newCustomerReserve);
@@ -250,7 +250,6 @@ public class ReserveBusiness : IReserveBusiness
             return Result.Success(true);
         });
     }
-
 
 
     private async Task<Result<Direction?>> GetDirectionAsync(int? locationId, string type)
@@ -585,11 +584,11 @@ public class ReserveBusiness : IReserveBusiness
     }
 
 
-    public async Task<Result<bool>> CreatePassengerReservesExternal(CustomerReserveCreateRequestWrapperExternalDto dto)
+    public async Task<Result<string>> CreatePassengerReservesExternal(CustomerReserveCreateRequestWrapperExternalDto dto)
     {
         var validationResult = ValidateUserReserveCombination(dto.Items);
         if (validationResult.IsFailure)
-            return Result.Failure<bool>(validationResult.Error);
+            return Result.Failure<string>(validationResult.Error);
 
         int userIdLogged = _userContext.UserId != 0
             ? _userContext.UserId
@@ -612,10 +611,10 @@ public class ReserveBusiness : IReserveBusiness
                    .SingleOrDefaultAsync(r => r.ReserveId == passenger.ReserveId);
 
                 if (reserve is null)
-                    return Result.Failure<bool>(ReserveError.NotFound);
+                    return Result.Failure<string>(ReserveError.NotFound);
 
                 if (reserve.Status != ReserveStatusEnum.Confirmed)
-                    return Result.Failure<bool>(ReserveError.NotAvailable);
+                    return Result.Failure<string>(ReserveError.NotAvailable);
 
                 var service = await _context.Services
                     .Include(s => s.ReservePrices)
@@ -629,27 +628,27 @@ public class ReserveBusiness : IReserveBusiness
                 var totalAfterInsert = existingPassengerCount + dto.Items.Count;
 
                 if (totalAfterInsert > vehicle.AvailableQuantity)
-                    return Result.Failure<bool>(
+                    return Result.Failure<string>(
                         ReserveError.VehicleQuantityNotAvailable(existingPassengerCount, dto.Items.Count, vehicle.AvailableQuantity));
 
                 var reservePrice = service.ReservePrices.SingleOrDefault(p => p.ReserveTypeId == (ReserveTypeIdEnum)passenger.ReserveTypeId);
                 if (reservePrice is null || passenger.Price != reservePrice.Price)
-                    return Result.Failure<bool>(ReserveError.PriceNotAvailable);
+                    return Result.Failure<string>(ReserveError.PriceNotAvailable);
 
                 var customerResult = await _customerBusiness.GetOrCreateFromPassengerAsync(passenger);
                 if (!customerResult.IsSuccess)
-                    return Result.Failure<bool>(customerResult.Error);
+                    return Result.Failure<string>(customerResult.Error);
 
                 customer = customerResult.Value;
 
                 if (reserve.CustomerReserves.Any(cr => cr.CustomerId == customer.CustomerId))
-                    return Result.Failure<bool>(ReserveError.CustomerAlreadyExists(customer.DocumentNumber));
+                    return Result.Failure<string>(ReserveError.CustomerAlreadyExists(customer.DocumentNumber));
 
                 var pickupResult = await GetDirectionAsync(passenger.PickupLocationId, "Pickup");
-                if (pickupResult.IsFailure) return Result.Failure<bool>(pickupResult.Error);
+                if (pickupResult.IsFailure) return Result.Failure<string>(pickupResult.Error);
 
                 var dropoffResult = await GetDirectionAsync(passenger.DropoffLocationId, "Dropoff");
-                if (dropoffResult.IsFailure) return Result.Failure<bool>(dropoffResult.Error);
+                if (dropoffResult.IsFailure) return Result.Failure<string>(dropoffResult.Error);
 
                 var newCustomerReserve = new CustomerReserve
                 {
@@ -685,16 +684,40 @@ public class ReserveBusiness : IReserveBusiness
                 totalExpectedAmount += reservePrice.Price;
             }
 
-            var totalProvidedAmount = dto.payment.TransactionAmount;
+            if (dto.Payment is null)
+            {
+                foreach (var reserve in reserves)
+                {
+                    foreach (var cr in reserve.CustomerReserves)
+                    {
+                        cr.Status = CustomerReserveStatusEnum.PendingPayment;
+                    }
+                }
 
-            if (totalExpectedAmount != totalProvidedAmount)
-                return Result.Failure<bool>(ReserveError.InvalidPaymentAmount(totalExpectedAmount, totalProvidedAmount));
+                var resultPayment = await CreatePendingPayment(totalExpectedAmount, reserves);
+                if (resultPayment.IsFailure) return Result.Failure<string>(resultPayment.Error);
 
-            var resultPayment = await CreatePayment(dto.payment, reserves);
-            if (resultPayment.IsFailure) return Result.Failure<bool>(resultPayment.Error);
+                string preferenceId = await _paymentGateway.CreatePreferenceAsync(
+                    resultPayment.Value.ToString(),
+                    totalExpectedAmount,
+                    dto.Items
+                );
+
+                return Result.Success(preferenceId);
+            }
+            else
+            {
+                var totalProvidedAmount = dto.Payment.TransactionAmount;
+
+                if (totalExpectedAmount != totalProvidedAmount)
+                    return Result.Failure<string>(ReserveError.InvalidPaymentAmount(totalExpectedAmount, totalProvidedAmount));
+
+                var resultPayment = await CreatePayment(dto.Payment, reserves);
+                if (resultPayment.IsFailure) return Result.Failure<string>(resultPayment.Error);
+            }
 
             await _context.SaveChangesWithOutboxAsync();
-            return Result.Success(true);
+            return Result.Success(string.Empty);
         });
     }
 
@@ -741,6 +764,8 @@ public class ReserveBusiness : IReserveBusiness
 
         var result = await _paymentGateway.CreatePaymentAsync(paymentRequest);
 
+        var isPendingApproval = result.Status == "pending" || result.Status == "in_process";
+
         var statusPaymentInternal = GetPaymentStatusFromExternal(result.Status);
 
         if (statusPaymentInternal is null)
@@ -755,6 +780,18 @@ public class ReserveBusiness : IReserveBusiness
         var payingCustomerReserve = allCustomerReserves
             .FirstOrDefault(cr => cr.DocumentNumber == paymentData.IdentificationNumber)
             ?? allCustomerReserves.First();
+
+        var reserveStatus = isPendingApproval ? CustomerReserveStatusEnum.PendingPayment :
+                       statusPaymentInternal == StatusPaymentEnum.Paid ? CustomerReserveStatusEnum.Confirmed :
+                       CustomerReserveStatusEnum.Cancelled;
+
+        foreach (var reserve in reserves)
+        {
+            foreach (var cr in reserve.CustomerReserves)
+            {
+                cr.Status = reserveStatus;
+            }
+        }
 
         var parentPayment = new ReservePayment
         {
@@ -795,6 +832,49 @@ public class ReserveBusiness : IReserveBusiness
         return true;
     }
 
+    private async Task<Result<int>> CreatePendingPayment(decimal amount, List<Reserve> reserves)
+    {
+        var allCustomerReserves = reserves.SelectMany(r => r.CustomerReserves).ToList();
+
+        var payingCustomerReserve = allCustomerReserves.First();
+
+        var parentPayment = new ReservePayment
+        {
+            Amount = amount,
+            ReserveId = payingCustomerReserve.ReserveId,
+            CustomerId = payingCustomerReserve.CustomerId,
+            Method = PaymentMethodEnum.Online,
+            Status = StatusPaymentEnum.Pending,
+            StatusDetail = "wallet_pending",
+            ResultApiExternalRawJson = null
+        };
+
+        _context.ReservePayments.Add(parentPayment);
+        await _context.SaveChangesWithOutboxAsync();
+
+        var parentId = parentPayment.ReservePaymentId;
+
+        foreach (var reserve in allCustomerReserves.Where(cr => cr.CustomerId != payingCustomerReserve.CustomerId))
+        {
+            var childPayment = new ReservePayment
+            {
+                Amount = 0,
+                ReserveId = reserve.ReserveId,
+                CustomerId = reserve.CustomerId,
+                Method = PaymentMethodEnum.Online,
+                Status = StatusPaymentEnum.Pending,
+                StatusDetail = "wallet_pending",
+                ParentReservePaymentId = parentId
+            };
+
+            _context.ReservePayments.Add(childPayment);
+        }
+
+        await _context.SaveChangesWithOutboxAsync();
+        return parentId;
+    }
+
+
     private StatusPaymentEnum? GetPaymentStatusFromExternal(string externalStatusPayment)
     {
         return externalStatusPayment?.ToLower() switch
@@ -810,5 +890,74 @@ public class ReserveBusiness : IReserveBusiness
             "charged_back" => StatusPaymentEnum.Cancelled,
             _ => null
         };
+    }
+
+    public async Task<Result<bool>> UpdateReservePaymentsByExternalId(string externalPaymentId)
+    {
+        if (_context.ReservePayments.Any(p => p.PaymentExternalId == long.Parse(externalPaymentId)
+        && p.Status != StatusPaymentEnum.Pending))
+        {
+            return Result.Success(true);
+        }
+
+        var reservePayments = _context.ReservePayments.ToList();
+
+        Payment mpPayment = await _paymentGateway.GetPaymentAsync(externalPaymentId);
+
+        return await _unitOfWork.ExecuteInTransactionAsync(async () =>
+        {
+            // Buscar el pago padre por externalId
+            var parentPayment = await _context.ReservePayments
+                .FirstOrDefaultAsync(rp => rp.ReservePaymentId == int.Parse(mpPayment.ExternalReference));
+
+            if (parentPayment == null)
+                return Result.Failure<bool>(Error.NotFound("Payment.NotFound", "No se encontró el pago con el ID externo proporcionado"));
+
+            // Determinar el estado interno
+            var internalStatus = GetPaymentStatusFromExternal(mpPayment.Status);
+            if (internalStatus == null)
+                return Result.Failure<bool>(Error.Validation("Payment.InvalidStatus", "Estado de pago no reconocido"));
+
+            // Actualizar todos los pagos relacionados (padre e hijos)
+            var relatedPayments = await _context.ReservePayments
+                .Where(rp => rp.ParentReservePaymentId == parentPayment.ReservePaymentId ||
+                             rp.ReservePaymentId == parentPayment.ReservePaymentId)
+                .ToListAsync();
+
+            foreach (var payment in relatedPayments)
+            {
+                payment.Status = internalStatus.Value;
+                payment.StatusDetail = parentPayment.StatusDetail;
+                payment.PaymentExternalId = mpPayment?.Id;
+                payment.ResultApiExternalRawJson = JsonConvert.SerializeObject(payment);
+
+                _context.ReservePayments.Update(payment);
+                await _context.SaveChangesWithOutboxAsync();
+            }
+
+            // Obtener todas las CustomerReserves asociadas a estos pagos
+            var reserveIds = relatedPayments.Select(rp => rp.ReserveId).Distinct().ToList();
+            var reserves = await _context.Reserves.Include(p => p.CustomerReserves).Where(p => reserveIds.Contains(p.ReserveId))
+                .ToListAsync();
+
+            // Actualizar el estado de las CustomerReserves según el resultado del pago
+            var newReserveStatus = internalStatus.Value == StatusPaymentEnum.Paid
+                ? CustomerReserveStatusEnum.Confirmed
+                : CustomerReserveStatusEnum.Cancelled;
+
+            foreach (var reserve in reserves)
+            {
+                foreach (var cr in reserve.CustomerReserves)
+                {
+                    cr.Status = newReserveStatus;
+                    _context.CustomerReserves.Update(cr);
+                }
+
+                await _context.SaveChangesWithOutboxAsync();
+            }
+
+            await _context.SaveChangesWithOutboxAsync();
+            return Result.Success(true);
+        });
     }
 }

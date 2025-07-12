@@ -10,7 +10,7 @@ public class CustomerReserve: IAuditable
     public int CustomerId { get; set; }
     public int ReserveId { get; set; }
     public bool IsPayment { get; set; }
-    public ReserveStatusEnum Status { get; set; }
+    public CustomerReserveStatusEnum Status { get; set; }
     public decimal Price { get; set; }
     public int? PickupLocationId { get; set; }
     public int? DropoffLocationId { get; set; }

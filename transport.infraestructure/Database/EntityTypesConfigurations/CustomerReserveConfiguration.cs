@@ -93,5 +93,10 @@ public class CustomerReserveConfiguration : IEntityTypeConfiguration<CustomerRes
             .HasMaxLength(30)
             .HasColumnType("VARCHAR(30)")
             .IsRequired(false);
+
+        builder.Property(r => r.Status)
+               .HasConversion<string>()
+               .HasColumnType("VARCHAR(20)")
+               .IsRequired();
     }
 }

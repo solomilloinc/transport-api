@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Transport.Infraestructure.Database;
 
@@ -11,9 +12,11 @@ using Transport.Infraestructure.Database;
 namespace Transport.Infraestructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250712171144_ReserveWithMpIntegration")]
+    partial class ReserveWithMpIntegration
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -587,6 +590,7 @@ namespace Transport.Infraestructure.Migrations
                         .HasColumnType("int");
 
                     b.Property<string>("ResultApiExternalRawJson")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Status")
@@ -906,14 +910,14 @@ namespace Transport.Infraestructure.Migrations
                         {
                             RoleId = 1,
                             CreatedBy = "System",
-                            CreatedDate = new DateTime(2025, 7, 12, 17, 17, 7, 856, DateTimeKind.Utc).AddTicks(2203),
+                            CreatedDate = new DateTime(2025, 7, 12, 17, 11, 44, 177, DateTimeKind.Utc).AddTicks(7675),
                             Name = "Administrador"
                         },
                         new
                         {
                             RoleId = 2,
                             CreatedBy = "System",
-                            CreatedDate = new DateTime(2025, 7, 12, 17, 17, 7, 856, DateTimeKind.Utc).AddTicks(2205),
+                            CreatedDate = new DateTime(2025, 7, 12, 17, 11, 44, 177, DateTimeKind.Utc).AddTicks(7677),
                             Name = "Cliente"
                         });
                 });
