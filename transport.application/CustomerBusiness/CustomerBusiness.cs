@@ -138,7 +138,7 @@ public class CustomerBusiness : ICustomerBusiness
 
             if (existing != null)
             {
-                return Result.Failure<Customer>(ReserveError.CustomerAlreadyExists(existing.DocumentNumber));
+                return existing;
             }
 
             var newCustomer = new Customer
@@ -147,7 +147,7 @@ public class CustomerBusiness : ICustomerBusiness
                 LastName = dto.CustomerCreate.LastName,
                 DocumentNumber = dto.CustomerCreate.DocumentNumber,
                 Email = dto.CustomerCreate.Email,
-                Phone1 = dto.CustomerCreate.Phone1,
+                Phone1 = dto.CustomerCreate.Phone1 ?? string.Empty,
                 Phone2 = dto.CustomerCreate.Phone2
             };
 
