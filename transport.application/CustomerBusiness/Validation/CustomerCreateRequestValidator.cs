@@ -25,10 +25,5 @@ public class CustomerCreateRequestValidator : AbstractValidator<CustomerCreateRe
             .MaximumLength(100).WithMessage("El Email no puede exceder los 100 caracteres")
             .Matches(@"^[\w\.-]+@[\w\.-]+\.\w{2,}$")
             .WithMessage("El Email no tiene un formato válido");
-
-        RuleFor(p => p.Phone1)
-            .NotEmpty().WithMessage("El Teléfono es requerido")
-            .MinimumLength(6).WithMessage("El Teléfono debe tener al menos 6 dígitos")
-            .MaximumLength(20).WithMessage("El Teléfono no puede exceder los 20 caracteres");
     }
 }
