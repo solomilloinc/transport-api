@@ -697,6 +697,24 @@ public class ReserveBusiness : IReserveBusiness
                 var resultPayment = await CreatePendingPayment(totalExpectedAmount, reserves);
                 if (resultPayment.IsFailure) return Result.Failure<string>(resultPayment.Error);
 
+                var mainReserveId = dto.Items.Min(i => i.ReserveId);
+
+                var chargeTransaction = new CustomerAccountTransaction
+                {
+                    CustomerId = customer.CustomerId,
+                    Date = DateTime.UtcNow,
+                    Type = TransactionType.Charge,
+                    Amount = totalExpectedAmount,
+                    Description = "Reserva online (wallet pendiente)",
+                    RelatedReserveId = mainReserveId
+                };
+                _context.CustomerAccountTransactions.Add(chargeTransaction);
+
+                customer.CurrentBalance += totalExpectedAmount;
+                _context.Customers.Update(customer);
+
+                await _context.SaveChangesWithOutboxAsync();
+
                 string preferenceId = await _paymentGateway.CreatePreferenceAsync(
                     resultPayment.Value.ToString(),
                     totalExpectedAmount,
@@ -954,6 +972,46 @@ public class ReserveBusiness : IReserveBusiness
                 }
 
                 await _context.SaveChangesWithOutboxAsync();
+            }
+
+            var groupedByCustomer = relatedPayments
+    .GroupBy(p => p.CustomerId)
+    .Select(g => new
+    {
+        CustomerId = g.Key,
+        TotalAmount = g.Sum(p => p.Amount),
+        MainReserveId = g.First().ReserveId,
+        ReservePaymentId = g.First().ParentReservePaymentId ?? g.First().ReservePaymentId
+    });
+
+            foreach (var group in groupedByCustomer)
+            {
+                var customer = await _context.Customers.FindAsync(group.CustomerId);
+                if (customer == null) continue;
+
+                if (internalStatus == StatusPaymentEnum.Paid)
+                {
+                    // Ajustar cuenta corriente
+                    var paymentTransaction = new CustomerAccountTransaction
+                    {
+                        CustomerId = customer.CustomerId,
+                        Date = DateTime.UtcNow,
+                        Type = TransactionType.Payment,
+                        Amount = -group.TotalAmount,
+                        Description = "Pago confirmado vía Mercado Pago",
+                        RelatedReserveId = group.MainReserveId,
+                        ReservePaymentId = group.ReservePaymentId
+                    };
+
+                    _context.CustomerAccountTransactions.Add(paymentTransaction);
+
+                    customer.CurrentBalance -= group.TotalAmount;
+                    _context.Customers.Update(customer);
+                }
+                else if (internalStatus == StatusPaymentEnum.Cancelled)
+                {
+                    // En este caso no se hace nada, porque el cargo ya está hecho y el pago no se completó
+                }
             }
 
             await _context.SaveChangesWithOutboxAsync();
