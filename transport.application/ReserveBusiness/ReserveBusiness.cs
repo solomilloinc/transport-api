@@ -703,6 +703,7 @@ public class ReserveBusiness : IReserveBusiness
                     dto.Items
                 );
 
+                await _context.SaveChangesWithOutboxAsync();
                 return Result.Success(preferenceId);
             }
             else
@@ -767,7 +768,6 @@ public class ReserveBusiness : IReserveBusiness
         var isPendingApproval = result.Status == "pending" || result.Status == "in_process";
 
         var statusPaymentInternal = GetPaymentStatusFromExternal(result.Status);
-
         if (statusPaymentInternal is null)
         {
             return Result.Failure<bool>(
@@ -781,9 +781,11 @@ public class ReserveBusiness : IReserveBusiness
             .FirstOrDefault(cr => cr.DocumentNumber == paymentData.IdentificationNumber)
             ?? allCustomerReserves.First();
 
-        var reserveStatus = isPendingApproval ? CustomerReserveStatusEnum.PendingPayment :
-                       statusPaymentInternal == StatusPaymentEnum.Paid ? CustomerReserveStatusEnum.Confirmed :
-                       CustomerReserveStatusEnum.Cancelled;
+        var reserveStatus = isPendingApproval
+            ? CustomerReserveStatusEnum.PendingPayment
+            : statusPaymentInternal == StatusPaymentEnum.Paid
+                ? CustomerReserveStatusEnum.Confirmed
+                : CustomerReserveStatusEnum.Cancelled;
 
         foreach (var reserve in reserves)
         {
@@ -828,7 +830,6 @@ public class ReserveBusiness : IReserveBusiness
         }
 
         await _context.SaveChangesWithOutboxAsync();
-
         return true;
     }
 
