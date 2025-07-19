@@ -103,6 +103,25 @@ public class ReservesFunction : FunctionBase
         return await MatchResultAsync(req, result);
     }
 
+    [Function("GetPublicReserveSummary")]
+    [AllowAnonymous]
+    [OpenApiOperation(
+    operationId: "public-reserve-summary",
+    tags: new[] { "Reserve" },
+    Summary = "Get Reserve Summary for Users",
+    Description = "Returns a grouped (outbound/return) paginated list of available reserves for final users.",
+    Visibility = OpenApiVisibilityType.Important)]
+    [OpenApiRequestBody("application/json", typeof(PagedReportRequestDto<ReserveReportFilterRequestDto>), Required = true)]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(ReserveGroupedPagedReportResponseDto), Summary = "Grouped Reserve Report")]
+    public async Task<HttpResponseData> GetPublicReserveSummary(
+    [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "public/reserve-summary/")] HttpRequestData req,
+    string reserveDate)
+    {
+        var filter = await req.ReadFromJsonAsync<PagedReportRequestDto<ReserveReportFilterRequestDto>>();
+        var result = await _reserveBusiness.GetReserveReport(filter);
+        return await MatchResultAsync(req, result);
+    }
+
 
     [Function("GetCustomerReserveReport")]
     [Authorize("Admin")]
