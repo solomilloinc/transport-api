@@ -368,6 +368,88 @@ public class ReserveBusiness : IReserveBusiness
         return Result.Success(pagedResult);
     }
 
+    public async Task<Result<ReserveGroupedPagedReportResponseDto>> GetReserveReport(PagedReportRequestDto<ReserveReportFilterRequestDto> requestDto)
+    {
+        var idaDate = requestDto.Filters.DepartureDate;
+        var vueltaDate = requestDto.Filters.ReturnDate?.Date;
+        var passengersRequested = requestDto.Filters.Passengers;
+
+        var query = _context.Reserves
+            .Include(r => r.Service)
+                .ThenInclude(s => s.Origin)
+            .Include(r => r.Service)
+                .ThenInclude(s => s.Destination)
+            .Include(r => r.Service.ReservePrices)
+            .Include(r => r.Service.Vehicle)
+            .Include(r => r.CustomerReserves)
+                .ThenInclude(cr => cr.Customer)
+            .Where(rp => rp.Status == ReserveStatusEnum.Confirmed &&
+                        (rp.ReserveDate.Date == idaDate ||
+                         (vueltaDate.HasValue && rp.ReserveDate.Date == vueltaDate.Value)));
+
+        var items = await query.ToListAsync();
+
+        // Agrupar por fecha para calcular ocupación
+
+        var idaItems = items
+            .Where(rp => rp.ReserveDate.Date == idaDate)
+            .Where(rp =>
+            {
+                int totalReserved = rp.CustomerReserves.Where(p => p.Status == CustomerReserveStatusEnum.Confirmed
+                && p.Status == CustomerReserveStatusEnum.PendingPayment).Count();
+                var available = rp.Service.Vehicle.AvailableQuantity - totalReserved;
+                return available >= passengersRequested;
+            })
+            .Select(rp => new ReserveExternalReportResponseDto(
+                rp.ReserveId,
+                rp.Service.Origin.Name,
+                rp.Service.Destination.Name,
+                rp.DepartureHour.ToString(@"hh\:mm"),
+                rp.Service.ReservePrices.FirstOrDefault(p => p.ReserveTypeId == ReserveTypeIdEnum.Ida)?.Price ?? 0
+            ))
+            .ToList();
+
+        var vueltaItems = vueltaDate.HasValue
+            ? items
+                .Where(rp => rp.ReserveDate.Date == vueltaDate.Value)
+                .Where(rp =>
+                {
+                    var totalReserved = rp.CustomerReserves.Where(p => p.Status == CustomerReserveStatusEnum.Confirmed
+                    && p.Status == CustomerReserveStatusEnum.PendingPayment).Count();
+                    var available = rp.Service.Vehicle.AvailableQuantity - totalReserved;
+                    return available >= passengersRequested;
+                })
+                .Select(rp => new ReserveExternalReportResponseDto(
+                    rp.ReserveId,
+                    rp.Service.Origin.Name,
+                    rp.Service.Destination.Name,
+                    rp.DepartureHour.ToString(@"hh\:mm"),
+                    rp.Service.ReservePrices.FirstOrDefault(p => p.ReserveTypeId == ReserveTypeIdEnum.Ida)?.Price ?? 0
+                ))
+                .ToList()
+            : new List<ReserveExternalReportResponseDto>();
+
+        var pagedOutbound = PagedReportResponseDto<ReserveExternalReportResponseDto>.Create(
+            idaItems,
+            requestDto.PageNumber,
+            requestDto.PageSize
+        );
+
+        var pagedReturn = PagedReportResponseDto<ReserveExternalReportResponseDto>.Create(
+            vueltaItems,
+            requestDto.PageNumber,
+            requestDto.PageSize
+        );
+
+        var result = new ReserveGroupedPagedReportResponseDto
+        {
+            Outbound = pagedOutbound,
+            Return = pagedReturn
+        };
+
+        return Result.Success(result);
+    }
+
     public async Task<Result<PagedReportResponseDto<CustomerReserveReportResponseDto>>> GetReserveCustomerReport(
     int reserveId,
     PagedReportRequestDto<CustomerReserveReportFilterRequestDto> requestDto)

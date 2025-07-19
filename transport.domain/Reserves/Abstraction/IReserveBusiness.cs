@@ -26,4 +26,5 @@ public interface IReserveBusiness
 
     Task<Result<bool>> UpdateCustomerReserveAsync(int customerReserveId, CustomerReserveUpdateRequestDto request);
     Task<Result<bool>> UpdateReservePaymentsByExternalId(string externalId);
+    Task<Result<ReserveGroupedPagedReportResponseDto>> GetReserveReport(PagedReportRequestDto<ReserveReportFilterRequestDto> requestDto);
 }
