@@ -370,9 +370,12 @@ public class ReserveBusiness : IReserveBusiness
 
     public async Task<Result<ReserveGroupedPagedReportResponseDto>> GetReserveReport(PagedReportRequestDto<ReserveReportFilterRequestDto> requestDto)
     {
-        var idaDate = requestDto.Filters.DepartureDate;
+        var idaDate = requestDto.Filters.DepartureDate.Date;
         var vueltaDate = requestDto.Filters.ReturnDate?.Date;
         var passengersRequested = requestDto.Filters.Passengers;
+
+        var originId = requestDto.Filters.OriginId;
+        var destinationId = requestDto.Filters.DestinationId;
 
         var query = _context.Reserves
             .Include(r => r.Service)
@@ -389,14 +392,14 @@ public class ReserveBusiness : IReserveBusiness
 
         var items = await query.ToListAsync();
 
-        // Agrupar por fecha para calcular ocupación
-
         var idaItems = items
             .Where(rp => rp.ReserveDate.Date == idaDate)
+            .Where(rp => rp.Service.Origin.CityId == originId && rp.Service.Destination.CityId == destinationId)
             .Where(rp =>
             {
-                int totalReserved = rp.CustomerReserves.Where(p => p.Status == CustomerReserveStatusEnum.Confirmed
-                && p.Status == CustomerReserveStatusEnum.PendingPayment).Count();
+                int totalReserved = rp.CustomerReserves
+                    .Count(p => p.Status == CustomerReserveStatusEnum.Confirmed
+                             || p.Status == CustomerReserveStatusEnum.PendingPayment);
                 var available = rp.Service.Vehicle.AvailableQuantity - totalReserved;
                 return available >= passengersRequested;
             })
@@ -412,10 +415,12 @@ public class ReserveBusiness : IReserveBusiness
         var vueltaItems = vueltaDate.HasValue
             ? items
                 .Where(rp => rp.ReserveDate.Date == vueltaDate.Value)
+                .Where(rp => rp.Service.Origin.CityId == destinationId && rp.Service.Destination.CityId == originId)
                 .Where(rp =>
                 {
-                    var totalReserved = rp.CustomerReserves.Where(p => p.Status == CustomerReserveStatusEnum.Confirmed
-                    && p.Status == CustomerReserveStatusEnum.PendingPayment).Count();
+                    int totalReserved = rp.CustomerReserves
+                        .Count(p => p.Status == CustomerReserveStatusEnum.Confirmed
+                                 || p.Status == CustomerReserveStatusEnum.PendingPayment);
                     var available = rp.Service.Vehicle.AvailableQuantity - totalReserved;
                     return available >= passengersRequested;
                 })
@@ -449,6 +454,7 @@ public class ReserveBusiness : IReserveBusiness
 
         return Result.Success(result);
     }
+
 
     public async Task<Result<PagedReportResponseDto<CustomerReserveReportResponseDto>>> GetReserveCustomerReport(
     int reserveId,
