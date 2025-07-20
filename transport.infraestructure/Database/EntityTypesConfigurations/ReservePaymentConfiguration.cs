@@ -24,6 +24,10 @@ internal class ReservePaymentConfiguration : IEntityTypeConfiguration<ReservePay
             .HasColumnType("VARCHAR(20)")
             .IsRequired();
 
+        builder.Property(r => r.StatusDetail)
+            .HasColumnType("VARCHAR(MAX)")
+            .IsRequired(false);
+
         builder.Property(r => r.ResultApiExternalRawJson).IsRequired(false);
 
         builder

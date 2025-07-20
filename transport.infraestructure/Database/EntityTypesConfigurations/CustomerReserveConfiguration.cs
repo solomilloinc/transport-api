@@ -98,5 +98,7 @@ public class CustomerReserveConfiguration : IEntityTypeConfiguration<CustomerRes
                .HasConversion<string>()
                .HasColumnType("VARCHAR(20)")
                .IsRequired();
+
+        builder.Property(r => r.ReserveDate).IsRequired();
     }
 }

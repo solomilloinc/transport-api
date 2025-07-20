@@ -42,7 +42,6 @@ public class DriverBusiness : IDriverBusiness
             DocumentNumber = dto.documentNumber
         };
 
-        driver.Raise((new DriverCreatedEvent(driver.DriverId)));
         _context.Drivers.Add(driver);
         await _context.SaveChangesWithOutboxAsync();
 

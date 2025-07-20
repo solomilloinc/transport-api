@@ -8,6 +8,7 @@ using Transport.Domain.Services.Abstraction;
 using Transport.Domain.Customers.Abstraction;
 using Transport.Domain.Reserves.Abstraction;
 using Transport.Domain.Directions.Abstraction;
+using Transport.Business.Tasks;
 
 namespace Transport.Business;
 
@@ -26,6 +27,7 @@ public static class DependencyInjection
         services.AddScoped<ICustomerBusiness, CustomerBusiness.CustomerBusiness>();
         services.AddScoped<IReserveBusiness, ReserveBusiness.ReserveBusiness>();
         services.AddScoped<IDirectionBusiness, DirectionBusiness.DirectionBusiness>();
+        services.AddScoped<ISendReservationEmailTask, SendReservationEmailTask>();
 
         return services;
     }

@@ -11,7 +11,7 @@ public static class DomainEventExtensions
             OccurredOn = domainEvent.OccurredOn,
             Type = domainEvent.EventType,
             Content = JsonSerializer.Serialize(domainEvent, domainEvent.GetType()),
-            Topic = topic
+            Topic = domainEvent.EventType
         };
     }
 }
