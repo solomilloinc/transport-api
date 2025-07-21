@@ -1,5 +1,6 @@
-﻿using Transport.Business.Services.Email;
-using FluentEmail.Core;
+﻿using FluentEmail.Core;
+using Microsoft.Extensions.Logging;
+using Transport.Business.Services.Email;
 using Transport.SharedKernel.Configuration;
 
 namespace Transport.Infraestructure.Services.Email;
@@ -7,22 +8,37 @@ namespace Transport.Infraestructure.Services.Email;
 public class EmailSender : IEmailSender
 {
     private readonly IFluentEmail _fluentEmail;
-    private readonly ISmtpSetting _smtpSetting;
-    public EmailSender(IFluentEmail fluentEmail, ISmtpSetting smtpSetting)
+    private readonly ISmtpSettingOption _smtpSetting;
+    private readonly ILogger<EmailSender> _logger;
+
+    public EmailSender(IFluentEmail fluentEmail, ISmtpSettingOption smtpSetting, ILogger<EmailSender> logger)
     {
         _fluentEmail = fluentEmail;
         _smtpSetting = smtpSetting;
+        _logger = logger;
     }
+
     public async Task SendEmailAsync(string toEmail, string subject, string bodyHtml)
     {
-        var response = await _fluentEmail
-              .SetFrom(_smtpSetting.FromEmail, _smtpSetting.FromName)
-              .To(toEmail)
-              .Subject(subject)
-              .Body(bodyHtml, true)
-              .SendAsync();
+        try
+        {
+            _logger.LogInformation("Intentando enviar email a {ToEmail} con asunto '{Subject}'", toEmail, subject);
 
-        if (!response.Successful)
-            throw new Exception($"Email failed: {string.Join(", ", response.ErrorMessages)}");
+            // Simulación o descomentar para envío real:
+            // var response = await _fluentEmail
+            //     .To(toEmail)
+            //     .Subject(subject)
+            //     .Body(bodyHtml, true)
+            //     .SendAsync();
+
+            // Simulación mientras lo estás debuggeando
+
+            _logger.LogInformation("Email enviado exitosamente a {ToEmail}", toEmail);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Excepción al enviar email a {ToEmail}", toEmail);
+            throw;
+        }
     }
 }

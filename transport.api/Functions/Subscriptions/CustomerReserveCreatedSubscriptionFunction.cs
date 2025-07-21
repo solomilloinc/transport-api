@@ -22,7 +22,7 @@ public class CustomerReserveCreatedSubscriptionFunction
 
     [Function(nameof(CustomerReserveCreatedSubscriptionFunction))]
     public async Task Run(
-        [ServiceBusTrigger("customerreservecreatedevent", Connection = "%ServiceBusConnection%")]
+        [ServiceBusTrigger("customerreservecreatedevent", Connection = "ServiceBusConnection")]
         ServiceBusReceivedMessage message,
         ServiceBusMessageActions messageActions)
     {

@@ -16,7 +16,7 @@ public class OutboxTimerFunction
     }
 
     [Function("OutboxTimerFunction")]
-    public async Task Run([TimerTrigger("0 */5 * * * *")] TimerInfo myTimer)
+    public async Task Run([TimerTrigger("%OutboxTimerCron%")] TimerInfo myTimer)
     {
         _logger.LogInformation("C# Timer trigger function executed at: {executionTime}", DateTime.Now);
         

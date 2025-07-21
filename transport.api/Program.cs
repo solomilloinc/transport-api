@@ -80,13 +80,9 @@ var host = new HostBuilder()
                c.GetSection(nameof(MpIntegrationOption)).Bind(s));
         services.AddSingleton<IMpIntegrationOption>(x => x.GetRequiredService<IOptions<MpIntegrationOption>>().Value);
 
-        services.AddOptions<ServiceBusSettings>().Configure<IConfiguration>((s, c) =>
-              c.GetSection(nameof(ServiceBusSettings)).Bind(s));
-        services.AddSingleton<IServiceBusSettings>(x => x.GetRequiredService<IOptions<ServiceBusSettings>>().Value);
-
-        services.AddOptions<SmtpSetting>().Configure<IConfiguration>((s, c) =>
-              c.GetSection(nameof(SmtpSetting)).Bind(s));
-        services.AddSingleton<ISmtpSetting>(x => x.GetRequiredService<IOptions<SmtpSetting>>().Value);
+        services.AddOptions<SmtpSettingOption>().Configure<IConfiguration>((s, c) =>
+              c.GetSection(nameof(SmtpSettingOption)).Bind(s));
+        services.AddSingleton<ISmtpSettingOption>(x => x.GetRequiredService<IOptions<SmtpSettingOption>>().Value);
     })
     .Build();
 

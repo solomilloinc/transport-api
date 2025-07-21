@@ -5,7 +5,7 @@ using Transport.Domain.Reserves;
 
 namespace Transport.Business.Tasks;
 
-public class SendReservationEmailTask: ISendReservationEmailTask
+public class SendReservationEmailTask : ISendReservationEmailTask
 {
     private readonly IEmailSender _emailSender;
     private readonly IApplicationDbContext _applicationDbContext;
@@ -19,7 +19,18 @@ public class SendReservationEmailTask: ISendReservationEmailTask
 
     public async Task ExecuteAsync(CustomerReserveCreatedEvent @event)
     {
-        var reserveCustomer = await _applicationDbContext.CustomerReserves.Where(p => p.CustomerId == @event.CustomerId).SingleOrDefaultAsync();
+        var reserveCustomer = await _applicationDbContext.CustomerReserves.Where(p => p.CustomerId == @event.CustomerId
+            && p.ReserveId == @event.ReserveId)
+            .SingleOrDefaultAsync();
+
+        var mockEmails = new List<string>() { "agustinyuse@gmail.com", "francomaluendez2016@gmail.com" };
+
+        string emailToSend = reserveCustomer.CustomerEmail;
+
+        if (!mockEmails.Contains(reserveCustomer.CustomerEmail))
+        {
+            emailToSend = "francomaluendez2016@gmail.com";
+        }
 
         var subject = $"Resumen de tu reserva #{reserveCustomer.CustomerReserveId}";
         var body =
@@ -37,6 +48,6 @@ Gracias por tu reserva. Aquí tienes el resumen:
 
 Equipo de Transporte";
 
-        await _emailSender.SendEmailAsync(reserveCustomer.CustomerEmail, subject, body);
+        await _emailSender.SendEmailAsync(emailToSend, subject, body);
     }
 }

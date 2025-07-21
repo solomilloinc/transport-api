@@ -6,10 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
-using System.Configuration;
-using System.Net.Mail;
 using System.Text;
 using Transport.Business.Authentication;
 using Transport.Business.Authorization;
@@ -25,7 +22,6 @@ using Transport.Infraestructure.Services.Email;
 using Transport.Infraestructure.Services.Payment;
 using Transport.Infraestructure.Time;
 using Transport.SharedKernel;
-using Transport.SharedKernel.Configuration;
 
 namespace Transport.Infraestructure;
 
@@ -47,7 +43,7 @@ public static class DependencyInjection
         services.AddSingleton<IDateTimeProvider, DateTimeProvider>();
         services.AddScoped<IMercadoPagoPaymentGateway, MercadoPagoPaymentGateway>();
 
-        var smtpSection = configuration.GetSection("Smtp");
+        var smtpSection = configuration.GetSection("SmtpSettingOption");
         var smtpHost = smtpSection.GetValue<string>("Host");
         var smtpPort = smtpSection.GetValue<int>("Port");
         var smtpUser = smtpSection.GetValue<string>("User");
@@ -55,14 +51,20 @@ public static class DependencyInjection
         var smtpFromEmail = smtpSection.GetValue<string>("FromEmail");
         var smtpFromName = smtpSection.GetValue<string>("FromName");
 
-        var sender = new SmtpSender(() => new SmtpClient(smtpHost)
+        var smtpClient = new System.Net.Mail.SmtpClient(smtpHost)
         {
             Port = smtpPort,
             Credentials = new System.Net.NetworkCredential(smtpUser, smtpPass),
             EnableSsl = true,
-        });
+        };
+
+        var sender = new SmtpSender(() => smtpClient);
 
         Email.DefaultSender = sender;
+
+        services
+            .AddFluentEmail(smtpFromEmail, smtpFromName)
+            .AddSmtpSender(smtpClient);
 
         services.AddScoped<IEmailSender, EmailSender>();
 

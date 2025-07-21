@@ -54,6 +54,9 @@ namespace Transport.Infraestructure.Messaging
                     message.Processed = true;
                     message.ProcessedOn = DateTime.UtcNow;
 
+                    _dbContext.OutboxMessages.Update(message);
+                    await _dbContext.SaveChangesWithOutboxAsync();
+
                     _logger.LogInformation("Outbox message {MessageId} sent to topic {Topic}.", message.Id, message.Topic);
                 }
                 catch (Exception ex)

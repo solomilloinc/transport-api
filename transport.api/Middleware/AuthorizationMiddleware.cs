@@ -20,6 +20,7 @@ public class AuthorizationMiddleware : IFunctionsWorkerMiddleware
             "RenderSwaggerUI",
             "RenderSwaggerDocument",
             "OutboxTimerFunction",
+            "CustomerReserveCreatedSubscriptionFunction"
         };
     public AuthorizationMiddleware(IAuthorizationService service, ITokenProvider tokenProvider)
     {

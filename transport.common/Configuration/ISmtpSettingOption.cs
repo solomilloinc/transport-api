@@ -1,6 +1,6 @@
 ﻿namespace Transport.SharedKernel.Configuration;
 
-public class SmtpSetting: ISmtpSetting
+public interface ISmtpSettingOption
 {
     public string Host { get; set; }
     public int Port { get; set; }
