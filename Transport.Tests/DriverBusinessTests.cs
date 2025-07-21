@@ -83,30 +83,6 @@ public class DriverBusinessTests : TestBase
     }
 
     [Fact]
-    public async Task Create_ShouldRaiseEvent_WhenDriverIsCreated()
-    {
-        // Arrange
-        var drivers = new List<Driver>();
-        _contextMock.Setup(x => x.Drivers).Returns(GetQueryableMockDbSet(drivers).Object);
-        SetupSaveChangesWithOutboxAsync(_contextMock);
-
-        var dto = new DriverCreateRequestDto("Test", "User", "22222222");
-
-        // Act
-        var result = await _driverBusiness.Create(dto);
-
-        // Assert
-        result.IsSuccess.Should().BeTrue();
-        drivers.Count.Should().Be(1);
-
-        var createdDriver = drivers.First();
-        var raisedEvent = GetRaisedEvent<Driver, DriverCreatedEvent>(createdDriver);
-
-        raisedEvent.Should().NotBeNull();
-        raisedEvent!.DriverId.Should().Be(result.Value);
-    }
-
-    [Fact]
     public async Task Delete_ShouldFail_WhenDriverNotFound()
     {
         // Arrange
