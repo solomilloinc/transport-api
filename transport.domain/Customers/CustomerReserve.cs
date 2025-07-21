@@ -37,6 +37,7 @@ public class CustomerReserve: IAuditable
     public string CustomerFullName { get; set; } = null!;
     public string DocumentNumber { get; set; } = null!;
     public string CustomerEmail { get; set; } = null!;
+    public DateTime ReserveDate { get; set; }
     public string? Phone1 { get; set; }
     public string? Phone2 { get; set; }
 

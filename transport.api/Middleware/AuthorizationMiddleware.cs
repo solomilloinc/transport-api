@@ -18,7 +18,9 @@ public class AuthorizationMiddleware : IFunctionsWorkerMiddleware
         {
             "MPWebhook",
             "RenderSwaggerUI",
-            "RenderSwaggerDocument"
+            "RenderSwaggerDocument",
+            "OutboxTimerFunction",
+            "CustomerReserveCreatedSubscriptionFunction"
         };
     public AuthorizationMiddleware(IAuthorizationService service, ITokenProvider tokenProvider)
     {

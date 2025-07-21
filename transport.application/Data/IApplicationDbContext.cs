@@ -9,6 +9,7 @@ using Transport.Domain.Cities;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Transport.Domain.Services;
 using Transport.Domain.Directions;
+using Transport.SharedKernel;
 
 namespace Transport.Business.Data;
 
@@ -30,6 +31,7 @@ public interface IApplicationDbContext
     DbSet<ServiceSchedule> ServiceSchedules { get; }
     DbSet<ReservePayment> ReservePayments { get; }
     DbSet<CustomerAccountTransaction> CustomerAccountTransactions { get; }
+    DbSet<OutboxMessage> OutboxMessages { get; }
     EntityEntry<TEntity> Entry<TEntity>(TEntity entity) where TEntity : class;
     Task<int> SaveChangesWithOutboxAsync(CancellationToken cancellationToken = default);
 }

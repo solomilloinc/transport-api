@@ -964,3 +964,130 @@ GO
 COMMIT;
 GO
 
+BEGIN TRANSACTION;
+GO
+
+ALTER TABLE [ReservePayment] ADD [PaymentExternalId] bigint NULL;
+GO
+
+ALTER TABLE [ReservePayment] ADD [ResultApiExternalRawJson] nvarchar(max) NOT NULL DEFAULT N'';
+GO
+
+ALTER TABLE [ReservePayment] ADD [StatusDetail] nvarchar(max) NOT NULL DEFAULT N'';
+GO
+
+DECLARE @var10 sysname;
+SELECT @var10 = [d].[name]
+FROM [sys].[default_constraints] [d]
+INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
+WHERE ([d].[parent_object_id] = OBJECT_ID(N'[CustomerReserve]') AND [c].[name] = N'Status');
+IF @var10 IS NOT NULL EXEC(N'ALTER TABLE [CustomerReserve] DROP CONSTRAINT [' + @var10 + '];');
+ALTER TABLE [CustomerReserve] ALTER COLUMN [Status] VARCHAR(20) NOT NULL;
+GO
+
+UPDATE [Role] SET [CreatedDate] = '2025-07-12T17:11:44.1777675Z'
+WHERE [RoleId] = 1;
+SELECT @@ROWCOUNT;
+
+GO
+
+UPDATE [Role] SET [CreatedDate] = '2025-07-12T17:11:44.1777677Z'
+WHERE [RoleId] = 2;
+SELECT @@ROWCOUNT;
+
+GO
+
+INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+VALUES (N'20250712171144_ReserveWithMpIntegration', N'8.0.14');
+GO
+
+COMMIT;
+GO
+
+BEGIN TRANSACTION;
+GO
+
+DECLARE @var11 sysname;
+SELECT @var11 = [d].[name]
+FROM [sys].[default_constraints] [d]
+INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
+WHERE ([d].[parent_object_id] = OBJECT_ID(N'[ReservePayment]') AND [c].[name] = N'ResultApiExternalRawJson');
+IF @var11 IS NOT NULL EXEC(N'ALTER TABLE [ReservePayment] DROP CONSTRAINT [' + @var11 + '];');
+ALTER TABLE [ReservePayment] ALTER COLUMN [ResultApiExternalRawJson] nvarchar(max) NULL;
+GO
+
+UPDATE [Role] SET [CreatedDate] = '2025-07-12T17:17:07.8562203Z'
+WHERE [RoleId] = 1;
+SELECT @@ROWCOUNT;
+
+GO
+
+UPDATE [Role] SET [CreatedDate] = '2025-07-12T17:17:07.8562205Z'
+WHERE [RoleId] = 2;
+SELECT @@ROWCOUNT;
+
+GO
+
+INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+VALUES (N'20250712171708_ReserveWithMpIntegration-pt2', N'8.0.14');
+GO
+
+COMMIT;
+GO
+
+BEGIN TRANSACTION;
+GO
+
+ALTER TABLE [CustomerReserve] ADD [ReserveDate] datetime2 NOT NULL DEFAULT '0001-01-01T00:00:00.0000000';
+GO
+
+UPDATE [Role] SET [CreatedDate] = '2025-07-20T20:50:27.3575035Z'
+WHERE [RoleId] = 1;
+SELECT @@ROWCOUNT;
+
+GO
+
+UPDATE [Role] SET [CreatedDate] = '2025-07-20T20:50:27.3575037Z'
+WHERE [RoleId] = 2;
+SELECT @@ROWCOUNT;
+
+GO
+
+INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+VALUES (N'20250720205027_AddReserveDateInCustomerReserve', N'8.0.14');
+GO
+
+COMMIT;
+GO
+
+BEGIN TRANSACTION;
+GO
+
+DECLARE @var12 sysname;
+SELECT @var12 = [d].[name]
+FROM [sys].[default_constraints] [d]
+INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
+WHERE ([d].[parent_object_id] = OBJECT_ID(N'[ReservePayment]') AND [c].[name] = N'StatusDetail');
+IF @var12 IS NOT NULL EXEC(N'ALTER TABLE [ReservePayment] DROP CONSTRAINT [' + @var12 + '];');
+ALTER TABLE [ReservePayment] ALTER COLUMN [StatusDetail] VARCHAR(MAX) NULL;
+GO
+
+UPDATE [Role] SET [CreatedDate] = '2025-07-20T21:03:16.3713414Z'
+WHERE [RoleId] = 1;
+SELECT @@ROWCOUNT;
+
+GO
+
+UPDATE [Role] SET [CreatedDate] = '2025-07-20T21:03:16.3713416Z'
+WHERE [RoleId] = 2;
+SELECT @@ROWCOUNT;
+
+GO
+
+INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+VALUES (N'20250720210316_StatusDetailInReservePaymentNullable', N'8.0.14');
+GO
+
+COMMIT;
+GO
+

@@ -79,6 +79,10 @@ var host = new HostBuilder()
         services.AddOptions<MpIntegrationOption>().Configure<IConfiguration>((s, c) =>
                c.GetSection(nameof(MpIntegrationOption)).Bind(s));
         services.AddSingleton<IMpIntegrationOption>(x => x.GetRequiredService<IOptions<MpIntegrationOption>>().Value);
+
+        services.AddOptions<SmtpSettingOption>().Configure<IConfiguration>((s, c) =>
+              c.GetSection(nameof(SmtpSettingOption)).Bind(s));
+        services.AddSingleton<ISmtpSettingOption>(x => x.GetRequiredService<IOptions<SmtpSettingOption>>().Value);
     })
     .Build();
 

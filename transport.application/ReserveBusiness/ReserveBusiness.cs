@@ -132,11 +132,12 @@ public class ReserveBusiness : IReserveBusiness
                     DocumentNumber = customer.DocumentNumber,
                     Phone1 = customer.Phone1,
                     Phone2 = customer.Phone2,
-                    Status = CustomerReserveStatusEnum.Confirmed
+                    Status = CustomerReserveStatusEnum.Confirmed,
+                    ReserveDate = reserve.ReserveDate
                 };
 
                 reserve.CustomerReserves.Add(newCustomerReserve);
-                reserve.Raise(new CustomerReserveCreatedEvent(newCustomerReserve.CustomerReserveId));
+                reserve.Raise(new CustomerReserveCreatedEvent(reserve.ReserveId, customer.CustomerId));
                 _context.Reserves.Update(reserve);
 
                 totalExpectedAmount += reservePrice.Price;
@@ -764,7 +765,7 @@ public class ReserveBusiness : IReserveBusiness
                 };
 
                 reserve.CustomerReserves.Add(newCustomerReserve);
-                reserve.Raise(new CustomerReserveCreatedEvent(newCustomerReserve.CustomerReserveId));
+                reserve.Raise(new CustomerReserveCreatedEvent(reserve.ReserveId, customer.CustomerId));
                 _context.Reserves.Update(reserve);
 
                 reserves.Add(reserve);

@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Transport.Infraestructure.Database;
 
@@ -11,9 +12,11 @@ using Transport.Infraestructure.Database;
 namespace Transport.Infraestructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250720205027_AddReserveDateInCustomerReserve")]
+    partial class AddReserveDateInCustomerReserve
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -597,7 +600,8 @@ namespace Transport.Infraestructure.Migrations
                         .HasColumnType("VARCHAR(20)");
 
                     b.Property<string>("StatusDetail")
-                        .HasColumnType("VARCHAR(MAX)");
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("UpdatedBy")
                         .HasColumnType("VARCHAR(256)");
@@ -908,14 +912,14 @@ namespace Transport.Infraestructure.Migrations
                         {
                             RoleId = 1,
                             CreatedBy = "System",
-                            CreatedDate = new DateTime(2025, 7, 20, 21, 3, 16, 371, DateTimeKind.Utc).AddTicks(3414),
+                            CreatedDate = new DateTime(2025, 7, 20, 20, 50, 27, 357, DateTimeKind.Utc).AddTicks(5035),
                             Name = "Administrador"
                         },
                         new
                         {
                             RoleId = 2,
                             CreatedBy = "System",
-                            CreatedDate = new DateTime(2025, 7, 20, 21, 3, 16, 371, DateTimeKind.Utc).AddTicks(3416),
+                            CreatedDate = new DateTime(2025, 7, 20, 20, 50, 27, 357, DateTimeKind.Utc).AddTicks(5037),
                             Name = "Cliente"
                         });
                 });
