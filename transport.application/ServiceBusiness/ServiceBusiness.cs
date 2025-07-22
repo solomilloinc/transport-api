@@ -394,6 +394,8 @@ public class ServiceBusiness : IServiceBusiness
         foreach (var reserve in oldAvailableReserves)
         {
             reserve.Status = ReserveStatusEnum.Expired;
+
+            _context.Reserves.Update(reserve);
         }
 
         await _context.SaveChangesWithOutboxAsync();
