@@ -89,7 +89,7 @@ public sealed class CityFunction : FunctionBase
     }
 
     [Function("GetCityReport")]
-    [Authorize("Admin")]
+    [AllowAnonymous]
     [OpenApiOperation(operationId: "city-report", tags: new[] { "City" }, Summary = "Get City Report", Description = "Returns paginated list of Citys", Visibility = OpenApiVisibilityType.Important)]
     [OpenApiRequestBody("application/json", typeof(PagedReportRequestDto<CityReportFilterRequestDto>), Required = true)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(PagedReportResponseDto<CityReportResponseDto>), Summary = "City Report")]
