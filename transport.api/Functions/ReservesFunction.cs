@@ -65,7 +65,7 @@ public class ReservesFunction : FunctionBase
     public async Task<HttpResponseData> CreatePassengerReserveExternal(
     [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "passenger-reserves-create-external")] HttpRequestData req)
     {
-        var dto = await req.ReadFromJsonAsync<CustomerReserveCreateRequestWrapperExternalDto>();
+        var dto = await req.ReadFromJsonAsync<CustomerReserveCreateRequestWrapperExternalDto>();        var raw = req.Body;
 
         var result = await ValidateAndMatchAsync(req, dto, GetValidator<CustomerReserveCreateRequestWrapperExternalDto>())
                         .BindAsync(_reserveBusiness.CreatePassengerReservesExternal);

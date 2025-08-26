@@ -672,23 +672,23 @@ public class ReserveBusiness : IReserveBusiness
         return Result.Success(true);
     }
 
-
-    public async Task<Result<string>> CreatePassengerReservesExternal(CustomerReserveCreateRequestWrapperExternalDto dto)
+    public async Task<Result<CreateReserveExternalResult>> CreatePassengerReservesExternal(CustomerReserveCreateRequestWrapperExternalDto dto)
     {
         var validationResult = ValidateUserReserveCombination(dto.Items);
         if (validationResult.IsFailure)
-            return Result.Failure<string>(validationResult.Error);
+            return Result.Failure<CreateReserveExternalResult>(validationResult.Error);
 
-        int userIdLogged = _userContext.UserId != 0
-            ? _userContext.UserId
-            : throw new InvalidOperationException("User context is not set. Ensure the user is authenticated.");
+        User userLogged = null;
 
-        User userLogged = await _context.Users.FindAsync(userIdLogged)
-                         ?? throw new InvalidOperationException("User Logged is not Found");
+        if (_userContext.UserId != null && _userContext.UserId > 0)
+        {
+            userLogged = await _context.Users.FindAsync(_userContext.UserId)
+                 ?? throw new InvalidOperationException("User Logged is not Found");
+        }
 
         List<Reserve> reserves = new List<Reserve>();
 
-        return await _unitOfWork.ExecuteInTransactionAsync(async () =>
+        return await _unitOfWork.ExecuteInTransactionAsync<CreateReserveExternalResult>(async () =>
         {
             decimal totalExpectedAmount = 0m;
             Customer? customer = null;
@@ -700,10 +700,10 @@ public class ReserveBusiness : IReserveBusiness
                    .SingleOrDefaultAsync(r => r.ReserveId == passenger.ReserveId);
 
                 if (reserve is null)
-                    return Result.Failure<string>(ReserveError.NotFound);
+                    return Result.Failure<CreateReserveExternalResult>(ReserveError.NotFound);
 
                 if (reserve.Status != ReserveStatusEnum.Confirmed)
-                    return Result.Failure<string>(ReserveError.NotAvailable);
+                    return Result.Failure<CreateReserveExternalResult>(ReserveError.NotAvailable);
 
                 var service = await _context.Services
                     .Include(s => s.ReservePrices)
@@ -717,27 +717,27 @@ public class ReserveBusiness : IReserveBusiness
                 var totalAfterInsert = existingPassengerCount + dto.Items.Count;
 
                 if (totalAfterInsert > vehicle.AvailableQuantity)
-                    return Result.Failure<string>(
+                    return Result.Failure<CreateReserveExternalResult>(
                         ReserveError.VehicleQuantityNotAvailable(existingPassengerCount, dto.Items.Count, vehicle.AvailableQuantity));
 
                 var reservePrice = service.ReservePrices.SingleOrDefault(p => p.ReserveTypeId == (ReserveTypeIdEnum)passenger.ReserveTypeId);
-                if (reservePrice is null || passenger.Price != reservePrice.Price)
-                    return Result.Failure<string>(ReserveError.PriceNotAvailable);
+                if (reservePrice is null)
+                    return Result.Failure<CreateReserveExternalResult>(ReserveError.PriceNotAvailable);
 
                 var customerResult = await _customerBusiness.GetOrCreateFromPassengerAsync(passenger);
                 if (!customerResult.IsSuccess)
-                    return Result.Failure<string>(customerResult.Error);
+                    return Result.Failure<CreateReserveExternalResult>(customerResult.Error);
 
                 customer = customerResult.Value;
 
                 if (reserve.CustomerReserves.Any(cr => cr.CustomerId == customer.CustomerId))
-                    return Result.Failure<string>(ReserveError.CustomerAlreadyExists(customer.DocumentNumber));
+                    return Result.Failure<CreateReserveExternalResult>(ReserveError.CustomerAlreadyExists(customer.DocumentNumber));
 
                 var pickupResult = await GetDirectionAsync(passenger.PickupLocationId, "Pickup");
-                if (pickupResult.IsFailure) return Result.Failure<string>(pickupResult.Error);
+                if (pickupResult.IsFailure) return Result.Failure<CreateReserveExternalResult>(pickupResult.Error);
 
                 var dropoffResult = await GetDirectionAsync(passenger.DropoffLocationId, "Dropoff");
-                if (dropoffResult.IsFailure) return Result.Failure<string>(dropoffResult.Error);
+                if (dropoffResult.IsFailure) return Result.Failure<CreateReserveExternalResult>(dropoffResult.Error);
 
                 var newCustomerReserve = new CustomerReserve
                 {
@@ -784,7 +784,7 @@ public class ReserveBusiness : IReserveBusiness
                 }
 
                 var resultPayment = await CreatePendingPayment(totalExpectedAmount, reserves);
-                if (resultPayment.IsFailure) return Result.Failure<string>(resultPayment.Error);
+                if (resultPayment.IsFailure) return Result.Failure<CreateReserveExternalResult>(resultPayment.Error);
 
                 string preferenceId = await _paymentGateway.CreatePreferenceAsync(
                     resultPayment.Value.ToString(),
@@ -793,21 +793,22 @@ public class ReserveBusiness : IReserveBusiness
                 );
 
                 await _context.SaveChangesWithOutboxAsync();
-                return Result.Success(preferenceId);
+                return Result.Success(new CreateReserveExternalResult(PaymentStatus.Pending, preferenceId));
             }
             else
             {
                 var totalProvidedAmount = dto.Payment.TransactionAmount;
 
                 if (totalExpectedAmount != totalProvidedAmount)
-                    return Result.Failure<string>(ReserveError.InvalidPaymentAmount(totalExpectedAmount, totalProvidedAmount));
+                    return Result.Failure<CreateReserveExternalResult>(ReserveError.InvalidPaymentAmount(totalExpectedAmount, totalProvidedAmount));
 
                 var resultPayment = await CreatePayment(dto.Payment, reserves);
-                if (resultPayment.IsFailure) return Result.Failure<string>(resultPayment.Error);
-            }
+                if (resultPayment.IsFailure) return Result.Failure<CreateReserveExternalResult>(resultPayment.Error);
 
-            await _context.SaveChangesWithOutboxAsync();
-            return Result.Success(string.Empty);
+                await _context.SaveChangesWithOutboxAsync();
+
+                return Result.Success(new CreateReserveExternalResult(PaymentStatus.Approved, null));
+            }
         });
     }
 
