@@ -8,5 +8,4 @@ public record CreatePaymentExternalRequestDto(decimal TransactionAmount,
     string PaymentMethodId,
     string PayerEmail,
     string IdentificationType,
-    string IdentificationNumber,
-    int ReserveTypeId);
+    string IdentificationNumber);

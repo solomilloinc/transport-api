@@ -8,7 +8,7 @@ public interface IReserveBusiness
 {
     Task<Result<bool>> CreatePassengerReserves(CustomerReserveCreateRequestWrapperDto dto);
 
-    Task<Result<string>> CreatePassengerReservesExternal(CustomerReserveCreateRequestWrapperExternalDto dto);
+    Task<Result<CreateReserveExternalResult>> CreatePassengerReservesExternal(CustomerReserveCreateRequestWrapperExternalDto dto);
 
     Task<Result<PagedReportResponseDto<ReservePriceReportResponseDto>>>
      GetReservePriceReport(PagedReportRequestDto<ReservePriceReportFilterRequestDto> requestDto);
