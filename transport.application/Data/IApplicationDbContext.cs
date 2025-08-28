@@ -10,6 +10,7 @@ using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Transport.Domain.Services;
 using Transport.Domain.Directions;
 using Transport.SharedKernel;
+using Transport.Domain.Passengers;
 
 namespace Transport.Business.Data;
 
@@ -27,7 +28,7 @@ public interface IApplicationDbContext
     DbSet<RefreshToken> RefreshTokens { get; }
     DbSet<Holiday> Holidays { get; }
     DbSet<ReservePrice> ReservePrices { get; }
-    DbSet<CustomerReserve> CustomerReserves { get; }
+    DbSet<Passenger> Passengers { get; }
     DbSet<ServiceSchedule> ServiceSchedules { get; }
     DbSet<ReservePayment> ReservePayments { get; }
     DbSet<CustomerAccountTransaction> CustomerAccountTransactions { get; }

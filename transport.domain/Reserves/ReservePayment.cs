@@ -11,11 +11,15 @@ public class ReservePayment : Entity, IAuditable
     public StatusPaymentEnum Status { get; set; }
     public string StatusDetail { get; set; }
     public string ResultApiExternalRawJson { get; set; }
-    public int CustomerId { get; set; }
+    public int? CustomerId { get; set; }
     public decimal Amount { get; set; }
     public long? PaymentExternalId { get; set; }
     public Reserve Reserve { get; set; } = null!;
-    public Customer Customer { get; set; } = null!;
+    public Customer? Customer { get; set; } = null!;
+
+    public string? PayerName { get; set; }
+    public string? PayerDocumentNumber { get; set; }
+    public string? PayerEmail { get; set; }
 
     public int? ParentReservePaymentId { get; set; }
     public ReservePayment? ParentReservePayment { get; set; }

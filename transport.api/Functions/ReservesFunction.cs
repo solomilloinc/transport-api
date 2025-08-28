@@ -17,7 +17,7 @@ using Transport_Api.Extensions;
 using Transport.Business.ReserveBusiness.Validation;
 using static System.Runtime.InteropServices.JavaScript.JSType;
 using System.Text.Json;
-using Transport.SharedKernel.Contracts.Customer;
+using Transport.SharedKernel.Contracts.Passenger;
 
 namespace transport_api.Functions;
 
@@ -39,14 +39,14 @@ public class ReservesFunction : FunctionBase
     Summary = "Create Passenger Reserves",
     Description = "Creates customer reserves for passengers, creating customers if needed.",
     Visibility = OpenApiVisibilityType.Important)]
-    [OpenApiRequestBody("application/json", typeof(CustomerReserveCreateRequestWrapperDto), Required = true)]
+    [OpenApiRequestBody("application/json", typeof(PassengerReserveCreateRequestWrapperDto), Required = true)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(Result<bool>), Summary = "Passenger reserves created successfully.")]
     public async Task<HttpResponseData> CreatePassengerReserves(
     [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "passenger-reserves-create")] HttpRequestData req)
     {
-        var dto = await req.ReadFromJsonAsync<CustomerReserveCreateRequestWrapperDto>();
+        var dto = await req.ReadFromJsonAsync<PassengerReserveCreateRequestWrapperDto>();
 
-        var result = await ValidateAndMatchAsync(req, dto, GetValidator<CustomerReserveCreateRequestWrapperDto>())
+        var result = await ValidateAndMatchAsync(req, dto, GetValidator<PassengerReserveCreateRequestWrapperDto>())
                         .BindAsync(_reserveBusiness.CreatePassengerReserves);
 
         return await MatchResultAsync(req, result);
@@ -60,14 +60,14 @@ public class ReservesFunction : FunctionBase
     Summary = "Create Passenger Reserves external",
     Description = "Creates customer reserves for passengers, creating customers if needed in user final",
     Visibility = OpenApiVisibilityType.Important)]
-    [OpenApiRequestBody("application/json", typeof(CustomerReserveCreateRequestWrapperExternalDto), Required = true)]
+    [OpenApiRequestBody("application/json", typeof(PassengerReserveCreateRequestWrapperExternalDto), Required = true)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(Result<bool>), Summary = "Passenger reserves created successfully.")]
     public async Task<HttpResponseData> CreatePassengerReserveExternal(
     [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "passenger-reserves-create-external")] HttpRequestData req)
     {
-        var dto = await req.ReadFromJsonAsync<CustomerReserveCreateRequestWrapperExternalDto>();
+        var dto = await req.ReadFromJsonAsync<PassengerReserveCreateRequestWrapperExternalDto>();
 
-        var result = await ValidateAndMatchAsync(req, dto, GetValidator<CustomerReserveCreateRequestWrapperExternalDto>())
+        var result = await ValidateAndMatchAsync(req, dto, GetValidator<PassengerReserveCreateRequestWrapperExternalDto>())
                         .BindAsync(_reserveBusiness.CreatePassengerReservesExternal);
 
         return await MatchResultAsync(req, result);
@@ -126,14 +126,14 @@ public class ReservesFunction : FunctionBase
     [Function("GetCustomerReserveReport")]
     [Authorize("Admin")]
     [OpenApiOperation(operationId: "customer-reserve-report", tags: new[] { "Reserve" }, Summary = "Get Customer Reserves Report", Description = "Returns paginated list of customer reserves", Visibility = OpenApiVisibilityType.Important)]
-    [OpenApiRequestBody("application/json", typeof(PagedReportRequestDto<CustomerReserveReportFilterRequestDto>), Required = true)]
-    [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(PagedReportResponseDto<CustomerReserveReportResponseDto>), Summary = "Customer Reserve Report")]
+    [OpenApiRequestBody("application/json", typeof(PagedReportRequestDto<PassengerReserveReportFilterRequestDto>), Required = true)]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(PagedReportResponseDto<PassengerReserveReportResponseDto>), Summary = "Customer Reserve Report")]
     public async Task<HttpResponseData> GetCustomerReserveReport(
     [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "customer-reserve-report/{reserveId:int}")] HttpRequestData req,
     int reserveId)
     {
-        var filter = await req.ReadFromJsonAsync<PagedReportRequestDto<CustomerReserveReportFilterRequestDto>>();
-        var result = await _reserveBusiness.GetReserveCustomerReport(reserveId, filter);
+        var filter = await req.ReadFromJsonAsync<PagedReportRequestDto<PassengerReserveReportFilterRequestDto>>();
+        var result = await _reserveBusiness.GetReservePassengerReport(reserveId, filter);
         return await MatchResultAsync(req, result);
     }
 
@@ -184,7 +184,7 @@ public class ReservesFunction : FunctionBase
         if (payments == null || !payments.Any())
             return req.CreateResponse(HttpStatusCode.BadRequest);
 
-        var result = await _reserveBusiness.CreatePaymentsAsync(reserveId, customerId, payments);
+        var result = await _reserveBusiness.CreatePaymentsAsync(reserveId, payments);
         return await MatchResultAsync(req, result);
     }
 
@@ -196,7 +196,7 @@ public class ReservesFunction : FunctionBase
     Summary = "Update a Customer Reserve",
     Description = "Updates the specified customer reserve with new pickup/dropoff locations or travel status.",
     Visibility = OpenApiVisibilityType.Important)]
-    [OpenApiRequestBody("application/json", typeof(CustomerReserveUpdateRequestDto), Required = true)]
+    [OpenApiRequestBody("application/json", typeof(PassengerReserveUpdateRequestDto), Required = true)]
     [OpenApiParameter(name: "customerReserveId", In = ParameterLocation.Path, Required = true, Type = typeof(int), Summary = "ID of the customer reserve")]
     [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(Result<bool>), Summary = "Customer reserve updated successfully.")]
     [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Summary = "Customer reserve not found.")]
@@ -204,10 +204,10 @@ public class ReservesFunction : FunctionBase
     [HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "customer-reserve-update/{customerReserveId:int}")] HttpRequestData req,
     int customerReserveId)
     {
-        var dto = await req.ReadFromJsonAsync<CustomerReserveUpdateRequestDto>();
+        var dto = await req.ReadFromJsonAsync<PassengerReserveUpdateRequestDto>();
 
-        var result = await ValidateAndMatchAsync(req, dto, GetValidator<CustomerReserveUpdateRequestDto>())
-                        .BindAsync(update => _reserveBusiness.UpdateCustomerReserveAsync(customerReserveId, update));
+        var result = await ValidateAndMatchAsync(req, dto, GetValidator<PassengerReserveUpdateRequestDto>())
+                        .BindAsync(update => _reserveBusiness.UpdatePassengerReserveAsync(customerReserveId, update));
 
         return await MatchResultAsync(req, result);
     }

@@ -1,6 +1,6 @@
 ﻿using FluentValidation;
 using Transport.Domain.Reserves;
-using Transport.SharedKernel.Contracts.Customer;
+using Transport.SharedKernel.Contracts.Reserve;
 
 namespace Transport.Business.ReserveBusiness.Validation;
 

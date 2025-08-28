@@ -4,9 +4,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Transport.Domain.Customers;
+namespace Transport.Domain.Passengers;
 
-public enum CustomerReserveStatusEnum
+public enum PassengerReserveStatusEnum
 {
     PendingPayment = 1,
     Confirmed = 2,

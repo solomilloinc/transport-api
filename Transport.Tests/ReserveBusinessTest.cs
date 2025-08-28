@@ -22,6 +22,8 @@ using Microsoft.AspNetCore.Builder.Extensions;
 using MercadoPago.Client.Payment;
 using Transport.Business.Services.Payment;
 using Transport.Domain.Customers.Abstraction;
+using Transport.Domain.Passengers;
+using Transport.SharedKernel.Contracts.Passenger;
 
 namespace Transport.Tests.ReserveBusinessTests;
 
@@ -137,7 +139,7 @@ public class ReserveBusinessTests : TestBase
         {
             ReserveId = i,
             Status = ReserveStatusEnum.Confirmed,
-            CustomerReserves = new List<CustomerReserve>(),
+            Passengers = new List<Passenger>(),
             VehicleId = 1,
             ServiceId = 1,
             Driver = new Driver { FirstName = "John", LastName = "Doe" }
@@ -182,11 +184,6 @@ public class ReserveBusinessTests : TestBase
             customer.CurrentBalance = c.CurrentBalance;
         });
 
-        _customerBusinessMock
-   .Setup(x => x.GetOrCreateFromPassengerAsync(It.IsAny<CustomerReserveCreateRequestDto>()))
-   .ReturnsAsync(Result.Success(customer));
-
-
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
         _unitOfWorkMock
@@ -196,7 +193,7 @@ public class ReserveBusinessTests : TestBase
             .Returns<Func<Task<Result<bool>>>, IsolationLevel>((func, _) => func());
 
         var passengers = Enumerable.Range(1, reserveCount).Select(i =>
-            new CustomerReserveCreateRequestDto(
+            new PassengerReserveCreateRequestDto(
                 ReserveId: i,
                 ReserveTypeId: (int)ReserveTypeIdEnum.IdaVuelta,
                 CustomerId: 1,
@@ -205,7 +202,11 @@ public class ReserveBusinessTests : TestBase
                 DropoffLocationId: 2,
                 HasTraveled: false,
                 Price: 100,
-                CustomerCreate: null
+                FirstName: "Test",
+                LastName: "Yuse",
+                Email: null,
+                Phone1: "222777777",
+                DocumentNumber: "12345678"
             )
         ).ToList();
 
@@ -214,18 +215,18 @@ public class ReserveBusinessTests : TestBase
 
         if (paymentCount == 1)
         {
-            payments.Add(new CreatePaymentRequestDto(totalAmount, 1));
+            payments.Add(new CreatePaymentRequestDto(totalAmount, 1, "123"));
         }
         else
         {
             var partialAmount = totalAmount / paymentCount;
             for (int i = 0; i < paymentCount; i++)
             {
-                payments.Add(new CreatePaymentRequestDto(partialAmount, 1));
+                payments.Add(new CreatePaymentRequestDto(partialAmount, 1, "123"));
             }
         }
 
-        var request = new CustomerReserveCreateRequestWrapperDto(payments, passengers);
+        var request = new PassengerReserveCreateRequestWrapperDto(payments, passengers);
 
         // Act
         var result = await _reserveBusiness.CreatePassengerReserves(request);
@@ -272,7 +273,7 @@ public class ReserveBusinessTests : TestBase
         {
             ReserveId = 1,
             Status = ReserveStatusEnum.Confirmed,
-            CustomerReserves = new List<CustomerReserve>(),
+            Passengers = new List<Passenger>(),
             VehicleId = 1,
             ServiceId = 1,
             Driver = new Driver { FirstName = "Mario", LastName = "Bros" }
@@ -281,7 +282,7 @@ public class ReserveBusinessTests : TestBase
         {
             ReserveId = 2,
             Status = ReserveStatusEnum.Confirmed,
-            CustomerReserves = new List<CustomerReserve>(),
+            Passengers = new List<Passenger>(),
             VehicleId = 1,
             ServiceId = 1
         };
@@ -309,7 +310,7 @@ public class ReserveBusinessTests : TestBase
         };
 
         var reservePaymentsList = new List<ReservePayment>();
-        var customerReservesList = new List<CustomerReserve>();
+        var passengers = new List<Passenger>();
         var reservesList = new List<Reserve> { reserve1, reserve2 };
 
         _contextMock.Setup(c => c.ReservePayments).Returns(GetMockDbSetWithIdentity(reservePaymentsList).Object);
@@ -317,7 +318,7 @@ public class ReserveBusinessTests : TestBase
         _contextMock.Setup(c => c.Services).Returns(GetMockDbSetWithIdentity(new List<Service> { service }).Object);
         _contextMock.Setup(c => c.Directions.FindAsync(It.IsAny<int>())).ReturnsAsync(destination);
         _contextMock.Setup(c => c.Directions.FindAsync(It.IsAny<int>())).ReturnsAsync(origin);
-        _contextMock.Setup(c => c.CustomerReserves).Returns(GetMockDbSetWithIdentity(customerReservesList).Object);
+        _contextMock.Setup(c => c.Passengers).Returns(GetMockDbSetWithIdentity(passengers).Object);
         _contextMock.Setup(c => c.Reserves).Returns(GetMockDbSetWithIdentity(reservesList).Object);
 
         SetupSaveChangesWithOutboxAsync(_contextMock);
@@ -348,32 +349,6 @@ public class ReserveBusinessTests : TestBase
                 ExternalReference = "12345"
             });
 
-        _customerBusinessMock
-            .Setup(x => x.GetOrCreateFromPassengerAsync(It.IsAny<CustomerReserveCreateRequestDto>()))
-            .ReturnsAsync((CustomerReserveCreateRequestDto dto) =>
-            {
-                if (dto.CustomerCreate.DocumentNumber == "32145678")
-                {
-                    return Result.Success(new Customer
-                    {
-                        CustomerId = 123,
-                        FirstName = "Pepe",
-                        LastName = "Argento",
-                        DocumentNumber = "32145678",
-                        Email = "pepe@example.com"
-                    });
-                }
-
-                return Result.Success(new Customer
-                {
-                    CustomerId = 124,
-                    FirstName = "Lionel",
-                    LastName = "Messi",
-                    DocumentNumber = "32145679",
-                    Email = "liomessi@example.com"
-                });
-            });
-
         var reserveBusiness = new ReserveBusiness(
             _contextMock.Object,
             _unitOfWorkMock.Object,
@@ -381,8 +356,8 @@ public class ReserveBusinessTests : TestBase
             paymentGatewayMock.Object,
             _customerBusinessMock.Object);
 
-        var passengers = new List<CustomerReserveCreateRequestDto>
-    {
+        var passengerList = new List<PassengerReserveCreateRequestDto>
+        {
         new(
             ReserveId: 1,
             ReserveTypeId: (int)ReserveTypeIdEnum.Ida,
@@ -392,7 +367,11 @@ public class ReserveBusinessTests : TestBase
             DropoffLocationId: 2,
             HasTraveled: false,
             Price: 100m,
-            CustomerCreate: new CustomerCreateRequestDto("Pepe", "Argento", "pepe@example.com", "32145678", "1111-2222", null)
+            FirstName: "Pepe",
+            LastName: "Argento",
+            Email: "pepe@example.com",
+            Phone1: "32145678",
+            DocumentNumber: "1111-2222"
         ),
         new(
             ReserveId: 2,
@@ -403,9 +382,13 @@ public class ReserveBusinessTests : TestBase
             DropoffLocationId: 2,
             HasTraveled: false,
             Price: 100m,
-            CustomerCreate: new CustomerCreateRequestDto("Lionel", "Messi", "liomessi@example.com", "32145679", "1111-2222", null)
+            FirstName: "Lionel",
+            LastName: "Messi",
+            Email: "liomessi@example.com",
+            Phone1: "32145679",
+            DocumentNumber: "1111-2222"
         )
-    };
+        };
 
         var paymentDto = new CreatePaymentExternalRequestDto(
             TransactionAmount: 200m,
@@ -415,11 +398,10 @@ public class ReserveBusinessTests : TestBase
             PaymentMethodId: "visa",
             PayerEmail: "pepe@example.com",
             IdentificationType: "DNI",
-            IdentificationNumber: "32145678",
-            ReserveTypeId: 2
+            IdentificationNumber: "32145678"
         );
 
-        var request = new CustomerReserveCreateRequestWrapperExternalDto(paymentDto, passengers);
+        var request = new PassengerReserveCreateRequestWrapperExternalDto(paymentDto, passengerList);
 
         _unitOfWorkMock
         .Setup(uow => uow.ExecuteInTransactionAsync<string>(
@@ -439,7 +421,7 @@ public class ReserveBusinessTests : TestBase
         // Assert - Verificaciones para pago directo
         Assert.True(result.IsSuccess);
         Assert.Equal(2, reservePaymentsList.Count);
-        Assert.Equal(2, reserve1.CustomerReserves.Count + reserve2.CustomerReserves.Count);
+        Assert.Equal(2, reserve1.Passengers.Count + reserve2.Passengers.Count);
 
         var parentPayment = reservePaymentsList[0];
         var childPayment = reservePaymentsList[1];
@@ -454,37 +436,37 @@ public class ReserveBusinessTests : TestBase
         Assert.Equal(StatusPaymentEnum.Paid, childPayment.Status);
 
         // Verificar estados de las reservas
-        Assert.All(reserve1.CustomerReserves, cr =>
-            Assert.Equal(CustomerReserveStatusEnum.Confirmed, cr.Status));
+        Assert.All(reserve1.Passengers, cr =>
+            Assert.Equal(PassengerStatusEnum.Confirmed, cr.Status));
 
-        Assert.All(reserve2.CustomerReserves, cr =>
-    Assert.Equal(CustomerReserveStatusEnum.Confirmed, cr.Status));
+        Assert.All(reserve2.Passengers, cr =>
+    Assert.Equal(PassengerStatusEnum.Confirmed, cr.Status));
 
 
         // Limpiar para prueba con wallet
         reservePaymentsList.Clear();
-        reserve1.CustomerReserves.Clear();
-        reserve2.CustomerReserves.Clear();
+        reserve1.Passengers.Clear();
+        reserve2.Passengers.Clear();
 
-        _contextMock.Setup(c => c.CustomerReserves.Add(It.IsAny<CustomerReserve>()))
-        .Callback<CustomerReserve>(cr => {
-            customerReservesList.Add(cr);
+        _contextMock.Setup(c => c.Passengers.Add(It.IsAny<Passenger>()))
+        .Callback<Passenger>(cr => {
+            passengers.Add(cr);
             // También agregar a la reserva correspondiente
             var reserve = reservesList.FirstOrDefault(r => r.ReserveId == cr.ReserveId);
             if (reserve != null)
             {
-                reserve.CustomerReserves.Add(cr);
+                reserve.Passengers.Add(cr);
             }
         });
 
         // Act - Prueba con wallet (sin pago directo)
-        var walletRequest = new CustomerReserveCreateRequestWrapperExternalDto(null, passengers);
+        var walletRequest = new PassengerReserveCreateRequestWrapperExternalDto(null, passengerList);
         var walletResult = await reserveBusiness.CreatePassengerReservesExternal(walletRequest);
 
         // Assert - Verificaciones para wallet
         Assert.True(walletResult.IsSuccess);
         Assert.Equal(2, reservePaymentsList.Count);
-        Assert.Equal(2, reserve1.CustomerReserves.Count + reserve2.CustomerReserves.Count);
+        Assert.Equal(2, reserve1.Passengers.Count + reserve2.Passengers.Count);
 
         var walletParentPayment = reservePaymentsList[0];
         var walletChildPayment = reservePaymentsList[1];
@@ -499,11 +481,11 @@ public class ReserveBusinessTests : TestBase
         Assert.Equal(StatusPaymentEnum.Pending, walletChildPayment.Status);
 
         // Verificar estados de las reservas
-        Assert.All(reserve1.CustomerReserves, cr =>
-           Assert.Equal(CustomerReserveStatusEnum.PendingPayment, cr.Status));
+        Assert.All(reserve1.Passengers, cr =>
+           Assert.Equal(PassengerStatusEnum.PendingPayment, cr.Status));
 
-        Assert.All(reserve2.CustomerReserves, cr =>
-    Assert.Equal(CustomerReserveStatusEnum.PendingPayment, cr.Status));
+        Assert.All(reserve2.Passengers, cr =>
+    Assert.Equal(PassengerStatusEnum.PendingPayment, cr.Status));
 
         paymentGatewayMock
         .Setup(x => x.GetPaymentAsync("987654321"))
@@ -534,9 +516,9 @@ public class ReserveBusinessTests : TestBase
         _unitOfWorkMock.Setup(uow => uow.ExecuteInTransactionAsync(It.IsAny<Func<Task<Result<bool>>>>(), It.IsAny<IsolationLevel>()))
                        .Returns<Func<Task<Result<bool>>>, IsolationLevel>(async (func, _) => await func());
 
-        var result = await _reserveBusiness.CreatePaymentsAsync(1, 1, new List<CreatePaymentRequestDto>
+        var result = await _reserveBusiness.CreatePaymentsAsync(1, new List<CreatePaymentRequestDto>
        {
-           new CreatePaymentRequestDto(1000, 1)
+           new CreatePaymentRequestDto(1000, 1, "12345678")
        });
 
         result.IsSuccess.Should().BeFalse();
@@ -555,9 +537,9 @@ public class ReserveBusinessTests : TestBase
                 It.IsAny<IsolationLevel>()))
             .Returns<Func<Task<Result<bool>>>, IsolationLevel>((func, _) => func());
 
-        var result = await _reserveBusiness.CreatePaymentsAsync(1, 1, new List<CreatePaymentRequestDto>
+        var result = await _reserveBusiness.CreatePaymentsAsync(1, new List<CreatePaymentRequestDto>
     {
-        new CreatePaymentRequestDto(1000, 1)
+        new CreatePaymentRequestDto(1000, 1, "12345678")
     });
 
         result.IsSuccess.Should().BeFalse();
@@ -576,7 +558,7 @@ public class ReserveBusinessTests : TestBase
               It.IsAny<IsolationLevel>()))
           .Returns<Func<Task<Result<bool>>>, IsolationLevel>((func, _) => func());
 
-        var result = await _reserveBusiness.CreatePaymentsAsync(1, 1, new List<CreatePaymentRequestDto>());
+        var result = await _reserveBusiness.CreatePaymentsAsync(1, new List<CreatePaymentRequestDto>());
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Code.Should().Be("Payments.Empty");
@@ -594,10 +576,10 @@ public class ReserveBusinessTests : TestBase
              It.IsAny<IsolationLevel>()))
          .Returns<Func<Task<Result<bool>>>, IsolationLevel>((func, _) => func());
 
-        var result = await _reserveBusiness.CreatePaymentsAsync(1, 1, new List<CreatePaymentRequestDto>
+        var result = await _reserveBusiness.CreatePaymentsAsync(1, new List<CreatePaymentRequestDto>
     {
-        new CreatePaymentRequestDto(0, 1),
-        new CreatePaymentRequestDto(-100, 2)
+        new CreatePaymentRequestDto(0, 1, "12345678"),
+        new CreatePaymentRequestDto(-100, 2, "12345678")
     });
 
         result.IsSuccess.Should().BeFalse();
@@ -617,10 +599,10 @@ public class ReserveBusinessTests : TestBase
             It.IsAny<IsolationLevel>()))
         .Returns<Func<Task<Result<bool>>>, IsolationLevel>((func, _) => func());
 
-        var result = await _reserveBusiness.CreatePaymentsAsync(1, 1, new List<CreatePaymentRequestDto>
+        var result = await _reserveBusiness.CreatePaymentsAsync(1, new List<CreatePaymentRequestDto>
     {
-        new CreatePaymentRequestDto(1000, 1),
-        new CreatePaymentRequestDto(2000, 1)
+        new CreatePaymentRequestDto(1000, 1, "12345678"),
+        new CreatePaymentRequestDto(2000, 1, "12345678")
     });
 
         result.IsSuccess.Should().BeFalse();
@@ -650,10 +632,10 @@ public class ReserveBusinessTests : TestBase
                It.IsAny<IsolationLevel>()))
            .Returns<Func<Task<Result<bool>>>, IsolationLevel>((func, _) => func());
 
-        var result = await _reserveBusiness.CreatePaymentsAsync(1, 1, new List<CreatePaymentRequestDto>
+        var result = await _reserveBusiness.CreatePaymentsAsync(1, new List<CreatePaymentRequestDto>
     {
-        new CreatePaymentRequestDto(50, 1),
-        new CreatePaymentRequestDto(50, 2)
+        new CreatePaymentRequestDto(50, 1, "12345678"),
+        new CreatePaymentRequestDto(50, 2, "12345678")
     });
 
         result.IsSuccess.Should().BeTrue();
@@ -692,8 +674,8 @@ public class ReserveBusinessTests : TestBase
 
         var payments = new List<CreatePaymentRequestDto>
     {
-        new CreatePaymentRequestDto(3000m, 1),
-        new CreatePaymentRequestDto(1000m, 2)
+        new CreatePaymentRequestDto(3000m, 1, "12345678"),
+        new CreatePaymentRequestDto(1000m, 2, "12345678")
     };
 
         _contextMock.Setup(c => c.Reserves.FindAsync(reserveId))
@@ -710,7 +692,7 @@ public class ReserveBusinessTests : TestBase
     .Returns<Func<Task<Result<bool>>>, IsolationLevel>((func, _) => func());
 
         // Act
-        var result = await _reserveBusiness.CreatePaymentsAsync(reserveId, customerId, payments);
+        var result = await _reserveBusiness.CreatePaymentsAsync(reserveId, payments);
 
         // Assert
         result.IsSuccess.Should().BeFalse();

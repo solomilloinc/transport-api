@@ -1,11 +1,11 @@
 ﻿using FluentValidation;
-using Transport.SharedKernel.Contracts.Customer;
+using Transport.SharedKernel.Contracts.Passenger;
 
 namespace Transport.Business.ReserveBusiness.Validation
 {
-    public class CustomerReserveCreateRequestWrapperValidator : AbstractValidator<CustomerReserveCreateRequestWrapperDto>
+    public class PassengerReserveCreateRequestWrapperValidator : AbstractValidator<PassengerReserveCreateRequestWrapperDto>
     {
-        public CustomerReserveCreateRequestWrapperValidator()
+        public PassengerReserveCreateRequestWrapperValidator()
         {
             RuleForEach(x => x.Items).SetValidator(new CustomerReserveCreateRequestDtoValidator());
             RuleForEach(x => x.Payments).SetValidator(new PaymentCreateRequestValidator());

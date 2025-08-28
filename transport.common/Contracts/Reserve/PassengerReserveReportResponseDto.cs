@@ -1,8 +1,8 @@
 ﻿namespace Transport.SharedKernel.Contracts.Reserve;
 
-public record CustomerReserveReportResponseDto(
-    int CustomerReserveId,
-    int CustomerId,
+public record PassengerReserveReportResponseDto(
+    int PassengerId,
+    int? CustomerId,
     string FullName,
     string DocumentNumber,
     string Email,
@@ -12,4 +12,4 @@ public record CustomerReserveReportResponseDto(
     string? DropoffLocationName,
     int PickupLocationId,
     string? PickupLocationName,
-    decimal CurrentBalance);
+    decimal? CurrentBalance);

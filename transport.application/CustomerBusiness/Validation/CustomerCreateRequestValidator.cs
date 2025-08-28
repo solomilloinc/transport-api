@@ -1,6 +1,6 @@
 ﻿using FluentValidation;
-using Transport.SharedKernel.Contracts.Customer;
 using System.Text.RegularExpressions;
+using Transport.SharedKernel.Contracts.Customer;
 
 namespace Transport.Business.CustomerBusiness.Validation;
 

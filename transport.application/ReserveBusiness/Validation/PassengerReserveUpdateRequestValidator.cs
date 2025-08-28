@@ -1,11 +1,11 @@
 ﻿using FluentValidation;
-using Transport.SharedKernel.Contracts.Customer;
+using Transport.SharedKernel.Contracts.Passenger;
 
 namespace Transport.Business.ReserveBusiness.Validation;
 
-public class CustomerReserveUpdateRequestValidator : AbstractValidator<CustomerReserveUpdateRequestDto>
+public class PassengerReserveUpdateRequestValidator : AbstractValidator<PassengerReserveUpdateRequestDto>
 {
-    public CustomerReserveUpdateRequestValidator()
+    public PassengerReserveUpdateRequestValidator()
     {
         RuleFor(x => x)
             .Must(x =>

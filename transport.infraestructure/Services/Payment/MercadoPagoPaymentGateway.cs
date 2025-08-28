@@ -24,7 +24,7 @@ public class MercadoPagoPaymentGateway : IMercadoPagoPaymentGateway
         return await client.CreateAsync(request);
     }
 
-    public async Task<string> CreatePreferenceAsync(string externalReference, decimal totalAmount, List<CustomerReserveCreateRequestDto> passengers)
+    public async Task<string> CreatePreferenceAsync(string externalReference, decimal totalAmount, List<PassengerReserveCreateRequestDto> passengers)
     {
         MercadoPagoConfig.AccessToken = _mpIntegrationOption.AccessToken;
 
@@ -33,7 +33,7 @@ public class MercadoPagoPaymentGateway : IMercadoPagoPaymentGateway
             Items = passengers.Select((p, i) => new PreferenceItemRequest
             {
                 Id = i.ToString(),
-                Title = $"Pasaje de {p.CustomerCreate?.FirstName ?? "Pasajero"}",
+                Title = $"Pasaje de {p.FirstName} {p.LastName}",
                 Quantity = 1,
                 UnitPrice = p.Price,
                 Description = $"Reserva {p.ReserveId}"
@@ -52,7 +52,7 @@ public class MercadoPagoPaymentGateway : IMercadoPagoPaymentGateway
 
         var client = new PreferenceClient();
         var preference = await client.CreateAsync(preferenceRequest);
-        return preference.Id; 
+        return preference.Id;
     }
 
     public async Task<MercadoPago.Resource.Payment.Payment> GetPaymentAsync(string paymentId)
