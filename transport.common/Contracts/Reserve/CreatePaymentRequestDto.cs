@@ -2,5 +2,4 @@
 
 //ReservePayment
 public record CreatePaymentRequestDto(decimal TransactionAmount,
-    int PaymentMethod,
-    string PayerDocumentNumber);
+    int PaymentMethod);

@@ -28,12 +28,6 @@ public class Reserve: Entity, IAuditable
     public ServiceSchedule ServiceSchedule { get; set; } = null!;
     public ICollection<Passenger> Passengers { get; set; } = new List<Passenger>();
 
-    // Agregar relación con el cliente que hizo la reserva
-    public int? BookedByCustomerId { get; set; }
-    public Customer? BookedByCustomer { get; set; }
-
-    public int? BookedByUserId { get; set; }
-    public User? BookedByUser { get; set; }
     public string CreatedBy { get; set; } = null!;
     public string? UpdatedBy { get; set; }
     public DateTime CreatedDate { get; set; } = DateTime.UtcNow;

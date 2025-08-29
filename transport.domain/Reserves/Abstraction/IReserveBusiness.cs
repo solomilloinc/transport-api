@@ -20,6 +20,7 @@ public interface IReserveBusiness
 
     Task<Result<bool>> UpdateReserveAsync(int reserveId, ReserveUpdateRequestDto request);
     Task<Result<bool>> CreatePaymentsAsync(
+    int customerId,
     int reserveId,
     List<CreatePaymentRequestDto> payments);
 

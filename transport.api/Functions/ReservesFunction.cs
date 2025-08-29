@@ -184,7 +184,7 @@ public class ReservesFunction : FunctionBase
         if (payments == null || !payments.Any())
             return req.CreateResponse(HttpStatusCode.BadRequest);
 
-        var result = await _reserveBusiness.CreatePaymentsAsync(reserveId, payments);
+        var result = await _reserveBusiness.CreatePaymentsAsync(customerId, reserveId, payments);
         return await MatchResultAsync(req, result);
     }
 

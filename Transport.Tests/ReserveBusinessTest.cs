@@ -159,7 +159,7 @@ public class ReserveBusinessTests : TestBase
             CustomerId = 1,
             FirstName = "Jane",
             LastName = "Smith",
-            DocumentNumber = "123456",
+            DocumentNumber = "12345678",
             Email = "jane@example.com",
             CurrentBalance = 0
         };
@@ -173,11 +173,20 @@ public class ReserveBusinessTests : TestBase
         var accountTransactionsList = new List<CustomerAccountTransaction>();
         _contextMock.Setup(c => c.CustomerAccountTransactions).Returns(GetMockDbSetWithIdentity(accountTransactionsList).Object);
 
-        _contextMock.Setup(c => c.Reserves).Returns(GetMockDbSetWithIdentity(reservesList).Object);
+        var customers = new List<Customer> { customer };
+        var directions = new List<Direction> { origin, destination };
+        var passengers = new List<Passenger>();
+        var users = new List<User>();
+
+        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(reservesList).Object);
         _contextMock.Setup(c => c.Vehicles.FindAsync(It.IsAny<int>())).ReturnsAsync(vehicle);
-        _contextMock.Setup(c => c.Services).Returns(GetMockDbSetWithIdentity(new List<Service> { service }).Object);
+        _contextMock.Setup(c => c.Services).Returns(GetQueryableMockDbSet(new List<Service> { service }).Object);
+        _contextMock.Setup(c => c.Customers).Returns(GetQueryableMockDbSet(customers).Object);
         _contextMock.Setup(c => c.Customers.FindAsync(It.IsAny<int>())).ReturnsAsync(customer);
+        _contextMock.Setup(c => c.Directions).Returns(GetQueryableMockDbSet(directions).Object);
         _contextMock.Setup(c => c.Directions.FindAsync(It.IsAny<int>())).ReturnsAsync(origin);
+        _contextMock.Setup(c => c.Passengers).Returns(GetMockDbSetWithIdentity(passengers).Object);
+        _contextMock.Setup(c => c.Users).Returns(GetQueryableMockDbSet(users).Object);
 
         _contextMock.Setup(c => c.Customers.Update(It.IsAny<Customer>())).Callback<Customer>(c =>
         {
@@ -192,7 +201,7 @@ public class ReserveBusinessTests : TestBase
                 It.IsAny<IsolationLevel>()))
             .Returns<Func<Task<Result<bool>>>, IsolationLevel>((func, _) => func());
 
-        var passengers = Enumerable.Range(1, reserveCount).Select(i =>
+        var passengersList = Enumerable.Range(1, reserveCount).Select(i =>
             new PassengerReserveCreateRequestDto(
                 ReserveId: i,
                 ReserveTypeId: (int)ReserveTypeIdEnum.IdaVuelta,
@@ -215,18 +224,18 @@ public class ReserveBusinessTests : TestBase
 
         if (paymentCount == 1)
         {
-            payments.Add(new CreatePaymentRequestDto(totalAmount, 1, "123"));
+            payments.Add(new CreatePaymentRequestDto(totalAmount, 1));
         }
         else
         {
             var partialAmount = totalAmount / paymentCount;
             for (int i = 0; i < paymentCount; i++)
             {
-                payments.Add(new CreatePaymentRequestDto(partialAmount, 1, "123"));
+                payments.Add(new CreatePaymentRequestDto(partialAmount, 1));
             }
         }
 
-        var request = new PassengerReserveCreateRequestWrapperDto(payments, passengers);
+        var request = new PassengerReserveCreateRequestWrapperDto(customer.CustomerId, payments, passengersList);
 
         // Act
         var result = await _reserveBusiness.CreatePassengerReserves(request);
@@ -320,13 +329,21 @@ public class ReserveBusinessTests : TestBase
         _contextMock.Setup(c => c.Directions.FindAsync(It.IsAny<int>())).ReturnsAsync(origin);
         _contextMock.Setup(c => c.Passengers).Returns(GetMockDbSetWithIdentity(passengers).Object);
         _contextMock.Setup(c => c.Reserves).Returns(GetMockDbSetWithIdentity(reservesList).Object);
+        _contextMock.Setup(c => c.Customers).Returns(GetMockDbSetWithIdentity(new List<Customer> { customer}).Object);
 
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
         // Setup usuario logueado
         _userContextMock.SetupGet(x => x.UserId).Returns(999);
-        var user = new User { UserId = 999, CustomerId = 123 };
-        _contextMock.Setup(c => c.Users.FindAsync(999)).ReturnsAsync(user);
+
+        var bookingCustomer = new Customer { CustomerId = 123, FirstName = "Pepe", LastName = "Argento" };
+        var user = new User { UserId = 999, CustomerId = 123, Customer = bookingCustomer };
+
+        _contextMock
+            .Setup(c => c.Users)
+            .Returns(GetMockDbSetWithIdentity(new List<User> { user }).Object);
+
+        _userContextMock.SetupGet(x => x.UserId).Returns(999);
 
         var paymentGatewayMock = new Mock<IMercadoPagoPaymentGateway>();
         paymentGatewayMock
@@ -404,16 +421,16 @@ public class ReserveBusinessTests : TestBase
         var request = new PassengerReserveCreateRequestWrapperExternalDto(paymentDto, passengerList);
 
         _unitOfWorkMock
-        .Setup(uow => uow.ExecuteInTransactionAsync<string>(
-            It.IsAny<Func<Task<Result<string>>>>(),
-            It.IsAny<IsolationLevel>()))
-        .Returns<Func<Task<Result<string>>>, IsolationLevel>((func, _) => func());
+    .Setup(u => u.ExecuteInTransactionAsync(
+        It.IsAny<Func<Task<Result<CreateReserveExternalResult>>>>(),
+        It.IsAny<IsolationLevel>()))
+    .Returns(async (Func<Task<Result<CreateReserveExternalResult>>> func, IsolationLevel _) => await func());
 
         _unitOfWorkMock
-            .Setup(uow => uow.ExecuteInTransactionAsync<bool>(
+            .Setup(u => u.ExecuteInTransactionAsync(
                 It.IsAny<Func<Task<Result<bool>>>>(),
                 It.IsAny<IsolationLevel>()))
-            .Returns<Func<Task<Result<bool>>>, IsolationLevel>(async (func, _) => await func());
+            .Returns(async (Func<Task<Result<bool>>> func, IsolationLevel _) => await func());
 
         // Act - Prueba con pago directo
         var result = await reserveBusiness.CreatePassengerReservesExternal(request);
@@ -511,45 +528,30 @@ public class ReserveBusinessTests : TestBase
     [Fact]
     public async Task CreatePaymentsAsync_ShouldFail_WhenReserveNotFound()
     {
-        _contextMock.Setup(c => c.Reserves.FindAsync(1)).ReturnsAsync((Reserve)null);
+        var reserves = new List<Reserve>();
+        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(reserves).Object);
 
         _unitOfWorkMock.Setup(uow => uow.ExecuteInTransactionAsync(It.IsAny<Func<Task<Result<bool>>>>(), It.IsAny<IsolationLevel>()))
                        .Returns<Func<Task<Result<bool>>>, IsolationLevel>(async (func, _) => await func());
 
-        var result = await _reserveBusiness.CreatePaymentsAsync(1, new List<CreatePaymentRequestDto>
+        var result = await _reserveBusiness.CreatePaymentsAsync(1, 1, new List<CreatePaymentRequestDto>
        {
-           new CreatePaymentRequestDto(1000, 1, "12345678")
+           new CreatePaymentRequestDto(1000, 1)
        });
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Should().Be(ReserveError.NotFound);
     }
 
-    [Fact]
-    public async Task CreatePaymentsAsync_ShouldFail_WhenCustomerNotFound()
-    {
-        _contextMock.Setup(c => c.Reserves.FindAsync(1)).ReturnsAsync(new Reserve { ReserveId = 1 });
-        _contextMock.Setup(c => c.Customers.FindAsync(1)).ReturnsAsync((Customer)null);
-
-        _unitOfWorkMock
-            .Setup(uow => uow.ExecuteInTransactionAsync<bool>(
-                It.IsAny<Func<Task<Result<bool>>>>(),
-                It.IsAny<IsolationLevel>()))
-            .Returns<Func<Task<Result<bool>>>, IsolationLevel>((func, _) => func());
-
-        var result = await _reserveBusiness.CreatePaymentsAsync(1, new List<CreatePaymentRequestDto>
-    {
-        new CreatePaymentRequestDto(1000, 1, "12345678")
-    });
-
-        result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Be(CustomerError.NotFound);
-    }
-
+   
     [Fact]
     public async Task CreatePaymentsAsync_ShouldFail_WhenPaymentsListIsEmpty()
     {
-        _contextMock.Setup(c => c.Reserves.FindAsync(1)).ReturnsAsync(new Reserve { ReserveId = 1 });
+        var passengers = new List<Passenger>();
+        var reserves = new List<Reserve> { new Reserve { ReserveId = 1, Passengers = passengers } };
+        var customers = new List<Customer> { new Customer { CustomerId = 1 } };
+        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(reserves).Object);
+        _contextMock.Setup(c => c.Customers).Returns(GetQueryableMockDbSet(customers).Object);
         _contextMock.Setup(c => c.Customers.FindAsync(1)).ReturnsAsync(new Customer { CustomerId = 1 });
 
         _unitOfWorkMock
@@ -558,7 +560,7 @@ public class ReserveBusinessTests : TestBase
               It.IsAny<IsolationLevel>()))
           .Returns<Func<Task<Result<bool>>>, IsolationLevel>((func, _) => func());
 
-        var result = await _reserveBusiness.CreatePaymentsAsync(1, new List<CreatePaymentRequestDto>());
+        var result = await _reserveBusiness.CreatePaymentsAsync(1, 1, new List<CreatePaymentRequestDto>());
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Code.Should().Be("Payments.Empty");
@@ -567,7 +569,11 @@ public class ReserveBusinessTests : TestBase
     [Fact]
     public async Task CreatePaymentsAsync_ShouldFail_WhenTransactionAmountIsInvalid()
     {
-        _contextMock.Setup(c => c.Reserves.FindAsync(1)).ReturnsAsync(new Reserve { ReserveId = 1 });
+        var passengers = new List<Passenger>();
+        var reserves = new List<Reserve> { new Reserve { ReserveId = 1, Passengers = passengers } };
+        var customers = new List<Customer> { new Customer { CustomerId = 1 } };
+        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(reserves).Object);
+        _contextMock.Setup(c => c.Customers).Returns(GetQueryableMockDbSet(customers).Object);
         _contextMock.Setup(c => c.Customers.FindAsync(1)).ReturnsAsync(new Customer { CustomerId = 1 });
 
         _unitOfWorkMock
@@ -576,10 +582,10 @@ public class ReserveBusinessTests : TestBase
              It.IsAny<IsolationLevel>()))
          .Returns<Func<Task<Result<bool>>>, IsolationLevel>((func, _) => func());
 
-        var result = await _reserveBusiness.CreatePaymentsAsync(1, new List<CreatePaymentRequestDto>
+        var result = await _reserveBusiness.CreatePaymentsAsync(1, 1, new List<CreatePaymentRequestDto>
     {
-        new CreatePaymentRequestDto(0, 1, "12345678"),
-        new CreatePaymentRequestDto(-100, 2, "12345678")
+        new CreatePaymentRequestDto(0, 1),
+        new CreatePaymentRequestDto(-100, 2)
     });
 
         result.IsSuccess.Should().BeFalse();
@@ -590,7 +596,11 @@ public class ReserveBusinessTests : TestBase
     [Fact]
     public async Task CreatePaymentsAsync_ShouldFail_WhenPaymentMethodsAreDuplicated()
     {
-        _contextMock.Setup(c => c.Reserves.FindAsync(1)).ReturnsAsync(new Reserve { ReserveId = 1 });
+        var passengers = new List<Passenger>();
+        var reserves = new List<Reserve> { new Reserve { ReserveId = 1, Passengers = passengers } };
+        var customers = new List<Customer> { new Customer { CustomerId = 1 } };
+        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(reserves).Object);
+        _contextMock.Setup(c => c.Customers).Returns(GetQueryableMockDbSet(customers).Object);
         _contextMock.Setup(c => c.Customers.FindAsync(1)).ReturnsAsync(new Customer { CustomerId = 1 });
 
         _unitOfWorkMock
@@ -599,10 +609,10 @@ public class ReserveBusinessTests : TestBase
             It.IsAny<IsolationLevel>()))
         .Returns<Func<Task<Result<bool>>>, IsolationLevel>((func, _) => func());
 
-        var result = await _reserveBusiness.CreatePaymentsAsync(1, new List<CreatePaymentRequestDto>
+        var result = await _reserveBusiness.CreatePaymentsAsync(1, 1, new List<CreatePaymentRequestDto>
     {
-        new CreatePaymentRequestDto(1000, 1, "12345678"),
-        new CreatePaymentRequestDto(2000, 1, "12345678")
+        new CreatePaymentRequestDto(1000, 1),
+        new CreatePaymentRequestDto(2000, 1)
     });
 
         result.IsSuccess.Should().BeFalse();
@@ -614,16 +624,23 @@ public class ReserveBusinessTests : TestBase
     public async Task CreatePaymentsAsync_ShouldSucceed_WhenValidPaymentsProvided()
     {
         var paymentsDb = new List<ReservePayment>();
-        var reserve = new Reserve { ReserveId = 1, ServiceId = 1 };
-        var customer = new Customer { CustomerId = 1 };
+        var passengers = new List<Passenger> { new Passenger { PassengerId = 1, ReserveId = 1, Price = 100 } };
+        var reserve = new Reserve { ReserveId = 1, ServiceId = 1, Passengers = passengers };
+        var reserves = new List<Reserve> { reserve };
+        var customer = new Customer { CustomerId = 1, DocumentNumber = "12345678" };
         var service = new Service { ServiceId = 1, ReservePrices = new List<ReservePrice> { new ReservePrice { ReserveTypeId = ReserveTypeIdEnum.Ida, Price = 100 } } };
 
-        _contextMock.Setup(c => c.Reserves.FindAsync(1)).ReturnsAsync(reserve);
+        var customers = new List<Customer> { customer };
+        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(reserves).Object);
+        _contextMock.Setup(c => c.Customers).Returns(GetQueryableMockDbSet(customers).Object);
         _contextMock.Setup(c => c.Customers.FindAsync(1)).ReturnsAsync(customer);
         _contextMock.Setup(c => c.Services).Returns(GetMockDbSetWithIdentity(new List<Service> { service }).Object);
 
+        var customerAccountTransactions = new List<CustomerAccountTransaction>();
         var reservePaymentsDbSet = GetMockDbSetWithIdentity(paymentsDb);
+        var customerAccountTransactionsDbSet = GetMockDbSetWithIdentity(customerAccountTransactions);
         _contextMock.Setup(c => c.ReservePayments).Returns(reservePaymentsDbSet.Object);
+        _contextMock.Setup(c => c.CustomerAccountTransactions).Returns(customerAccountTransactionsDbSet.Object);
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
         _unitOfWorkMock
@@ -632,10 +649,10 @@ public class ReserveBusinessTests : TestBase
                It.IsAny<IsolationLevel>()))
            .Returns<Func<Task<Result<bool>>>, IsolationLevel>((func, _) => func());
 
-        var result = await _reserveBusiness.CreatePaymentsAsync(1, new List<CreatePaymentRequestDto>
+        var result = await _reserveBusiness.CreatePaymentsAsync(1, 1, new List<CreatePaymentRequestDto>
     {
-        new CreatePaymentRequestDto(50, 1, "12345678"),
-        new CreatePaymentRequestDto(50, 2, "12345678")
+        new CreatePaymentRequestDto(50, 1),
+        new CreatePaymentRequestDto(50, 2)
     });
 
         result.IsSuccess.Should().BeTrue();
@@ -651,11 +668,14 @@ public class ReserveBusinessTests : TestBase
         // Arrange
         var reserveId = 1;
         var customerId = 1;
+        var passengers = new List<Passenger> { new Passenger { PassengerId = 1, ReserveId = reserveId, Price = 5000 } };
         var reserve = new Reserve
         {
             ReserveId = reserveId,
             ServiceId = 1,
+            Passengers = passengers
         };
+        var reserves = new List<Reserve> { reserve };
 
         var customer = new Customer { CustomerId = customerId };
 
@@ -674,12 +694,12 @@ public class ReserveBusinessTests : TestBase
 
         var payments = new List<CreatePaymentRequestDto>
     {
-        new CreatePaymentRequestDto(3000m, 1, "12345678"),
-        new CreatePaymentRequestDto(1000m, 2, "12345678")
+        new CreatePaymentRequestDto(3000m, 1),
+        new CreatePaymentRequestDto(1000m, 2)
     };
 
-        _contextMock.Setup(c => c.Reserves.FindAsync(reserveId))
-            .ReturnsAsync(reserve);
+        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(reserves).Object);
+
         _contextMock.Setup(c => c.Customers.FindAsync(customerId))
             .ReturnsAsync(customer);
         _contextMock.Setup(c => c.Services)
@@ -692,7 +712,7 @@ public class ReserveBusinessTests : TestBase
     .Returns<Func<Task<Result<bool>>>, IsolationLevel>((func, _) => func());
 
         // Act
-        var result = await _reserveBusiness.CreatePaymentsAsync(reserveId, payments);
+        var result = await _reserveBusiness.CreatePaymentsAsync(1, reserveId, payments);
 
         // Assert
         result.IsSuccess.Should().BeFalse();
