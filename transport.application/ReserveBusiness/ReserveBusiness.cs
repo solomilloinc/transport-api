@@ -518,8 +518,6 @@ public class ReserveBusiness : IReserveBusiness
         foreach (var p in allPassengers)
         {
             p.Status = passengerStatus;
-            p.UpdatedBy = "System";
-            p.UpdatedDate = DateTime.UtcNow;
             _context.Passengers.Update(p);
         }
 
