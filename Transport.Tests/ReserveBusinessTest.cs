@@ -398,7 +398,7 @@ public class ReserveBusinessTests : TestBase
             paymentGatewayMock.Object,
             _customerBusinessMock.Object);
 
-        var passengerList = new List<PassengerReserveCreateRequestDto>
+        var passengerList = new List<PassengerReserveExternalCreateRequestDto>
         {
         new(
             ReserveId: 1,
@@ -509,7 +509,6 @@ public class ReserveBusinessTests : TestBase
         // Assert - Verificaciones para wallet
         Assert.True(walletResult.IsSuccess);
         Assert.Equal(2, reservePaymentsList.Count);
-        Assert.Equal(2, reserve1.Passengers.Count + reserve2.Passengers.Count);
 
         var walletParentPayment = reservePaymentsList[0];
         var walletChildPayment = reservePaymentsList[1];

@@ -111,24 +111,14 @@ public class ReserveBusiness : IReserveBusiness
                 if (reservePrice is null || dto.Price != reservePrice.Price)
                     return Result.Failure<bool>(ReserveError.PriceNotAvailable);
 
-                if (reserve.Passengers.Any(p => p.DocumentNumber == dto.DocumentNumber))
-                    return Result.Failure<bool>(ReserveError.PassengerAlreadyExists(dto.DocumentNumber));
-
                 var pickupResult = await GetDirectionAsync(dto.PickupLocationId, "Pickup");
                 if (pickupResult.IsFailure) return Result.Failure<bool>(pickupResult.Error);
 
                 var dropoffResult = await GetDirectionAsync(dto.DropoffLocationId, "Dropoff");
                 if (dropoffResult.IsFailure) return Result.Failure<bool>(dropoffResult.Error);
-
-                // Registramos al pasajero (en admin usamos los datos del payer; ajusta si querés usar los del dto)
                 var passenger = new Passenger
                 {
                     ReserveId = reserve.ReserveId,
-                    FirstName = payer.FirstName,
-                    LastName = payer.LastName,
-                    DocumentNumber = payer.DocumentNumber,
-                    Email = payer.Email,
-                    Phone = payer.Phone1,
                     PickupLocationId = dto.PickupLocationId,
                     DropoffLocationId = dto.DropoffLocationId,
                     PickupAddress = pickupResult.Value?.Name,
@@ -136,7 +126,12 @@ public class ReserveBusiness : IReserveBusiness
                     HasTraveled = dto.HasTraveled,
                     Price = reservePrice.Price,
                     Status = PassengerStatusEnum.Confirmed,
-                    CustomerId = payer.CustomerId
+                    CustomerId = payer.CustomerId,
+                    DocumentNumber = payer.DocumentNumber,
+                    FirstName = payer.FirstName,
+                    LastName = payer.LastName,
+                    Phone = $"{payer.Phone1} / {payer.Phone2}",
+                    Email = payer.Email
                 };
 
                 reserve.Passengers.Add(passenger);
@@ -437,8 +432,6 @@ public class ReserveBusiness : IReserveBusiness
             Method = PaymentMethodEnum.Online,
             Status = StatusPaymentEnum.Pending,
             StatusDetail = "creating",
-            CreatedBy = "System",
-            CreatedDate = DateTime.UtcNow
         };
 
         _context.ReservePayments.Add(parentPayment);
@@ -480,8 +473,6 @@ public class ReserveBusiness : IReserveBusiness
         parentPayment.Status = statusPaymentInternal.Value;
         parentPayment.StatusDetail = result.StatusDetail;
         parentPayment.ResultApiExternalRawJson = JsonConvert.SerializeObject(result);
-        parentPayment.UpdatedBy = "System";
-        parentPayment.UpdatedDate = DateTime.UtcNow;
         _context.ReservePayments.Update(parentPayment);
 
         // 4) Crear HIJOS “link” (monto 0) para cada reserva adicional (vuelta, etc.)
@@ -499,8 +490,6 @@ public class ReserveBusiness : IReserveBusiness
                 Status = parentPayment.Status, // espejo del padre
                 StatusDetail = parentPayment.StatusDetail,
                 ParentReservePaymentId = parentPayment.ReservePaymentId,
-                CreatedBy = "System",
-                CreatedDate = DateTime.UtcNow
             };
             _context.ReservePayments.Add(child);
         }
@@ -529,7 +518,7 @@ public class ReserveBusiness : IReserveBusiness
     private async Task<Result<int>> CreatePendingPayment(
       decimal amount,
       List<Reserve> reserves,
-      PassengerReserveCreateRequestDto firstPassenger)
+      PassengerReserveExternalCreateRequestDto firstPassenger)
     {
         // Ordenar reservas para decidir padre/hijos
         var orderedReserves = reserves
@@ -558,8 +547,6 @@ public class ReserveBusiness : IReserveBusiness
             Status = StatusPaymentEnum.Pending,
             StatusDetail = "wallet_pending",
             ResultApiExternalRawJson = null,
-            CreatedBy = "System",
-            CreatedDate = DateTime.UtcNow
         };
 
         _context.ReservePayments.Add(parentPayment);
@@ -580,8 +567,6 @@ public class ReserveBusiness : IReserveBusiness
                 Status = StatusPaymentEnum.Pending,
                 StatusDetail = "wallet_pending",
                 ParentReservePaymentId = parentPayment.ReservePaymentId,
-                CreatedBy = "System",
-                CreatedDate = DateTime.UtcNow
             };
             _context.ReservePayments.Add(child);
         }
@@ -621,7 +606,7 @@ public class ReserveBusiness : IReserveBusiness
         return $"Reserva(s): {desc1}; {desc2}";
     }
 
-    private Result ValidateUserReserveCombination(List<PassengerReserveCreateRequestDto> items)
+    private Result ValidateUserReserveCombination(List<PassengerReserveExternalCreateRequestDto> items)
     {
         if (items == null || items.Count == 0)
             return Result.Failure(ReserveError.InvalidReserveCombination("No hay ítems para validar."));
@@ -752,8 +737,6 @@ public class ReserveBusiness : IReserveBusiness
             {
                 child.Status = parentPayment.Status;
                 child.StatusDetail = parentPayment.StatusDetail;
-                child.UpdatedBy = "System";
-                child.UpdatedDate = DateTime.UtcNow;
                 _context.ReservePayments.Update(child);
             }
 
@@ -775,8 +758,6 @@ public class ReserveBusiness : IReserveBusiness
                 foreach (var passenger in reserve.Passengers)
                 {
                     passenger.Status = newPassengerStatus;
-                    passenger.UpdatedBy = "System";
-                    passenger.UpdatedDate = DateTime.UtcNow;
                     _context.Passengers.Update(passenger);
                 }
             }

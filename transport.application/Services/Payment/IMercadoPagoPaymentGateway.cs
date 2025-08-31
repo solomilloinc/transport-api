@@ -6,6 +6,6 @@ namespace Transport.Business.Services.Payment;
 public interface IMercadoPagoPaymentGateway
 {
     Task<MercadoPago.Resource.Payment.Payment> CreatePaymentAsync(PaymentCreateRequest request);
-    Task<string> CreatePreferenceAsync(string externalReference, decimal totalAmount, List<PassengerReserveCreateRequestDto> passengers);
+    Task<string> CreatePreferenceAsync(string externalReference, decimal totalAmount, List<PassengerReserveExternalCreateRequestDto> passengers);
     Task<MercadoPago.Resource.Payment.Payment> GetPaymentAsync(string paymentId);
 }

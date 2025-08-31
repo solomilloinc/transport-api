@@ -7,7 +7,7 @@ namespace Transport.Business.ReserveBusiness.Validation
     {
         public PassengerReserveCreateRequestWrapperValidator()
         {
-            RuleForEach(x => x.Items).SetValidator(new CustomerReserveCreateRequestDtoValidator());
+            RuleForEach(x => x.Items).SetValidator(new PassengerReserveCreateRequestDtoValidator());
             RuleForEach(x => x.Payments).SetValidator(new PaymentCreateRequestValidator());
         }
     }

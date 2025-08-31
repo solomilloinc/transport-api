@@ -8,6 +8,6 @@ internal class PassengerReserveCreateRequestWrapperExternalValidator : AbstractV
     public PassengerReserveCreateRequestWrapperExternalValidator()
     {
         RuleFor(x => x.Payment).SetValidator(new CreatePaymentExternalRequestValidator());
-        RuleForEach(x => x.Items).SetValidator(new CustomerReserveCreateRequestDtoValidator());
+        RuleForEach(x => x.Items).SetValidator(new PassengerReserveExternalCreateRequestDtoValidator());
     }
 }

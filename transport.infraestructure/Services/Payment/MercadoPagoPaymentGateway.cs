@@ -24,7 +24,7 @@ public class MercadoPagoPaymentGateway : IMercadoPagoPaymentGateway
         return await client.CreateAsync(request);
     }
 
-    public async Task<string> CreatePreferenceAsync(string externalReference, decimal totalAmount, List<PassengerReserveCreateRequestDto> passengers)
+    public async Task<string> CreatePreferenceAsync(string externalReference, decimal totalAmount, List<PassengerReserveExternalCreateRequestDto> passengers)
     {
         MercadoPagoConfig.AccessToken = _mpIntegrationOption.AccessToken;
 
