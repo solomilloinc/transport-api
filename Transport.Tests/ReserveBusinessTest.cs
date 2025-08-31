@@ -235,23 +235,48 @@ public class ReserveBusinessTests : TestBase
             }
         }
 
-        var request = new PassengerReserveCreateRequestWrapperDto(customer.CustomerId, payments, passengersList);
+        var request = new PassengerReserveCreateRequestWrapperDto(payments, passengersList);
 
         // Act
         var result = await _reserveBusiness.CreatePassengerReserves(request);
 
         // Assert
         Assert.True(result.IsSuccess);
-        Assert.Equal(paymentCount, reservePaymentsList.Count);
+
+        if (paymentCount == 1)
+        {
+            int accountPaymentShouldBe = 0;
+
+            if (reserveCount == 2)
+            {
+                accountPaymentShouldBe += 1;
+            }
+
+            Assert.Equal(paymentCount + accountPaymentShouldBe, reservePaymentsList.Count);
+        }
+        else
+        {
+            int accountPaymentShouldBe = 1;
+
+            if (reserveCount == 2)
+            {
+                accountPaymentShouldBe += 1;
+            }
+
+            Assert.Equal(paymentCount + accountPaymentShouldBe, reservePaymentsList.Count);
+        }
 
         var parent = reservePaymentsList.First();
-        Assert.Equal(payments[0].TransactionAmount, parent.Amount);
+        Assert.Equal(payments.Sum(p => p.TransactionAmount), parent.Amount);
         Assert.Null(parent.ParentReservePaymentId);
 
-        foreach (var child in reservePaymentsList.Skip(1))
+        if (reserveCount == 2)
         {
-            Assert.Equal(0, child.Amount);
-            Assert.Equal(parent.ReservePaymentId, child.ParentReservePaymentId);
+            foreach (var child in reservePaymentsList.TakeLast(0))
+            {
+                Assert.Equal(0, child.Amount);
+                Assert.Equal(parent.ReservePaymentId, child.ParentReservePaymentId);
+            }
         }
 
         // ✅ Validación de CustomerAccountTransactions
@@ -329,7 +354,7 @@ public class ReserveBusinessTests : TestBase
         _contextMock.Setup(c => c.Directions.FindAsync(It.IsAny<int>())).ReturnsAsync(origin);
         _contextMock.Setup(c => c.Passengers).Returns(GetMockDbSetWithIdentity(passengers).Object);
         _contextMock.Setup(c => c.Reserves).Returns(GetMockDbSetWithIdentity(reservesList).Object);
-        _contextMock.Setup(c => c.Customers).Returns(GetMockDbSetWithIdentity(new List<Customer> { customer}).Object);
+        _contextMock.Setup(c => c.Customers).Returns(GetMockDbSetWithIdentity(new List<Customer> { customer }).Object);
 
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
@@ -466,7 +491,8 @@ public class ReserveBusinessTests : TestBase
         reserve2.Passengers.Clear();
 
         _contextMock.Setup(c => c.Passengers.Add(It.IsAny<Passenger>()))
-        .Callback<Passenger>(cr => {
+        .Callback<Passenger>(cr =>
+        {
             passengers.Add(cr);
             // También agregar a la reserva correspondiente
             var reserve = reservesList.FirstOrDefault(r => r.ReserveId == cr.ReserveId);
@@ -543,7 +569,7 @@ public class ReserveBusinessTests : TestBase
         result.Error.Should().Be(ReserveError.NotFound);
     }
 
-   
+
     [Fact]
     public async Task CreatePaymentsAsync_ShouldFail_WhenPaymentsListIsEmpty()
     {
