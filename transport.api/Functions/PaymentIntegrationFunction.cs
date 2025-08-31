@@ -1,11 +1,12 @@
-﻿using System.Net;
+﻿using Microsoft.Azure.Functions.Worker;
+using Microsoft.Azure.Functions.Worker.Http;
+using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Attributes;
+using Microsoft.Extensions.Logging;
+using Newtonsoft.Json.Linq;
+using System.Net;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
-using Microsoft.Azure.Functions.Worker;
-using Microsoft.Azure.Functions.Worker.Http;
-using Microsoft.Extensions.Logging;
-using Newtonsoft.Json.Linq;
 using Transport.Domain.Reserves.Abstraction;
 using Transport.SharedKernel.Configuration;
 
@@ -68,6 +69,22 @@ public class PaymentIntegrationFunction
         var invalidResp = req.CreateResponse(HttpStatusCode.BadRequest);
         await invalidResp.WriteStringAsync("Evento no manejado o sin ID.");
         return invalidResp;
+    }
+
+
+
+    [Function("WalletForSuccess")]
+    [OpenApiOperation(operationId: "wallet-for-success", tags: new[] { "Reserves" })]
+    [OpenApiResponseWithoutBody(statusCode: HttpStatusCode.OK, Description = "Future reserves generated successfully")]
+    public async Task<HttpResponseData> WalletForSuccess(
+     [HttpTrigger(AuthorizationLevel.Anonymous, "get", "post")] HttpRequestData req)
+    {
+        _logger.LogInformation("C# HTTP trigger function processed a request.");
+
+        var response = req.CreateResponse(HttpStatusCode.OK);
+        await response.WriteStringAsync("El Pago por wallet salió ok.");
+
+        return response;
     }
 
     private bool IsValidMercadoPagoHmacSignature(HttpRequestData req, string? signatureHeader, string? requestIdHeader, string? dataIdQuery, string secret)

@@ -210,12 +210,7 @@ public class ReserveBusinessTests : TestBase
                 PickupLocationId: 1,
                 DropoffLocationId: 2,
                 HasTraveled: false,
-                Price: 100,
-                FirstName: "Test",
-                LastName: "Yuse",
-                Email: null,
-                Phone1: "222777777",
-                DocumentNumber: "12345678"
+                Price: 100
             )
         ).ToList();
 

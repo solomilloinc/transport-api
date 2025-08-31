@@ -21,6 +21,7 @@ using Transport.Domain.Vehicles;
 using Transport.SharedKernel;
 using Transport.SharedKernel.Contracts.Customer;
 using Transport.SharedKernel.Contracts.Passenger;
+using Transport.SharedKernel.Contracts.Payment;
 using Transport.SharedKernel.Contracts.Reserve;
 using Transport.SharedKernel.Contracts.Service;
 
@@ -703,6 +704,11 @@ public class ReserveBusiness : IReserveBusiness
         }
 
         Payment mpPayment = await _paymentGateway.GetPaymentAsync(externalPaymentId);
+
+        if (mpPayment.Status.Equals("in_process") || mpPayment.Status.Equals("pending"))
+        {
+            return true;
+        }
 
         return await _unitOfWork.ExecuteInTransactionAsync(async () =>
         {
