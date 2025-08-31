@@ -435,32 +435,6 @@ namespace Transport.Infraestructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "CustomerBookingHistory",
-                columns: table => new
-                {
-                    CustomerBookingHistoryId = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    CustomerId = table.Column<int>(type: "int", nullable: false),
-                    ReserveId = table.Column<int>(type: "int", nullable: false),
-                    Role = table.Column<string>(type: "VARCHAR(20)", nullable: false),
-                    BookingDate = table.Column<DateTime>(type: "datetime2", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_CustomerBookingHistory", x => x.CustomerBookingHistoryId);
-                    table.ForeignKey(
-                        name: "FK_CustomerBookingHistory_Customer_CustomerId",
-                        column: x => x.CustomerId,
-                        principalTable: "Customer",
-                        principalColumn: "CustomerId");
-                    table.ForeignKey(
-                        name: "FK_CustomerBookingHistory_Reserve_ReserveId",
-                        column: x => x.ReserveId,
-                        principalTable: "Reserve",
-                        principalColumn: "ReserveId");
-                });
-
-            migrationBuilder.CreateTable(
                 name: "Passenger",
                 columns: table => new
                 {
@@ -613,8 +587,8 @@ namespace Transport.Infraestructure.Migrations
                 columns: new[] { "RoleId", "CreatedBy", "CreatedDate", "Name", "UpdatedBy", "UpdatedDate" },
                 values: new object[,]
                 {
-                    { 1, "System", new DateTime(2025, 8, 29, 21, 26, 36, 204, DateTimeKind.Utc).AddTicks(2800), "Administrador", null, null },
-                    { 2, "System", new DateTime(2025, 8, 29, 21, 26, 36, 204, DateTimeKind.Utc).AddTicks(2803), "Cliente", null, null }
+                    { 1, "System", new DateTime(2025, 8, 31, 21, 9, 34, 705, DateTimeKind.Utc).AddTicks(2618), "Administrador", null, null },
+                    { 2, "System", new DateTime(2025, 8, 31, 21, 9, 34, 705, DateTimeKind.Utc).AddTicks(2620), "Cliente", null, null }
                 });
 
             migrationBuilder.CreateIndex(
@@ -659,22 +633,6 @@ namespace Transport.Infraestructure.Migrations
                 name: "IX_CustomerAccountTransactions_Type",
                 table: "CustomerAccountTransactions",
                 column: "Type");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_CustomerBookingHistory_BookingDate",
-                table: "CustomerBookingHistory",
-                column: "BookingDate");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_CustomerBookingHistory_CustomerId_ReserveId_Role",
-                table: "CustomerBookingHistory",
-                columns: new[] { "CustomerId", "ReserveId", "Role" },
-                unique: true);
-
-            migrationBuilder.CreateIndex(
-                name: "IX_CustomerBookingHistory_ReserveId",
-                table: "CustomerBookingHistory",
-                column: "ReserveId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Direction_CityId",
@@ -853,9 +811,6 @@ namespace Transport.Infraestructure.Migrations
         {
             migrationBuilder.DropTable(
                 name: "CustomerAccountTransactions");
-
-            migrationBuilder.DropTable(
-                name: "CustomerBookingHistory");
 
             migrationBuilder.DropTable(
                 name: "Holiday");

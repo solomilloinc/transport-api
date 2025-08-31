@@ -16,6 +16,10 @@ CREATE TABLE [City] (
     [Code] nvarchar(50) NOT NULL,
     [Name] nvarchar(100) NOT NULL,
     [Status] int NOT NULL,
+    [CreatedBy] VARCHAR(256) NOT NULL DEFAULT 'System',
+    [UpdatedBy] VARCHAR(256) NULL,
+    [CreatedDate] datetime2 NOT NULL DEFAULT (GETDATE()),
+    [UpdatedDate] datetime2 NULL,
     CONSTRAINT [PK_City] PRIMARY KEY ([CityId])
 );
 GO
@@ -29,6 +33,11 @@ CREATE TABLE [Customer] (
     [Phone1] nvarchar(20) NOT NULL,
     [Phone2] nvarchar(20) NULL,
     [Status] int NOT NULL,
+    [CurrentBalance] decimal(18,2) NOT NULL DEFAULT 0.0,
+    [CreatedBy] VARCHAR(256) NOT NULL DEFAULT 'System',
+    [UpdatedBy] VARCHAR(256) NULL,
+    [CreatedDate] datetime2 NOT NULL DEFAULT (GETDATE()),
+    [UpdatedDate] datetime2 NULL,
     CONSTRAINT [PK_Customer] PRIMARY KEY ([CustomerId])
 );
 GO
@@ -39,6 +48,10 @@ CREATE TABLE [Driver] (
     [LastName] nvarchar(100) NOT NULL,
     [DocumentNumber] nvarchar(50) NOT NULL,
     [Status] int NOT NULL,
+    [CreatedBy] VARCHAR(256) NOT NULL DEFAULT 'System',
+    [UpdatedBy] VARCHAR(256) NULL,
+    [CreatedDate] datetime2 NOT NULL DEFAULT (GETDATE()),
+    [UpdatedDate] datetime2 NULL,
     CONSTRAINT [PK_Driver] PRIMARY KEY ([DriverId])
 );
 GO
@@ -47,6 +60,10 @@ CREATE TABLE [Holiday] (
     [HolidayId] int NOT NULL IDENTITY,
     [HolidayDate] datetime2 NOT NULL,
     [Description] nvarchar(255) NOT NULL,
+    [CreatedBy] VARCHAR(256) NOT NULL DEFAULT 'System',
+    [UpdatedBy] VARCHAR(256) NULL,
+    [CreatedDate] datetime2 NOT NULL DEFAULT (GETDATE()),
+    [UpdatedDate] datetime2 NULL,
     CONSTRAINT [PK_Holiday] PRIMARY KEY ([HolidayId])
 );
 GO
@@ -66,6 +83,10 @@ GO
 CREATE TABLE [Role] (
     [RoleId] int NOT NULL IDENTITY,
     [Name] nvarchar(250) NOT NULL,
+    [CreatedBy] VARCHAR(256) NOT NULL DEFAULT 'System',
+    [UpdatedBy] VARCHAR(256) NULL,
+    [CreatedDate] datetime2 NOT NULL DEFAULT (GETDATE()),
+    [UpdatedDate] datetime2 NULL,
     CONSTRAINT [PK_Role] PRIMARY KEY ([RoleId])
 );
 GO
@@ -76,14 +97,25 @@ CREATE TABLE [VehicleType] (
     [Quantity] int NOT NULL,
     [ImageBase64] text NULL,
     [Status] int NOT NULL,
+    [CreatedBy] VARCHAR(256) NOT NULL DEFAULT 'System',
+    [UpdatedBy] VARCHAR(256) NULL,
+    [CreatedDate] datetime2 NOT NULL DEFAULT (GETDATE()),
+    [UpdatedDate] datetime2 NULL,
     CONSTRAINT [PK_VehicleType] PRIMARY KEY ([VehicleTypeId])
 );
 GO
 
 CREATE TABLE [Direction] (
     [DirectionId] int NOT NULL IDENTITY,
-    [Name] nvarchar(250) NOT NULL,
+    [Name] VARCHAR(250) NOT NULL,
+    [Lat] float NULL,
+    [Lng] float NULL,
     [CityId] int NOT NULL,
+    [Status] int NOT NULL,
+    [CreatedBy] VARCHAR(256) NOT NULL DEFAULT 'System',
+    [UpdatedBy] VARCHAR(256) NULL,
+    [CreatedDate] datetime2 NOT NULL DEFAULT (GETDATE()),
+    [UpdatedDate] datetime2 NULL,
     CONSTRAINT [PK_Direction] PRIMARY KEY ([DirectionId]),
     CONSTRAINT [FK_Direction_City_CityId] FOREIGN KEY ([CityId]) REFERENCES [City] ([CityId]) ON DELETE CASCADE
 );
@@ -108,197 +140,13 @@ CREATE TABLE [Vehicle] (
     [InternalNumber] nvarchar(50) NOT NULL,
     [Status] int NOT NULL,
     [AvailableQuantity] int NOT NULL,
+    [CreatedBy] VARCHAR(256) NOT NULL DEFAULT 'System',
+    [UpdatedBy] VARCHAR(256) NULL,
+    [CreatedDate] datetime2 NOT NULL DEFAULT (GETDATE()),
+    [UpdatedDate] datetime2 NULL,
     CONSTRAINT [PK_Vehicle] PRIMARY KEY ([VehicleId]),
     CONSTRAINT [FK_Vehicle_VehicleType_VehicleTypeId] FOREIGN KEY ([VehicleTypeId]) REFERENCES [VehicleType] ([VehicleTypeId]) ON DELETE CASCADE
 );
-GO
-
-CREATE TABLE [Service] (
-    [ServiceId] int NOT NULL IDENTITY,
-    [Name] nvarchar(250) NOT NULL,
-    [StartDay] int NOT NULL,
-    [EndDay] int NOT NULL,
-    [OriginId] int NOT NULL,
-    [DestinationId] int NOT NULL,
-    [EstimatedDuration] time NOT NULL,
-    [DepartureHour] time NOT NULL,
-    [IsHoliday] bit NOT NULL,
-    [VehicleId] int NOT NULL,
-    [Status] int NOT NULL,
-    CONSTRAINT [PK_Service] PRIMARY KEY ([ServiceId]),
-    CONSTRAINT [FK_Service_City_DestinationId] FOREIGN KEY ([DestinationId]) REFERENCES [City] ([CityId]) ON DELETE NO ACTION,
-    CONSTRAINT [FK_Service_City_OriginId] FOREIGN KEY ([OriginId]) REFERENCES [City] ([CityId]) ON DELETE NO ACTION,
-    CONSTRAINT [FK_Service_Vehicle_VehicleId] FOREIGN KEY ([VehicleId]) REFERENCES [Vehicle] ([VehicleId]) ON DELETE CASCADE
-);
-GO
-
-CREATE TABLE [Reserve] (
-    [ReserveId] int NOT NULL IDENTITY,
-    [ReserveDate] datetime2 NOT NULL,
-    [Status] nvarchar(max) NOT NULL,
-    [VehicleId] int NOT NULL,
-    [DriverId] int NULL,
-    [ServiceId] int NOT NULL,
-    CONSTRAINT [PK_Reserve] PRIMARY KEY ([ReserveId]),
-    CONSTRAINT [FK_Reserve_Driver_DriverId] FOREIGN KEY ([DriverId]) REFERENCES [Driver] ([DriverId]),
-    CONSTRAINT [FK_Reserve_Service_ServiceId] FOREIGN KEY ([ServiceId]) REFERENCES [Service] ([ServiceId]) ON DELETE CASCADE,
-    CONSTRAINT [FK_Reserve_Vehicle_VehicleId] FOREIGN KEY ([VehicleId]) REFERENCES [Vehicle] ([VehicleId]) ON DELETE NO ACTION
-);
-GO
-
-CREATE TABLE [ReservePrice] (
-    [ReservePriceId] int NOT NULL IDENTITY,
-    [ServiceId] int NOT NULL,
-    [Price] decimal(10,2) NOT NULL,
-    [ReserveTypeId] int NOT NULL,
-    CONSTRAINT [PK_ReservePrice] PRIMARY KEY ([ReservePriceId]),
-    CONSTRAINT [FK_ReservePrice_Service_ServiceId] FOREIGN KEY ([ServiceId]) REFERENCES [Service] ([ServiceId]) ON DELETE CASCADE
-);
-GO
-
-CREATE TABLE [ServiceCustomer] (
-    [ServiceCustomerId] int NOT NULL IDENTITY,
-    [ServiceId] int NOT NULL,
-    [CustomerId] int NOT NULL,
-    CONSTRAINT [PK_ServiceCustomer] PRIMARY KEY ([ServiceCustomerId]),
-    CONSTRAINT [FK_ServiceCustomer_Customer_CustomerId] FOREIGN KEY ([CustomerId]) REFERENCES [Customer] ([CustomerId]) ON DELETE CASCADE,
-    CONSTRAINT [FK_ServiceCustomer_Service_ServiceId] FOREIGN KEY ([ServiceId]) REFERENCES [Service] ([ServiceId]) ON DELETE CASCADE
-);
-GO
-
-CREATE TABLE [CustomerReserve] (
-    [CustomerReserveId] int NOT NULL IDENTITY,
-    [CustomerId] int NOT NULL,
-    [ReserveId] int NOT NULL,
-    [IsPayment] bit NOT NULL,
-    [StatusPayment] int NOT NULL,
-    [Price] decimal(10,2) NOT NULL,
-    [PickupLocationId] int NOT NULL,
-    [DropoffLocationId] int NOT NULL,
-    [HasTraveled] bit NOT NULL DEFAULT CAST(0 AS bit),
-    CONSTRAINT [PK_CustomerReserve] PRIMARY KEY ([CustomerReserveId]),
-    CONSTRAINT [FK_CustomerReserve_Customer_CustomerId] FOREIGN KEY ([CustomerId]) REFERENCES [Customer] ([CustomerId]) ON DELETE CASCADE,
-    CONSTRAINT [FK_CustomerReserve_Direction_DropoffLocationId] FOREIGN KEY ([DropoffLocationId]) REFERENCES [Direction] ([DirectionId]),
-    CONSTRAINT [FK_CustomerReserve_Direction_PickupLocationId] FOREIGN KEY ([PickupLocationId]) REFERENCES [Direction] ([DirectionId]),
-    CONSTRAINT [FK_CustomerReserve_Reserve_ReserveId] FOREIGN KEY ([ReserveId]) REFERENCES [Reserve] ([ReserveId]) ON DELETE CASCADE
-);
-GO
-
-IF EXISTS (SELECT * FROM [sys].[identity_columns] WHERE [name] IN (N'RoleId', N'Name') AND [object_id] = OBJECT_ID(N'[Role]'))
-    SET IDENTITY_INSERT [Role] ON;
-INSERT INTO [Role] ([RoleId], [Name])
-VALUES (1, N'Administrador'),
-(2, N'Cliente');
-IF EXISTS (SELECT * FROM [sys].[identity_columns] WHERE [name] IN (N'RoleId', N'Name') AND [object_id] = OBJECT_ID(N'[Role]'))
-    SET IDENTITY_INSERT [Role] OFF;
-GO
-
-CREATE UNIQUE INDEX [IX_City_Code] ON [City] ([Code]);
-GO
-
-CREATE UNIQUE INDEX [IX_Customer_DocumentNumber] ON [Customer] ([DocumentNumber]);
-GO
-
-CREATE UNIQUE INDEX [IX_Customer_Email] ON [Customer] ([Email]);
-GO
-
-CREATE INDEX [IX_CustomerReserve_CustomerId] ON [CustomerReserve] ([CustomerId]);
-GO
-
-CREATE INDEX [IX_CustomerReserve_DropoffLocationId] ON [CustomerReserve] ([DropoffLocationId]);
-GO
-
-CREATE INDEX [IX_CustomerReserve_PickupLocationId] ON [CustomerReserve] ([PickupLocationId]);
-GO
-
-CREATE INDEX [IX_CustomerReserve_ReserveId] ON [CustomerReserve] ([ReserveId]);
-GO
-
-CREATE INDEX [IX_Direction_CityId] ON [Direction] ([CityId]);
-GO
-
-CREATE UNIQUE INDEX [IX_Driver_DocumentNumber] ON [Driver] ([DocumentNumber]);
-GO
-
-CREATE UNIQUE INDEX [IX_Holiday_HolidayDate] ON [Holiday] ([HolidayDate]);
-GO
-
-CREATE INDEX [IX_Reserve_DriverId] ON [Reserve] ([DriverId]);
-GO
-
-CREATE INDEX [IX_Reserve_ServiceId] ON [Reserve] ([ServiceId]);
-GO
-
-CREATE INDEX [IX_Reserve_VehicleId] ON [Reserve] ([VehicleId]);
-GO
-
-CREATE INDEX [IX_ReservePrice_ServiceId] ON [ReservePrice] ([ServiceId]);
-GO
-
-CREATE INDEX [IX_Service_DestinationId] ON [Service] ([DestinationId]);
-GO
-
-CREATE INDEX [IX_Service_OriginId] ON [Service] ([OriginId]);
-GO
-
-CREATE INDEX [IX_Service_VehicleId] ON [Service] ([VehicleId]);
-GO
-
-CREATE INDEX [IX_ServiceCustomer_CustomerId] ON [ServiceCustomer] ([CustomerId]);
-GO
-
-CREATE INDEX [IX_ServiceCustomer_ServiceId] ON [ServiceCustomer] ([ServiceId]);
-GO
-
-CREATE UNIQUE INDEX [IX_User_CustomerId] ON [User] ([CustomerId]) WHERE [CustomerId] IS NOT NULL;
-GO
-
-CREATE INDEX [IX_User_RoleId] ON [User] ([RoleId]);
-GO
-
-CREATE INDEX [IX_Vehicle_VehicleTypeId] ON [Vehicle] ([VehicleTypeId]);
-GO
-
-CREATE UNIQUE INDEX [IX_VehicleType_Name] ON [VehicleType] ([Name]);
-GO
-
-INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
-VALUES (N'20250502194209_InitialMigration', N'8.0.14');
-GO
-
-COMMIT;
-GO
-
-BEGIN TRANSACTION;
-GO
-
-ALTER TABLE [Direction] ADD [Lat] float NULL;
-GO
-
-ALTER TABLE [Direction] ADD [Lng] float NULL;
-GO
-
-INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
-VALUES (N'20250504002738_InitialMigration-pt2', N'8.0.14');
-GO
-
-COMMIT;
-GO
-
-BEGIN TRANSACTION;
-GO
-
-ALTER TABLE [ReservePrice] ADD [Status] int NOT NULL DEFAULT 1;
-GO
-
-INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
-VALUES (N'20250507224207_InitialMigration-pt3', N'8.0.14');
-GO
-
-COMMIT;
-GO
-
-BEGIN TRANSACTION;
 GO
 
 CREATE TABLE [RefreshToken] (
@@ -311,386 +159,61 @@ CREATE TABLE [RefreshToken] (
     [RevokedAt] datetime2 NULL,
     [RevokedByIp] nvarchar(45) NULL,
     [ReplacedByToken] nvarchar(100) NULL,
+    [CreatedBy] VARCHAR(256) NOT NULL DEFAULT 'System',
+    [UpdatedBy] VARCHAR(256) NULL,
+    [CreatedDate] datetime2 NOT NULL DEFAULT (GETDATE()),
+    [UpdatedDate] datetime2 NULL,
     CONSTRAINT [PK_RefreshToken] PRIMARY KEY ([Id]),
     CONSTRAINT [FK_RefreshToken_User_UserId] FOREIGN KEY ([UserId]) REFERENCES [User] ([UserId]) ON DELETE CASCADE
 );
 GO
 
-CREATE INDEX [IX_RefreshToken_UserId] ON [RefreshToken] ([UserId]);
-GO
-
-INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
-VALUES (N'20250510200933_InitialMigration-pt4', N'8.0.14');
-GO
-
-COMMIT;
-GO
-
-BEGIN TRANSACTION;
-GO
-
-DROP INDEX [IX_ReservePrice_ServiceId] ON [ReservePrice];
-GO
-
-ALTER TABLE [VehicleType] ADD [CreatedBy] VARCHAR(256) NOT NULL DEFAULT 'System';
-GO
-
-ALTER TABLE [VehicleType] ADD [CreatedDate] datetime2 NOT NULL DEFAULT (GETDATE());
-GO
-
-ALTER TABLE [VehicleType] ADD [UpdatedBy] VARCHAR(256) NULL;
-GO
-
-ALTER TABLE [VehicleType] ADD [UpdatedDate] datetime2 NULL;
-GO
-
-ALTER TABLE [Vehicle] ADD [CreatedBy] VARCHAR(256) NOT NULL DEFAULT 'System';
-GO
-
-ALTER TABLE [Vehicle] ADD [CreatedDate] datetime2 NOT NULL DEFAULT (GETDATE());
-GO
-
-ALTER TABLE [Vehicle] ADD [UpdatedBy] VARCHAR(256) NULL;
-GO
-
-ALTER TABLE [Vehicle] ADD [UpdatedDate] datetime2 NULL;
-GO
-
-ALTER TABLE [ServiceCustomer] ADD [CreatedBy] VARCHAR(256) NOT NULL DEFAULT 'System';
-GO
-
-ALTER TABLE [ServiceCustomer] ADD [CreatedDate] datetime2 NOT NULL DEFAULT (GETDATE());
-GO
-
-ALTER TABLE [ServiceCustomer] ADD [UpdatedBy] VARCHAR(256) NULL;
-GO
-
-ALTER TABLE [ServiceCustomer] ADD [UpdatedDate] datetime2 NULL;
-GO
-
-ALTER TABLE [Service] ADD [CreatedBy] VARCHAR(256) NOT NULL DEFAULT 'System';
-GO
-
-ALTER TABLE [Service] ADD [CreatedDate] datetime2 NOT NULL DEFAULT (GETDATE());
-GO
-
-ALTER TABLE [Service] ADD [UpdatedBy] VARCHAR(256) NULL;
-GO
-
-ALTER TABLE [Service] ADD [UpdatedDate] datetime2 NULL;
-GO
-
-ALTER TABLE [Role] ADD [CreatedBy] VARCHAR(256) NOT NULL DEFAULT 'System';
-GO
-
-ALTER TABLE [Role] ADD [CreatedDate] datetime2 NOT NULL DEFAULT (GETDATE());
-GO
-
-ALTER TABLE [Role] ADD [UpdatedBy] VARCHAR(256) NULL;
-GO
-
-ALTER TABLE [Role] ADD [UpdatedDate] datetime2 NULL;
-GO
-
-ALTER TABLE [ReservePrice] ADD [CreatedBy] VARCHAR(256) NOT NULL DEFAULT 'System';
-GO
-
-ALTER TABLE [ReservePrice] ADD [CreatedDate] datetime2 NOT NULL DEFAULT (GETDATE());
-GO
-
-ALTER TABLE [ReservePrice] ADD [UpdatedBy] VARCHAR(256) NULL;
-GO
-
-ALTER TABLE [ReservePrice] ADD [UpdatedDate] datetime2 NULL;
-GO
-
-ALTER TABLE [Reserve] ADD [CreatedBy] VARCHAR(256) NOT NULL DEFAULT 'System';
-GO
-
-ALTER TABLE [Reserve] ADD [CreatedDate] datetime2 NOT NULL DEFAULT (GETDATE());
-GO
-
-ALTER TABLE [Reserve] ADD [UpdatedBy] VARCHAR(256) NULL;
-GO
-
-ALTER TABLE [Reserve] ADD [UpdatedDate] datetime2 NULL;
-GO
-
-ALTER TABLE [RefreshToken] ADD [CreatedBy] VARCHAR(256) NOT NULL DEFAULT 'System';
-GO
-
-ALTER TABLE [RefreshToken] ADD [CreatedDate] datetime2 NOT NULL DEFAULT (GETDATE());
-GO
-
-ALTER TABLE [RefreshToken] ADD [UpdatedBy] VARCHAR(256) NULL;
-GO
-
-ALTER TABLE [RefreshToken] ADD [UpdatedDate] datetime2 NULL;
-GO
-
-ALTER TABLE [Holiday] ADD [CreatedBy] VARCHAR(256) NOT NULL DEFAULT 'System';
-GO
-
-ALTER TABLE [Holiday] ADD [CreatedDate] datetime2 NOT NULL DEFAULT (GETDATE());
-GO
-
-ALTER TABLE [Holiday] ADD [UpdatedBy] VARCHAR(256) NULL;
-GO
-
-ALTER TABLE [Holiday] ADD [UpdatedDate] datetime2 NULL;
-GO
-
-ALTER TABLE [Driver] ADD [CreatedBy] VARCHAR(256) NOT NULL DEFAULT 'System';
-GO
-
-ALTER TABLE [Driver] ADD [CreatedDate] datetime2 NOT NULL DEFAULT (GETDATE());
-GO
-
-ALTER TABLE [Driver] ADD [UpdatedBy] VARCHAR(256) NULL;
-GO
-
-ALTER TABLE [Driver] ADD [UpdatedDate] datetime2 NULL;
-GO
-
-ALTER TABLE [Direction] ADD [CreatedBy] VARCHAR(256) NOT NULL DEFAULT 'System';
-GO
-
-ALTER TABLE [Direction] ADD [CreatedDate] datetime2 NOT NULL DEFAULT (GETDATE());
-GO
-
-ALTER TABLE [Direction] ADD [UpdatedBy] VARCHAR(256) NULL;
-GO
-
-ALTER TABLE [Direction] ADD [UpdatedDate] datetime2 NULL;
-GO
-
-DECLARE @var0 sysname;
-SELECT @var0 = [d].[name]
-FROM [sys].[default_constraints] [d]
-INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
-WHERE ([d].[parent_object_id] = OBJECT_ID(N'[CustomerReserve]') AND [c].[name] = N'PickupLocationId');
-IF @var0 IS NOT NULL EXEC(N'ALTER TABLE [CustomerReserve] DROP CONSTRAINT [' + @var0 + '];');
-ALTER TABLE [CustomerReserve] ALTER COLUMN [PickupLocationId] int NULL;
-GO
-
-DECLARE @var1 sysname;
-SELECT @var1 = [d].[name]
-FROM [sys].[default_constraints] [d]
-INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
-WHERE ([d].[parent_object_id] = OBJECT_ID(N'[CustomerReserve]') AND [c].[name] = N'DropoffLocationId');
-IF @var1 IS NOT NULL EXEC(N'ALTER TABLE [CustomerReserve] DROP CONSTRAINT [' + @var1 + '];');
-ALTER TABLE [CustomerReserve] ALTER COLUMN [DropoffLocationId] int NULL;
-GO
-
-ALTER TABLE [CustomerReserve] ADD [CreatedBy] VARCHAR(256) NOT NULL DEFAULT 'System';
-GO
-
-ALTER TABLE [CustomerReserve] ADD [CreatedDate] datetime2 NOT NULL DEFAULT (GETDATE());
-GO
-
-ALTER TABLE [CustomerReserve] ADD [UpdatedBy] VARCHAR(256) NULL;
-GO
-
-ALTER TABLE [CustomerReserve] ADD [UpdatedDate] datetime2 NULL;
-GO
-
-ALTER TABLE [CustomerReserve] ADD [UserId] int NULL;
-GO
-
-ALTER TABLE [Customer] ADD [CreatedBy] VARCHAR(256) NOT NULL DEFAULT 'System';
-GO
-
-ALTER TABLE [Customer] ADD [CreatedDate] datetime2 NOT NULL DEFAULT (GETDATE());
-GO
-
-ALTER TABLE [Customer] ADD [UpdatedBy] VARCHAR(256) NULL;
-GO
-
-ALTER TABLE [Customer] ADD [UpdatedDate] datetime2 NULL;
-GO
-
-ALTER TABLE [City] ADD [CreatedBy] VARCHAR(256) NOT NULL DEFAULT 'System';
-GO
-
-ALTER TABLE [City] ADD [CreatedDate] datetime2 NOT NULL DEFAULT (GETDATE());
-GO
-
-ALTER TABLE [City] ADD [UpdatedBy] VARCHAR(256) NULL;
-GO
-
-ALTER TABLE [City] ADD [UpdatedDate] datetime2 NULL;
-GO
-
-UPDATE [Role] SET [CreatedBy] = 'System', [CreatedDate] = '2025-05-18T22:41:03.2441076Z', [UpdatedBy] = NULL, [UpdatedDate] = NULL
-WHERE [RoleId] = 1;
-SELECT @@ROWCOUNT;
-
-GO
-
-UPDATE [Role] SET [CreatedBy] = 'System', [CreatedDate] = '2025-05-18T22:41:03.2441079Z', [UpdatedBy] = NULL, [UpdatedDate] = NULL
-WHERE [RoleId] = 2;
-SELECT @@ROWCOUNT;
-
-GO
-
-CREATE UNIQUE INDEX [IX_ReservePrice_ServiceId] ON [ReservePrice] ([ServiceId]);
-GO
-
-INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
-VALUES (N'20250518224103_AuditableFields', N'8.0.14');
-GO
-
-COMMIT;
-GO
-
-BEGIN TRANSACTION;
-GO
-
-DROP INDEX [IX_Reserve_ServiceId] ON [Reserve];
-GO
-
-DECLARE @var2 sysname;
-SELECT @var2 = [d].[name]
-FROM [sys].[default_constraints] [d]
-INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
-WHERE ([d].[parent_object_id] = OBJECT_ID(N'[Reserve]') AND [c].[name] = N'Status');
-IF @var2 IS NOT NULL EXEC(N'ALTER TABLE [Reserve] DROP CONSTRAINT [' + @var2 + '];');
-ALTER TABLE [Reserve] ALTER COLUMN [Status] VARCHAR(20) NOT NULL;
-GO
-
-ALTER TABLE [CustomerReserve] ADD [PaymentMethod] VARCHAR(20) NULL;
-GO
-
-ALTER TABLE [CustomerReserve] ADD [Status] int NOT NULL DEFAULT 0;
-GO
-
-UPDATE [Role] SET [CreatedDate] = '2025-05-24T18:44:56.5585699Z'
-WHERE [RoleId] = 1;
-SELECT @@ROWCOUNT;
-
-GO
-
-UPDATE [Role] SET [CreatedDate] = '2025-05-24T18:44:56.5585702Z'
-WHERE [RoleId] = 2;
-SELECT @@ROWCOUNT;
-
-GO
-
-CREATE INDEX [IX_Reserve_ServiceId_ReserveDate] ON [Reserve] ([ServiceId], [ReserveDate]);
-GO
-
-CREATE INDEX [IX_Reserve_Status_ReserveDate] ON [Reserve] ([Status], [ReserveDate]);
-GO
-
-INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
-VALUES (N'20250524184457_AddReserveReportsAndPassengers', N'8.0.14');
-GO
-
-COMMIT;
-GO
-
-BEGIN TRANSACTION;
-GO
-
-DROP INDEX [IX_ReservePrice_ServiceId] ON [ReservePrice];
-GO
-
-UPDATE [Role] SET [CreatedDate] = '2025-05-24T19:17:50.5670852Z'
-WHERE [RoleId] = 1;
-SELECT @@ROWCOUNT;
-
-GO
-
-UPDATE [Role] SET [CreatedDate] = '2025-05-24T19:17:50.5670855Z'
-WHERE [RoleId] = 2;
-SELECT @@ROWCOUNT;
-
-GO
-
-CREATE INDEX [IX_ReservePrice_ServiceId_ReserveTypeId] ON [ReservePrice] ([ServiceId], [ReserveTypeId]);
-GO
-
-INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
-VALUES (N'20250524191751_AddIndexInServiceIdAndReserveTypeId', N'8.0.14');
-GO
-
-COMMIT;
-GO
-
-BEGIN TRANSACTION;
-GO
-
-DECLARE @var3 sysname;
-SELECT @var3 = [d].[name]
-FROM [sys].[default_constraints] [d]
-INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
-WHERE ([d].[parent_object_id] = OBJECT_ID(N'[Direction]') AND [c].[name] = N'Name');
-IF @var3 IS NOT NULL EXEC(N'ALTER TABLE [Direction] DROP CONSTRAINT [' + @var3 + '];');
-ALTER TABLE [Direction] ALTER COLUMN [Name] VARCHAR(250) NOT NULL;
-GO
-
-ALTER TABLE [Direction] ADD [Status] int NOT NULL DEFAULT 0;
-GO
-
-UPDATE [Role] SET [CreatedDate] = '2025-05-26T11:33:42.5415717Z'
-WHERE [RoleId] = 1;
-SELECT @@ROWCOUNT;
-
-GO
-
-UPDATE [Role] SET [CreatedDate] = '2025-05-26T11:33:42.5415719Z'
-WHERE [RoleId] = 2;
-SELECT @@ROWCOUNT;
-
-GO
-
-INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
-VALUES (N'20250526113343_AddStatusInDirection', N'8.0.14');
-GO
-
-COMMIT;
-GO
-
-BEGIN TRANSACTION;
-GO
-
-DECLARE @var4 sysname;
-SELECT @var4 = [d].[name]
-FROM [sys].[default_constraints] [d]
-INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
-WHERE ([d].[parent_object_id] = OBJECT_ID(N'[Service]') AND [c].[name] = N'DepartureHour');
-IF @var4 IS NOT NULL EXEC(N'ALTER TABLE [Service] DROP CONSTRAINT [' + @var4 + '];');
-ALTER TABLE [Service] DROP COLUMN [DepartureHour];
-GO
-
-DECLARE @var5 sysname;
-SELECT @var5 = [d].[name]
-FROM [sys].[default_constraints] [d]
-INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
-WHERE ([d].[parent_object_id] = OBJECT_ID(N'[Service]') AND [c].[name] = N'EndDay');
-IF @var5 IS NOT NULL EXEC(N'ALTER TABLE [Service] DROP CONSTRAINT [' + @var5 + '];');
-ALTER TABLE [Service] DROP COLUMN [EndDay];
-GO
-
-DECLARE @var6 sysname;
-SELECT @var6 = [d].[name]
-FROM [sys].[default_constraints] [d]
-INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
-WHERE ([d].[parent_object_id] = OBJECT_ID(N'[Service]') AND [c].[name] = N'IsHoliday');
-IF @var6 IS NOT NULL EXEC(N'ALTER TABLE [Service] DROP CONSTRAINT [' + @var6 + '];');
-ALTER TABLE [Service] DROP COLUMN [IsHoliday];
-GO
-
-DECLARE @var7 sysname;
-SELECT @var7 = [d].[name]
-FROM [sys].[default_constraints] [d]
-INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
-WHERE ([d].[parent_object_id] = OBJECT_ID(N'[Service]') AND [c].[name] = N'StartDay');
-IF @var7 IS NOT NULL EXEC(N'ALTER TABLE [Service] DROP CONSTRAINT [' + @var7 + '];');
-ALTER TABLE [Service] DROP COLUMN [StartDay];
-GO
-
-ALTER TABLE [Reserve] ADD [ServiceScheduleId] int NOT NULL DEFAULT 0;
+CREATE TABLE [Service] (
+    [ServiceId] int NOT NULL IDENTITY,
+    [Name] nvarchar(250) NOT NULL,
+    [OriginId] int NOT NULL,
+    [DestinationId] int NOT NULL,
+    [EstimatedDuration] time NOT NULL,
+    [VehicleId] int NOT NULL,
+    [Status] int NOT NULL,
+    [CreatedBy] VARCHAR(256) NOT NULL DEFAULT 'System',
+    [UpdatedBy] VARCHAR(256) NULL,
+    [CreatedDate] datetime2 NOT NULL DEFAULT (GETDATE()),
+    [UpdatedDate] datetime2 NULL,
+    CONSTRAINT [PK_Service] PRIMARY KEY ([ServiceId]),
+    CONSTRAINT [FK_Service_City_DestinationId] FOREIGN KEY ([DestinationId]) REFERENCES [City] ([CityId]) ON DELETE NO ACTION,
+    CONSTRAINT [FK_Service_City_OriginId] FOREIGN KEY ([OriginId]) REFERENCES [City] ([CityId]) ON DELETE NO ACTION,
+    CONSTRAINT [FK_Service_Vehicle_VehicleId] FOREIGN KEY ([VehicleId]) REFERENCES [Vehicle] ([VehicleId]) ON DELETE CASCADE
+);
+GO
+
+CREATE TABLE [ReservePrice] (
+    [ReservePriceId] int NOT NULL IDENTITY,
+    [ServiceId] int NOT NULL,
+    [Price] decimal(10,2) NOT NULL,
+    [ReserveTypeId] int NOT NULL,
+    [Status] int NOT NULL,
+    [CreatedBy] VARCHAR(256) NOT NULL DEFAULT 'System',
+    [UpdatedBy] VARCHAR(256) NULL,
+    [CreatedDate] datetime2 NOT NULL DEFAULT (GETDATE()),
+    [UpdatedDate] datetime2 NULL,
+    CONSTRAINT [PK_ReservePrice] PRIMARY KEY ([ReservePriceId]),
+    CONSTRAINT [FK_ReservePrice_Service_ServiceId] FOREIGN KEY ([ServiceId]) REFERENCES [Service] ([ServiceId]) ON DELETE CASCADE
+);
+GO
+
+CREATE TABLE [ServiceCustomer] (
+    [ServiceCustomerId] int NOT NULL IDENTITY,
+    [ServiceId] int NOT NULL,
+    [CustomerId] int NOT NULL,
+    [CreatedBy] VARCHAR(256) NOT NULL DEFAULT 'System',
+    [UpdatedBy] VARCHAR(256) NULL,
+    [CreatedDate] datetime2 NOT NULL DEFAULT (GETDATE()),
+    [UpdatedDate] datetime2 NULL,
+    CONSTRAINT [PK_ServiceCustomer] PRIMARY KEY ([ServiceCustomerId]),
+    CONSTRAINT [FK_ServiceCustomer_Customer_CustomerId] FOREIGN KEY ([CustomerId]) REFERENCES [Customer] ([CustomerId]) ON DELETE CASCADE,
+    CONSTRAINT [FK_ServiceCustomer_Service_ServiceId] FOREIGN KEY ([ServiceId]) REFERENCES [Service] ([ServiceId]) ON DELETE CASCADE
+);
 GO
 
 CREATE TABLE [ServiceSchedule] (
@@ -710,151 +233,61 @@ CREATE TABLE [ServiceSchedule] (
 );
 GO
 
-UPDATE [Role] SET [CreatedDate] = '2025-05-30T01:26:03.4101367Z'
-WHERE [RoleId] = 1;
-SELECT @@ROWCOUNT;
-
+CREATE TABLE [Reserve] (
+    [ReserveId] int NOT NULL IDENTITY,
+    [ReserveDate] datetime2 NOT NULL,
+    [VehicleId] int NOT NULL,
+    [DriverId] int NULL,
+    [ServiceId] int NOT NULL,
+    [ServiceScheduleId] int NOT NULL,
+    [Status] VARCHAR(20) NOT NULL,
+    [ServiceName] VARCHAR(250) NOT NULL,
+    [OriginName] VARCHAR(100) NOT NULL,
+    [DestinationName] VARCHAR(100) NOT NULL,
+    [DepartureHour] time NOT NULL,
+    [IsHoliday] bit NOT NULL,
+    [CreatedBy] VARCHAR(256) NOT NULL DEFAULT 'System',
+    [UpdatedBy] VARCHAR(256) NULL,
+    [CreatedDate] datetime2 NOT NULL DEFAULT (GETDATE()),
+    [UpdatedDate] datetime2 NULL,
+    CONSTRAINT [PK_Reserve] PRIMARY KEY ([ReserveId]),
+    CONSTRAINT [FK_Reserve_Driver_DriverId] FOREIGN KEY ([DriverId]) REFERENCES [Driver] ([DriverId]) ON DELETE SET NULL,
+    CONSTRAINT [FK_Reserve_ServiceSchedule_ServiceScheduleId] FOREIGN KEY ([ServiceScheduleId]) REFERENCES [ServiceSchedule] ([ServiceScheduleId]) ON DELETE NO ACTION,
+    CONSTRAINT [FK_Reserve_Service_ServiceId] FOREIGN KEY ([ServiceId]) REFERENCES [Service] ([ServiceId]) ON DELETE NO ACTION,
+    CONSTRAINT [FK_Reserve_Vehicle_VehicleId] FOREIGN KEY ([VehicleId]) REFERENCES [Vehicle] ([VehicleId]) ON DELETE NO ACTION
+);
 GO
 
-UPDATE [Role] SET [CreatedDate] = '2025-05-30T01:26:03.4101370Z'
-WHERE [RoleId] = 2;
-SELECT @@ROWCOUNT;
-
-GO
-
-CREATE INDEX [IX_Reserve_ServiceScheduleId] ON [Reserve] ([ServiceScheduleId]);
-GO
-
-CREATE INDEX [IX_ServiceSchedule_ServiceId] ON [ServiceSchedule] ([ServiceId]);
-GO
-
-ALTER TABLE [Reserve] ADD CONSTRAINT [FK_Reserve_ServiceSchedule_ServiceScheduleId] FOREIGN KEY ([ServiceScheduleId]) REFERENCES [ServiceSchedule] ([ServiceScheduleId]) ON DELETE NO ACTION;
-GO
-
-INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
-VALUES (N'20250530012604_AddServiceSchedule', N'8.0.14');
-GO
-
-COMMIT;
-GO
-
-BEGIN TRANSACTION;
-GO
-
-ALTER TABLE [CustomerReserve] ADD [CustomerEmail] VARCHAR(150) NOT NULL DEFAULT '';
-GO
-
-ALTER TABLE [CustomerReserve] ADD [CustomerFullName] VARCHAR(250) NOT NULL DEFAULT '';
-GO
-
-ALTER TABLE [CustomerReserve] ADD [DestinationCityName] VARCHAR(100) NOT NULL DEFAULT '';
-GO
-
-ALTER TABLE [CustomerReserve] ADD [DocumentNumber] VARCHAR(50) NOT NULL DEFAULT '';
-GO
-
-ALTER TABLE [CustomerReserve] ADD [DriverName] VARCHAR(100) NULL;
-GO
-
-ALTER TABLE [CustomerReserve] ADD [DropoffAddress] VARCHAR(250) NULL;
-GO
-
-ALTER TABLE [CustomerReserve] ADD [OriginCityName] VARCHAR(100) NOT NULL DEFAULT '';
-GO
-
-ALTER TABLE [CustomerReserve] ADD [Phone1] VARCHAR(30) NULL;
-GO
-
-ALTER TABLE [CustomerReserve] ADD [Phone2] VARCHAR(30) NULL;
-GO
-
-ALTER TABLE [CustomerReserve] ADD [PickupAddress] VARCHAR(250) NULL;
-GO
-
-ALTER TABLE [CustomerReserve] ADD [ServiceName] VARCHAR(250) NOT NULL DEFAULT '';
-GO
-
-ALTER TABLE [CustomerReserve] ADD [VehicleInternalNumber] VARCHAR(20) NOT NULL DEFAULT '';
-GO
-
-UPDATE [Role] SET [CreatedDate] = '2025-06-01T20:42:32.3185202Z'
-WHERE [RoleId] = 1;
-SELECT @@ROWCOUNT;
-
-GO
-
-UPDATE [Role] SET [CreatedDate] = '2025-06-01T20:42:32.3185206Z'
-WHERE [RoleId] = 2;
-SELECT @@ROWCOUNT;
-
-GO
-
-INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
-VALUES (N'20250601204232_DesnormalizarCustomerReserveParaReportes', N'8.0.14');
-GO
-
-COMMIT;
-GO
-
-BEGIN TRANSACTION;
-GO
-
-ALTER TABLE [Reserve] ADD [DepartureHour] time NOT NULL DEFAULT '00:00:00';
-GO
-
-ALTER TABLE [Reserve] ADD [DestinationName] VARCHAR(100) NOT NULL DEFAULT '';
-GO
-
-ALTER TABLE [Reserve] ADD [IsHoliday] bit NOT NULL DEFAULT CAST(0 AS bit);
-GO
-
-ALTER TABLE [Reserve] ADD [OriginName] VARCHAR(100) NOT NULL DEFAULT '';
-GO
-
-ALTER TABLE [Reserve] ADD [ServiceName] VARCHAR(250) NOT NULL DEFAULT '';
-GO
-
-UPDATE [Role] SET [CreatedDate] = '2025-06-07T01:18:11.3747054Z'
-WHERE [RoleId] = 1;
-SELECT @@ROWCOUNT;
-
-GO
-
-UPDATE [Role] SET [CreatedDate] = '2025-06-07T01:18:11.3747058Z'
-WHERE [RoleId] = 2;
-SELECT @@ROWCOUNT;
-
-GO
-
-INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
-VALUES (N'20250607011811_AddColumnsInReserve', N'8.0.14');
-GO
-
-COMMIT;
-GO
-
-BEGIN TRANSACTION;
-GO
-
-DECLARE @var8 sysname;
-SELECT @var8 = [d].[name]
-FROM [sys].[default_constraints] [d]
-INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
-WHERE ([d].[parent_object_id] = OBJECT_ID(N'[CustomerReserve]') AND [c].[name] = N'PaymentMethod');
-IF @var8 IS NOT NULL EXEC(N'ALTER TABLE [CustomerReserve] DROP CONSTRAINT [' + @var8 + '];');
-ALTER TABLE [CustomerReserve] DROP COLUMN [PaymentMethod];
-GO
-
-DECLARE @var9 sysname;
-SELECT @var9 = [d].[name]
-FROM [sys].[default_constraints] [d]
-INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
-WHERE ([d].[parent_object_id] = OBJECT_ID(N'[CustomerReserve]') AND [c].[name] = N'StatusPayment');
-IF @var9 IS NOT NULL EXEC(N'ALTER TABLE [CustomerReserve] DROP CONSTRAINT [' + @var9 + '];');
-ALTER TABLE [CustomerReserve] DROP COLUMN [StatusPayment];
-GO
-
-ALTER TABLE [CustomerReserve] ADD [ReferencePaymentId] int NULL;
+CREATE TABLE [Passenger] (
+    [PassengerId] int NOT NULL IDENTITY,
+    [ReserveId] int NOT NULL,
+    [FirstName] VARCHAR(100) NOT NULL,
+    [LastName] VARCHAR(100) NOT NULL,
+    [DocumentNumber] VARCHAR(50) NOT NULL,
+    [Email] VARCHAR(150) NULL,
+    [Phone] VARCHAR(30) NULL,
+    [PickupLocationId] int NULL,
+    [DropoffLocationId] int NULL,
+    [PickupAddress] VARCHAR(250) NULL,
+    [DropoffAddress] VARCHAR(250) NULL,
+    [HasTraveled] bit NOT NULL DEFAULT CAST(0 AS bit),
+    [Price] decimal(18,2) NOT NULL,
+    [Status] VARCHAR(20) NOT NULL,
+    [CustomerId] int NULL,
+    [CreatedBy] VARCHAR(256) NOT NULL DEFAULT 'System',
+    [CreatedDate] datetime2 NOT NULL DEFAULT (GETDATE()),
+    [UpdatedBy] VARCHAR(256) NULL,
+    [UpdatedDate] datetime2 NULL,
+    [DirectionId] int NULL,
+    [DirectionId1] int NULL,
+    CONSTRAINT [PK_Passenger] PRIMARY KEY ([PassengerId]),
+    CONSTRAINT [FK_Passenger_Customer_CustomerId] FOREIGN KEY ([CustomerId]) REFERENCES [Customer] ([CustomerId]),
+    CONSTRAINT [FK_Passenger_Direction_DirectionId] FOREIGN KEY ([DirectionId]) REFERENCES [Direction] ([DirectionId]),
+    CONSTRAINT [FK_Passenger_Direction_DirectionId1] FOREIGN KEY ([DirectionId1]) REFERENCES [Direction] ([DirectionId]),
+    CONSTRAINT [FK_Passenger_Direction_DropoffLocationId] FOREIGN KEY ([DropoffLocationId]) REFERENCES [Direction] ([DirectionId]),
+    CONSTRAINT [FK_Passenger_Direction_PickupLocationId] FOREIGN KEY ([PickupLocationId]) REFERENCES [Direction] ([DirectionId]),
+    CONSTRAINT [FK_Passenger_Reserve_ReserveId] FOREIGN KEY ([ReserveId]) REFERENCES [Reserve] ([ReserveId])
+);
 GO
 
 CREATE TABLE [ReservePayment] (
@@ -862,52 +295,24 @@ CREATE TABLE [ReservePayment] (
     [ReserveId] int NOT NULL,
     [Method] VARCHAR(20) NOT NULL,
     [Status] VARCHAR(20) NOT NULL,
-    [CustomerId] int NOT NULL,
+    [StatusDetail] VARCHAR(MAX) NULL,
+    [ResultApiExternalRawJson] NVARCHAR(MAX) NULL,
+    [CustomerId] int NULL,
     [Amount] decimal(18,2) NOT NULL,
+    [PaymentExternalId] BIGINT NULL,
+    [PayerName] VARCHAR(150) NULL,
+    [PayerDocumentNumber] VARCHAR(50) NULL,
+    [PayerEmail] VARCHAR(150) NULL,
     [ParentReservePaymentId] int NULL,
     [CreatedBy] VARCHAR(256) NOT NULL DEFAULT 'System',
     [UpdatedBy] VARCHAR(256) NULL,
     [CreatedDate] datetime2 NOT NULL DEFAULT (GETDATE()),
     [UpdatedDate] datetime2 NULL,
     CONSTRAINT [PK_ReservePayment] PRIMARY KEY ([ReservePaymentId]),
-    CONSTRAINT [FK_ReservePayment_Customer_CustomerId] FOREIGN KEY ([CustomerId]) REFERENCES [Customer] ([CustomerId]) ON DELETE CASCADE,
+    CONSTRAINT [FK_ReservePayment_Customer_CustomerId] FOREIGN KEY ([CustomerId]) REFERENCES [Customer] ([CustomerId]),
     CONSTRAINT [FK_ReservePayment_ReservePayment_ParentReservePaymentId] FOREIGN KEY ([ParentReservePaymentId]) REFERENCES [ReservePayment] ([ReservePaymentId]) ON DELETE NO ACTION,
-    CONSTRAINT [FK_ReservePayment_Reserve_ReserveId] FOREIGN KEY ([ReserveId]) REFERENCES [Reserve] ([ReserveId]) ON DELETE CASCADE
+    CONSTRAINT [FK_ReservePayment_Reserve_ReserveId] FOREIGN KEY ([ReserveId]) REFERENCES [Reserve] ([ReserveId]) ON DELETE NO ACTION
 );
-GO
-
-UPDATE [Role] SET [CreatedDate] = '2025-06-18T04:36:00.1032752Z'
-WHERE [RoleId] = 1;
-SELECT @@ROWCOUNT;
-
-GO
-
-UPDATE [Role] SET [CreatedDate] = '2025-06-18T04:36:00.1032754Z'
-WHERE [RoleId] = 2;
-SELECT @@ROWCOUNT;
-
-GO
-
-CREATE INDEX [IX_ReservePayment_CustomerId] ON [ReservePayment] ([CustomerId]);
-GO
-
-CREATE INDEX [IX_ReservePayment_ParentReservePaymentId] ON [ReservePayment] ([ParentReservePaymentId]);
-GO
-
-CREATE INDEX [IX_ReservePayment_ReserveId] ON [ReservePayment] ([ReserveId]);
-GO
-
-INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
-VALUES (N'20250618043600_AddReservePayment', N'8.0.14');
-GO
-
-COMMIT;
-GO
-
-BEGIN TRANSACTION;
-GO
-
-ALTER TABLE [Customer] ADD [CurrentBalance] decimal(18,2) NOT NULL DEFAULT 0.0;
 GO
 
 CREATE TABLE [CustomerAccountTransactions] (
@@ -930,16 +335,22 @@ CREATE TABLE [CustomerAccountTransactions] (
 );
 GO
 
-UPDATE [Role] SET [CreatedDate] = '2025-06-27T22:28:21.0110427Z'
-WHERE [RoleId] = 1;
-SELECT @@ROWCOUNT;
-
+IF EXISTS (SELECT * FROM [sys].[identity_columns] WHERE [name] IN (N'RoleId', N'CreatedBy', N'CreatedDate', N'Name', N'UpdatedBy', N'UpdatedDate') AND [object_id] = OBJECT_ID(N'[Role]'))
+    SET IDENTITY_INSERT [Role] ON;
+INSERT INTO [Role] ([RoleId], [CreatedBy], [CreatedDate], [Name], [UpdatedBy], [UpdatedDate])
+VALUES (1, 'System', '2025-08-31T21:09:34.7052618Z', N'Administrador', NULL, NULL),
+(2, 'System', '2025-08-31T21:09:34.7052620Z', N'Cliente', NULL, NULL);
+IF EXISTS (SELECT * FROM [sys].[identity_columns] WHERE [name] IN (N'RoleId', N'CreatedBy', N'CreatedDate', N'Name', N'UpdatedBy', N'UpdatedDate') AND [object_id] = OBJECT_ID(N'[Role]'))
+    SET IDENTITY_INSERT [Role] OFF;
 GO
 
-UPDATE [Role] SET [CreatedDate] = '2025-06-27T22:28:21.0110429Z'
-WHERE [RoleId] = 2;
-SELECT @@ROWCOUNT;
+CREATE UNIQUE INDEX [IX_City_Code] ON [City] ([Code]);
+GO
 
+CREATE UNIQUE INDEX [IX_Customer_DocumentNumber] ON [Customer] ([DocumentNumber]);
+GO
+
+CREATE UNIQUE INDEX [IX_Customer_Email] ON [Customer] ([Email]);
 GO
 
 CREATE INDEX [IX_CustomerAccountTransactions_CustomerId] ON [CustomerAccountTransactions] ([CustomerId]);
@@ -957,135 +368,107 @@ GO
 CREATE INDEX [IX_CustomerAccountTransactions_Type] ON [CustomerAccountTransactions] ([Type]);
 GO
 
-INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
-VALUES (N'20250627222821_AddCtaCte', N'8.0.14');
+CREATE INDEX [IX_Direction_CityId] ON [Direction] ([CityId]);
 GO
 
-COMMIT;
+CREATE UNIQUE INDEX [IX_Driver_DocumentNumber] ON [Driver] ([DocumentNumber]);
 GO
 
-BEGIN TRANSACTION;
+CREATE UNIQUE INDEX [IX_Holiday_HolidayDate] ON [Holiday] ([HolidayDate]);
 GO
 
-ALTER TABLE [ReservePayment] ADD [PaymentExternalId] bigint NULL;
+CREATE INDEX [IX_Passenger_CustomerId] ON [Passenger] ([CustomerId]);
 GO
 
-ALTER TABLE [ReservePayment] ADD [ResultApiExternalRawJson] nvarchar(max) NOT NULL DEFAULT N'';
+CREATE INDEX [IX_Passenger_DirectionId] ON [Passenger] ([DirectionId]);
 GO
 
-ALTER TABLE [ReservePayment] ADD [StatusDetail] nvarchar(max) NOT NULL DEFAULT N'';
+CREATE INDEX [IX_Passenger_DirectionId1] ON [Passenger] ([DirectionId1]);
 GO
 
-DECLARE @var10 sysname;
-SELECT @var10 = [d].[name]
-FROM [sys].[default_constraints] [d]
-INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
-WHERE ([d].[parent_object_id] = OBJECT_ID(N'[CustomerReserve]') AND [c].[name] = N'Status');
-IF @var10 IS NOT NULL EXEC(N'ALTER TABLE [CustomerReserve] DROP CONSTRAINT [' + @var10 + '];');
-ALTER TABLE [CustomerReserve] ALTER COLUMN [Status] VARCHAR(20) NOT NULL;
+CREATE INDEX [IX_Passenger_DropoffLocationId] ON [Passenger] ([DropoffLocationId]);
 GO
 
-UPDATE [Role] SET [CreatedDate] = '2025-07-12T17:11:44.1777675Z'
-WHERE [RoleId] = 1;
-SELECT @@ROWCOUNT;
-
+CREATE INDEX [IX_Passenger_PickupLocationId] ON [Passenger] ([PickupLocationId]);
 GO
 
-UPDATE [Role] SET [CreatedDate] = '2025-07-12T17:11:44.1777677Z'
-WHERE [RoleId] = 2;
-SELECT @@ROWCOUNT;
-
+CREATE INDEX [IX_Passenger_ReserveId] ON [Passenger] ([ReserveId]);
 GO
 
-INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
-VALUES (N'20250712171144_ReserveWithMpIntegration', N'8.0.14');
+CREATE UNIQUE INDEX [IX_Passenger_ReserveId_DocumentNumber] ON [Passenger] ([ReserveId], [DocumentNumber]);
 GO
 
-COMMIT;
+CREATE INDEX [IX_Passenger_Status] ON [Passenger] ([Status]);
 GO
 
-BEGIN TRANSACTION;
+CREATE INDEX [IX_RefreshToken_UserId] ON [RefreshToken] ([UserId]);
 GO
 
-DECLARE @var11 sysname;
-SELECT @var11 = [d].[name]
-FROM [sys].[default_constraints] [d]
-INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
-WHERE ([d].[parent_object_id] = OBJECT_ID(N'[ReservePayment]') AND [c].[name] = N'ResultApiExternalRawJson');
-IF @var11 IS NOT NULL EXEC(N'ALTER TABLE [ReservePayment] DROP CONSTRAINT [' + @var11 + '];');
-ALTER TABLE [ReservePayment] ALTER COLUMN [ResultApiExternalRawJson] nvarchar(max) NULL;
+CREATE INDEX [IX_Reserve_DriverId] ON [Reserve] ([DriverId]);
 GO
 
-UPDATE [Role] SET [CreatedDate] = '2025-07-12T17:17:07.8562203Z'
-WHERE [RoleId] = 1;
-SELECT @@ROWCOUNT;
-
+CREATE INDEX [IX_Reserve_ServiceId_ReserveDate] ON [Reserve] ([ServiceId], [ReserveDate]);
 GO
 
-UPDATE [Role] SET [CreatedDate] = '2025-07-12T17:17:07.8562205Z'
-WHERE [RoleId] = 2;
-SELECT @@ROWCOUNT;
-
+CREATE INDEX [IX_Reserve_ServiceScheduleId] ON [Reserve] ([ServiceScheduleId]);
 GO
 
-INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
-VALUES (N'20250712171708_ReserveWithMpIntegration-pt2', N'8.0.14');
+CREATE INDEX [IX_Reserve_Status_ReserveDate] ON [Reserve] ([Status], [ReserveDate]);
 GO
 
-COMMIT;
+CREATE INDEX [IX_Reserve_VehicleId] ON [Reserve] ([VehicleId]);
 GO
 
-BEGIN TRANSACTION;
+CREATE INDEX [IX_ReservePayment_CustomerId] ON [ReservePayment] ([CustomerId]);
 GO
 
-ALTER TABLE [CustomerReserve] ADD [ReserveDate] datetime2 NOT NULL DEFAULT '0001-01-01T00:00:00.0000000';
+CREATE INDEX [IX_ReservePayment_ParentReservePaymentId] ON [ReservePayment] ([ParentReservePaymentId]);
 GO
 
-UPDATE [Role] SET [CreatedDate] = '2025-07-20T20:50:27.3575035Z'
-WHERE [RoleId] = 1;
-SELECT @@ROWCOUNT;
-
+CREATE INDEX [IX_ReservePayment_PaymentExternalId] ON [ReservePayment] ([PaymentExternalId]);
 GO
 
-UPDATE [Role] SET [CreatedDate] = '2025-07-20T20:50:27.3575037Z'
-WHERE [RoleId] = 2;
-SELECT @@ROWCOUNT;
-
+CREATE INDEX [IX_ReservePayment_ReserveId] ON [ReservePayment] ([ReserveId]);
 GO
 
-INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
-VALUES (N'20250720205027_AddReserveDateInCustomerReserve', N'8.0.14');
+CREATE INDEX [IX_ReservePayment_Status] ON [ReservePayment] ([Status]);
 GO
 
-COMMIT;
+CREATE INDEX [IX_ReservePrice_ServiceId_ReserveTypeId] ON [ReservePrice] ([ServiceId], [ReserveTypeId]);
 GO
 
-BEGIN TRANSACTION;
+CREATE INDEX [IX_Service_DestinationId] ON [Service] ([DestinationId]);
 GO
 
-DECLARE @var12 sysname;
-SELECT @var12 = [d].[name]
-FROM [sys].[default_constraints] [d]
-INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
-WHERE ([d].[parent_object_id] = OBJECT_ID(N'[ReservePayment]') AND [c].[name] = N'StatusDetail');
-IF @var12 IS NOT NULL EXEC(N'ALTER TABLE [ReservePayment] DROP CONSTRAINT [' + @var12 + '];');
-ALTER TABLE [ReservePayment] ALTER COLUMN [StatusDetail] VARCHAR(MAX) NULL;
+CREATE INDEX [IX_Service_OriginId] ON [Service] ([OriginId]);
 GO
 
-UPDATE [Role] SET [CreatedDate] = '2025-07-20T21:03:16.3713414Z'
-WHERE [RoleId] = 1;
-SELECT @@ROWCOUNT;
-
+CREATE INDEX [IX_Service_VehicleId] ON [Service] ([VehicleId]);
 GO
 
-UPDATE [Role] SET [CreatedDate] = '2025-07-20T21:03:16.3713416Z'
-WHERE [RoleId] = 2;
-SELECT @@ROWCOUNT;
+CREATE INDEX [IX_ServiceCustomer_CustomerId] ON [ServiceCustomer] ([CustomerId]);
+GO
 
+CREATE INDEX [IX_ServiceCustomer_ServiceId] ON [ServiceCustomer] ([ServiceId]);
+GO
+
+CREATE INDEX [IX_ServiceSchedule_ServiceId] ON [ServiceSchedule] ([ServiceId]);
+GO
+
+CREATE UNIQUE INDEX [IX_User_CustomerId] ON [User] ([CustomerId]) WHERE [CustomerId] IS NOT NULL;
+GO
+
+CREATE INDEX [IX_User_RoleId] ON [User] ([RoleId]);
+GO
+
+CREATE INDEX [IX_Vehicle_VehicleTypeId] ON [Vehicle] ([VehicleTypeId]);
+GO
+
+CREATE UNIQUE INDEX [IX_VehicleType_Name] ON [VehicleType] ([Name]);
 GO
 
 INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
-VALUES (N'20250720210316_StatusDetailInReservePaymentNullable', N'8.0.14');
+VALUES (N'20250831210935_InitialMigration', N'8.0.14');
 GO
 
 COMMIT;

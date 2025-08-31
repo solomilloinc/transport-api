@@ -12,7 +12,7 @@ using Transport.Infraestructure.Database;
 namespace Transport.Infraestructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20250829212636_InitialMigration")]
+    [Migration("20250831210935_InitialMigration")]
     partial class InitialMigration
     {
         /// <inheritdoc />
@@ -206,39 +206,6 @@ namespace Transport.Infraestructure.Migrations
                     b.HasIndex("Type");
 
                     b.ToTable("CustomerAccountTransactions", (string)null);
-                });
-
-            modelBuilder.Entity("Transport.Domain.Customers.CustomerBookingHistory", b =>
-                {
-                    b.Property<int>("CustomerBookingHistoryId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("CustomerBookingHistoryId"));
-
-                    b.Property<DateTime>("BookingDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("CustomerId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("ReserveId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Role")
-                        .IsRequired()
-                        .HasColumnType("VARCHAR(20)");
-
-                    b.HasKey("CustomerBookingHistoryId");
-
-                    b.HasIndex("BookingDate");
-
-                    b.HasIndex("ReserveId");
-
-                    b.HasIndex("CustomerId", "ReserveId", "Role")
-                        .IsUnique();
-
-                    b.ToTable("CustomerBookingHistory", (string)null);
                 });
 
             modelBuilder.Entity("Transport.Domain.Directions.Direction", b =>
@@ -929,14 +896,14 @@ namespace Transport.Infraestructure.Migrations
                         {
                             RoleId = 1,
                             CreatedBy = "System",
-                            CreatedDate = new DateTime(2025, 8, 29, 21, 26, 36, 204, DateTimeKind.Utc).AddTicks(2800),
+                            CreatedDate = new DateTime(2025, 8, 31, 21, 9, 34, 705, DateTimeKind.Utc).AddTicks(2618),
                             Name = "Administrador"
                         },
                         new
                         {
                             RoleId = 2,
                             CreatedBy = "System",
-                            CreatedDate = new DateTime(2025, 8, 29, 21, 26, 36, 204, DateTimeKind.Utc).AddTicks(2803),
+                            CreatedDate = new DateTime(2025, 8, 31, 21, 9, 34, 705, DateTimeKind.Utc).AddTicks(2620),
                             Name = "Cliente"
                         });
                 });
@@ -1126,25 +1093,6 @@ namespace Transport.Infraestructure.Migrations
                     b.Navigation("RelatedReserve");
 
                     b.Navigation("ReservePayment");
-                });
-
-            modelBuilder.Entity("Transport.Domain.Customers.CustomerBookingHistory", b =>
-                {
-                    b.HasOne("Transport.Domain.Customers.Customer", "Customer")
-                        .WithMany("BookingHistories")
-                        .HasForeignKey("CustomerId")
-                        .OnDelete(DeleteBehavior.NoAction)
-                        .IsRequired();
-
-                    b.HasOne("Transport.Domain.Reserves.Reserve", "Reserve")
-                        .WithMany()
-                        .HasForeignKey("ReserveId")
-                        .OnDelete(DeleteBehavior.NoAction)
-                        .IsRequired();
-
-                    b.Navigation("Customer");
-
-                    b.Navigation("Reserve");
                 });
 
             modelBuilder.Entity("Transport.Domain.Directions.Direction", b =>
@@ -1376,8 +1324,6 @@ namespace Transport.Infraestructure.Migrations
             modelBuilder.Entity("Transport.Domain.Customers.Customer", b =>
                 {
                     b.Navigation("AccountTransactions");
-
-                    b.Navigation("BookingHistories");
 
                     b.Navigation("Passengers");
 

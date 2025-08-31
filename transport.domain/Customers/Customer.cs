@@ -24,7 +24,6 @@ public class Customer : Entity, IAuditable
     public DateTime? UpdatedDate { get; set; }
 
     public ICollection<ServiceCustomer> Services { get; set; } = new List<ServiceCustomer>();
-    public ICollection<CustomerBookingHistory> BookingHistories { get; set; } = new List<CustomerBookingHistory>();
     public ICollection<CustomerAccountTransaction> AccountTransactions { get; set; } = new List<CustomerAccountTransaction>();
     public ICollection<Passenger> Passengers { get; set; } = new List<Passenger>();
 }
