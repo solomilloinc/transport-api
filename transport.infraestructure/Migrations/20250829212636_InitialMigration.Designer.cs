@@ -12,8 +12,8 @@ using Transport.Infraestructure.Database;
 namespace Transport.Infraestructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20250524184457_AddReserveReportsAndPassengers")]
-    partial class AddReserveReportsAndPassengers
+    [Migration("20250829212636_InitialMigration")]
+    partial class InitialMigration
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -90,6 +90,11 @@ namespace Transport.Infraestructure.Migrations
                         .HasColumnType("datetime2")
                         .HasDefaultValueSql("GETDATE()");
 
+                    b.Property<decimal>("CurrentBalance")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("decimal(18,2)")
+                        .HasDefaultValue(0m);
+
                     b.Property<string>("DocumentNumber")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -139,13 +144,16 @@ namespace Transport.Infraestructure.Migrations
                     b.ToTable("Customer", (string)null);
                 });
 
-            modelBuilder.Entity("Transport.Domain.Customers.CustomerReserve", b =>
+            modelBuilder.Entity("Transport.Domain.Customers.CustomerAccountTransaction", b =>
                 {
-                    b.Property<int>("CustomerReserveId")
+                    b.Property<int>("CustomerAccountTransactionId")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("CustomerReserveId"));
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("CustomerAccountTransactionId"));
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("decimal(18,2)");
 
                     b.Property<string>("CreatedBy")
                         .IsRequired()
@@ -161,35 +169,23 @@ namespace Transport.Infraestructure.Migrations
                     b.Property<int>("CustomerId")
                         .HasColumnType("int");
 
-                    b.Property<int?>("DropoffLocationId")
+                    b.Property<DateTime>("Date")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(250)
+                        .HasColumnType("nvarchar(250)");
+
+                    b.Property<int?>("RelatedReserveId")
                         .HasColumnType("int");
 
-                    b.Property<bool>("HasTraveled")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bit")
-                        .HasDefaultValue(false);
-
-                    b.Property<bool>("IsPayment")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("PaymentMethod")
-                        .HasColumnType("VARCHAR(20)");
-
-                    b.Property<int?>("PickupLocationId")
+                    b.Property<int?>("ReservePaymentId")
                         .HasColumnType("int");
 
-                    b.Property<decimal>("Price")
-                        .HasColumnType("decimal(10,2)");
-
-                    b.Property<int>("ReserveId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("Status")
-                        .HasColumnType("int");
-
-                    b.Property<int>("StatusPayment")
-                        .HasMaxLength(50)
-                        .HasColumnType("int");
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
 
                     b.Property<string>("UpdatedBy")
                         .HasColumnType("VARCHAR(256)");
@@ -197,23 +193,55 @@ namespace Transport.Infraestructure.Migrations
                     b.Property<DateTime?>("UpdatedDate")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("UserId")
-                        .HasColumnType("int");
-
-                    b.HasKey("CustomerReserveId");
+                    b.HasKey("CustomerAccountTransactionId");
 
                     b.HasIndex("CustomerId");
 
-                    b.HasIndex("DropoffLocationId");
+                    b.HasIndex("Date");
 
-                    b.HasIndex("PickupLocationId");
+                    b.HasIndex("RelatedReserveId");
+
+                    b.HasIndex("ReservePaymentId");
+
+                    b.HasIndex("Type");
+
+                    b.ToTable("CustomerAccountTransactions", (string)null);
+                });
+
+            modelBuilder.Entity("Transport.Domain.Customers.CustomerBookingHistory", b =>
+                {
+                    b.Property<int>("CustomerBookingHistoryId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("CustomerBookingHistoryId"));
+
+                    b.Property<DateTime>("BookingDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("CustomerId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ReserveId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasColumnType("VARCHAR(20)");
+
+                    b.HasKey("CustomerBookingHistoryId");
+
+                    b.HasIndex("BookingDate");
 
                     b.HasIndex("ReserveId");
 
-                    b.ToTable("CustomerReserve", (string)null);
+                    b.HasIndex("CustomerId", "ReserveId", "Role")
+                        .IsUnique();
+
+                    b.ToTable("CustomerBookingHistory", (string)null);
                 });
 
-            modelBuilder.Entity("Transport.Domain.Direction", b =>
+            modelBuilder.Entity("Transport.Domain.Directions.Direction", b =>
                 {
                     b.Property<int>("DirectionId")
                         .ValueGeneratedOnAdd()
@@ -243,8 +271,10 @@ namespace Transport.Infraestructure.Migrations
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasMaxLength(250)
-                        .HasColumnType("nvarchar(250)");
+                        .HasColumnType("VARCHAR(250)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
 
                     b.Property<string>("UpdatedBy")
                         .HasColumnType("VARCHAR(256)");
@@ -351,6 +381,107 @@ namespace Transport.Infraestructure.Migrations
                     b.ToTable("Holiday", (string)null);
                 });
 
+            modelBuilder.Entity("Transport.Domain.Passengers.Passenger", b =>
+                {
+                    b.Property<int>("PassengerId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("PassengerId"));
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("VARCHAR(256)")
+                        .HasDefaultValue("System");
+
+                    b.Property<DateTime>("CreatedDate")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("GETDATE()");
+
+                    b.Property<int?>("CustomerId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("DirectionId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("DirectionId1")
+                        .HasColumnType("int");
+
+                    b.Property<string>("DocumentNumber")
+                        .IsRequired()
+                        .HasColumnType("VARCHAR(50)");
+
+                    b.Property<string>("DropoffAddress")
+                        .HasColumnType("VARCHAR(250)");
+
+                    b.Property<int?>("DropoffLocationId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Email")
+                        .HasColumnType("VARCHAR(150)");
+
+                    b.Property<string>("FirstName")
+                        .IsRequired()
+                        .HasColumnType("VARCHAR(100)");
+
+                    b.Property<bool>("HasTraveled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<string>("LastName")
+                        .IsRequired()
+                        .HasColumnType("VARCHAR(100)");
+
+                    b.Property<string>("Phone")
+                        .HasColumnType("VARCHAR(30)");
+
+                    b.Property<string>("PickupAddress")
+                        .HasColumnType("VARCHAR(250)");
+
+                    b.Property<int?>("PickupLocationId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("Price")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("ReserveId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("VARCHAR(20)");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("VARCHAR(256)");
+
+                    b.Property<DateTime?>("UpdatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("PassengerId");
+
+                    b.HasIndex("CustomerId");
+
+                    b.HasIndex("DirectionId");
+
+                    b.HasIndex("DirectionId1");
+
+                    b.HasIndex("DropoffLocationId");
+
+                    b.HasIndex("PickupLocationId");
+
+                    b.HasIndex("ReserveId");
+
+                    b.HasIndex("Status");
+
+                    b.HasIndex("ReserveId", "DocumentNumber")
+                        .IsUnique();
+
+                    b.ToTable("Passenger", (string)null);
+                });
+
             modelBuilder.Entity("Transport.Domain.Reserves.Reserve", b =>
                 {
                     b.Property<int>("ReserveId")
@@ -370,13 +501,34 @@ namespace Transport.Infraestructure.Migrations
                         .HasColumnType("datetime2")
                         .HasDefaultValueSql("GETDATE()");
 
+                    b.Property<TimeSpan>("DepartureHour")
+                        .HasColumnType("time");
+
+                    b.Property<string>("DestinationName")
+                        .IsRequired()
+                        .HasColumnType("VARCHAR(100)");
+
                     b.Property<int?>("DriverId")
                         .HasColumnType("int");
+
+                    b.Property<bool>("IsHoliday")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("OriginName")
+                        .IsRequired()
+                        .HasColumnType("VARCHAR(100)");
 
                     b.Property<DateTime>("ReserveDate")
                         .HasColumnType("datetime2");
 
                     b.Property<int>("ServiceId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ServiceName")
+                        .IsRequired()
+                        .HasColumnType("VARCHAR(250)");
+
+                    b.Property<int>("ServiceScheduleId")
                         .HasColumnType("int");
 
                     b.Property<string>("Status")
@@ -396,6 +548,8 @@ namespace Transport.Infraestructure.Migrations
 
                     b.HasIndex("DriverId");
 
+                    b.HasIndex("ServiceScheduleId");
+
                     b.HasIndex("VehicleId");
 
                     b.HasIndex("ServiceId", "ReserveDate");
@@ -403,6 +557,84 @@ namespace Transport.Infraestructure.Migrations
                     b.HasIndex("Status", "ReserveDate");
 
                     b.ToTable("Reserve", (string)null);
+                });
+
+            modelBuilder.Entity("Transport.Domain.Reserves.ReservePayment", b =>
+                {
+                    b.Property<int>("ReservePaymentId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ReservePaymentId"));
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("VARCHAR(256)")
+                        .HasDefaultValue("System");
+
+                    b.Property<DateTime>("CreatedDate")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("GETDATE()");
+
+                    b.Property<int?>("CustomerId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Method")
+                        .IsRequired()
+                        .HasColumnType("VARCHAR(20)");
+
+                    b.Property<int?>("ParentReservePaymentId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("PayerDocumentNumber")
+                        .HasColumnType("VARCHAR(50)");
+
+                    b.Property<string>("PayerEmail")
+                        .HasColumnType("VARCHAR(150)");
+
+                    b.Property<string>("PayerName")
+                        .HasColumnType("VARCHAR(150)");
+
+                    b.Property<long?>("PaymentExternalId")
+                        .HasColumnType("BIGINT");
+
+                    b.Property<int>("ReserveId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ResultApiExternalRawJson")
+                        .HasColumnType("NVARCHAR(MAX)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("VARCHAR(20)");
+
+                    b.Property<string>("StatusDetail")
+                        .HasColumnType("VARCHAR(MAX)");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("VARCHAR(256)");
+
+                    b.Property<DateTime?>("UpdatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("ReservePaymentId");
+
+                    b.HasIndex("CustomerId");
+
+                    b.HasIndex("ParentReservePaymentId");
+
+                    b.HasIndex("PaymentExternalId");
+
+                    b.HasIndex("ReserveId");
+
+                    b.HasIndex("Status");
+
+                    b.ToTable("ReservePayment", (string)null);
                 });
 
             modelBuilder.Entity("Transport.Domain.Reserves.ReservePrice", b =>
@@ -445,8 +677,7 @@ namespace Transport.Infraestructure.Migrations
 
                     b.HasKey("ReservePriceId");
 
-                    b.HasIndex("ServiceId")
-                        .IsUnique();
+                    b.HasIndex("ServiceId", "ReserveTypeId");
 
                     b.ToTable("ReservePrice", (string)null);
                 });
@@ -470,20 +701,11 @@ namespace Transport.Infraestructure.Migrations
                         .HasColumnType("datetime2")
                         .HasDefaultValueSql("GETDATE()");
 
-                    b.Property<TimeSpan>("DepartureHour")
-                        .HasColumnType("time");
-
                     b.Property<int>("DestinationId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("EndDay")
                         .HasColumnType("int");
 
                     b.Property<TimeSpan>("EstimatedDuration")
                         .HasColumnType("time");
-
-                    b.Property<bool>("IsHoliday")
-                        .HasColumnType("bit");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -491,9 +713,6 @@ namespace Transport.Infraestructure.Migrations
                         .HasColumnType("nvarchar(250)");
 
                     b.Property<int>("OriginId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("StartDay")
                         .HasColumnType("int");
 
                     b.Property<int>("Status")
@@ -557,6 +776,56 @@ namespace Transport.Infraestructure.Migrations
                     b.HasIndex("ServiceId");
 
                     b.ToTable("ServiceCustomer", (string)null);
+                });
+
+            modelBuilder.Entity("Transport.Domain.Services.ServiceSchedule", b =>
+                {
+                    b.Property<int>("ServiceScheduleId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ServiceScheduleId"));
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("VARCHAR(256)")
+                        .HasDefaultValue("System");
+
+                    b.Property<DateTime>("CreatedDate")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("GETDATE()");
+
+                    b.Property<TimeSpan>("DepartureHour")
+                        .HasColumnType("time");
+
+                    b.Property<int>("EndDay")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsHoliday")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("ServiceId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("StartDay")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("VARCHAR(256)");
+
+                    b.Property<DateTime?>("UpdatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("ServiceScheduleId");
+
+                    b.HasIndex("ServiceId");
+
+                    b.ToTable("ServiceSchedule", (string)null);
                 });
 
             modelBuilder.Entity("Transport.Domain.Users.RefreshToken", b =>
@@ -660,14 +929,14 @@ namespace Transport.Infraestructure.Migrations
                         {
                             RoleId = 1,
                             CreatedBy = "System",
-                            CreatedDate = new DateTime(2025, 5, 24, 18, 44, 56, 558, DateTimeKind.Utc).AddTicks(5699),
+                            CreatedDate = new DateTime(2025, 8, 29, 21, 26, 36, 204, DateTimeKind.Utc).AddTicks(2800),
                             Name = "Administrador"
                         },
                         new
                         {
                             RoleId = 2,
                             CreatedBy = "System",
-                            CreatedDate = new DateTime(2025, 5, 24, 18, 44, 56, 558, DateTimeKind.Utc).AddTicks(5702),
+                            CreatedDate = new DateTime(2025, 8, 29, 21, 26, 36, 204, DateTimeKind.Utc).AddTicks(2803),
                             Name = "Cliente"
                         });
                 });
@@ -834,28 +1103,90 @@ namespace Transport.Infraestructure.Migrations
                     b.ToTable("OutboxMessage", (string)null);
                 });
 
-            modelBuilder.Entity("Transport.Domain.Customers.CustomerReserve", b =>
+            modelBuilder.Entity("Transport.Domain.Customers.CustomerAccountTransaction", b =>
                 {
                     b.HasOne("Transport.Domain.Customers.Customer", "Customer")
-                        .WithMany("CustomerReserves")
+                        .WithMany("AccountTransactions")
                         .HasForeignKey("CustomerId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Transport.Domain.Direction", "DropoffLocation")
+                    b.HasOne("Transport.Domain.Reserves.Reserve", "RelatedReserve")
+                        .WithMany()
+                        .HasForeignKey("RelatedReserveId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Transport.Domain.Reserves.ReservePayment", "ReservePayment")
+                        .WithMany()
+                        .HasForeignKey("ReservePaymentId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Customer");
+
+                    b.Navigation("RelatedReserve");
+
+                    b.Navigation("ReservePayment");
+                });
+
+            modelBuilder.Entity("Transport.Domain.Customers.CustomerBookingHistory", b =>
+                {
+                    b.HasOne("Transport.Domain.Customers.Customer", "Customer")
+                        .WithMany("BookingHistories")
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("Transport.Domain.Reserves.Reserve", "Reserve")
+                        .WithMany()
+                        .HasForeignKey("ReserveId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.Navigation("Customer");
+
+                    b.Navigation("Reserve");
+                });
+
+            modelBuilder.Entity("Transport.Domain.Directions.Direction", b =>
+                {
+                    b.HasOne("Transport.Domain.Cities.City", "City")
+                        .WithMany("Directions")
+                        .HasForeignKey("CityId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("City");
+                });
+
+            modelBuilder.Entity("Transport.Domain.Passengers.Passenger", b =>
+                {
+                    b.HasOne("Transport.Domain.Customers.Customer", "Customer")
+                        .WithMany("Passengers")
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("Transport.Domain.Directions.Direction", null)
                         .WithMany("DropoffCustomerReserves")
+                        .HasForeignKey("DirectionId");
+
+                    b.HasOne("Transport.Domain.Directions.Direction", null)
+                        .WithMany("PickupCustomerReserves")
+                        .HasForeignKey("DirectionId1");
+
+                    b.HasOne("Transport.Domain.Directions.Direction", "DropoffLocation")
+                        .WithMany()
                         .HasForeignKey("DropoffLocationId")
                         .OnDelete(DeleteBehavior.NoAction);
 
-                    b.HasOne("Transport.Domain.Direction", "PickupLocation")
-                        .WithMany("PickupCustomerReserves")
+                    b.HasOne("Transport.Domain.Directions.Direction", "PickupLocation")
+                        .WithMany()
                         .HasForeignKey("PickupLocationId")
                         .OnDelete(DeleteBehavior.NoAction);
 
                     b.HasOne("Transport.Domain.Reserves.Reserve", "Reserve")
-                        .WithMany("CustomerReserves")
+                        .WithMany("Passengers")
                         .HasForeignKey("ReserveId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
 
                     b.Navigation("Customer");
@@ -867,27 +1198,23 @@ namespace Transport.Infraestructure.Migrations
                     b.Navigation("Reserve");
                 });
 
-            modelBuilder.Entity("Transport.Domain.Direction", b =>
-                {
-                    b.HasOne("Transport.Domain.Cities.City", "City")
-                        .WithMany("Directions")
-                        .HasForeignKey("CityId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("City");
-                });
-
             modelBuilder.Entity("Transport.Domain.Reserves.Reserve", b =>
                 {
                     b.HasOne("Transport.Domain.Drivers.Driver", "Driver")
                         .WithMany("Reserves")
-                        .HasForeignKey("DriverId");
+                        .HasForeignKey("DriverId")
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.HasOne("Transport.Domain.Services.Service", "Service")
                         .WithMany("Reserves")
                         .HasForeignKey("ServiceId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Transport.Domain.Services.ServiceSchedule", "ServiceSchedule")
+                        .WithMany()
+                        .HasForeignKey("ServiceScheduleId")
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("Transport.Domain.Vehicles.Vehicle", "Vehicle")
@@ -900,7 +1227,34 @@ namespace Transport.Infraestructure.Migrations
 
                     b.Navigation("Service");
 
+                    b.Navigation("ServiceSchedule");
+
                     b.Navigation("Vehicle");
+                });
+
+            modelBuilder.Entity("Transport.Domain.Reserves.ReservePayment", b =>
+                {
+                    b.HasOne("Transport.Domain.Customers.Customer", "Customer")
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("Transport.Domain.Reserves.ReservePayment", "ParentReservePayment")
+                        .WithMany("ChildPayments")
+                        .HasForeignKey("ParentReservePaymentId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Transport.Domain.Reserves.Reserve", "Reserve")
+                        .WithMany()
+                        .HasForeignKey("ReserveId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Customer");
+
+                    b.Navigation("ParentReservePayment");
+
+                    b.Navigation("Reserve");
                 });
 
             modelBuilder.Entity("Transport.Domain.Reserves.ReservePrice", b =>
@@ -960,6 +1314,17 @@ namespace Transport.Infraestructure.Migrations
                     b.Navigation("Service");
                 });
 
+            modelBuilder.Entity("Transport.Domain.Services.ServiceSchedule", b =>
+                {
+                    b.HasOne("Transport.Domain.Services.Service", "Service")
+                        .WithMany("Schedules")
+                        .HasForeignKey("ServiceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Service");
+                });
+
             modelBuilder.Entity("Transport.Domain.Users.RefreshToken", b =>
                 {
                     b.HasOne("Transport.Domain.Users.User", "User")
@@ -1010,14 +1375,18 @@ namespace Transport.Infraestructure.Migrations
 
             modelBuilder.Entity("Transport.Domain.Customers.Customer", b =>
                 {
-                    b.Navigation("CustomerReserves");
+                    b.Navigation("AccountTransactions");
+
+                    b.Navigation("BookingHistories");
+
+                    b.Navigation("Passengers");
 
                     b.Navigation("Services");
 
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("Transport.Domain.Direction", b =>
+            modelBuilder.Entity("Transport.Domain.Directions.Direction", b =>
                 {
                     b.Navigation("DropoffCustomerReserves");
 
@@ -1031,7 +1400,12 @@ namespace Transport.Infraestructure.Migrations
 
             modelBuilder.Entity("Transport.Domain.Reserves.Reserve", b =>
                 {
-                    b.Navigation("CustomerReserves");
+                    b.Navigation("Passengers");
+                });
+
+            modelBuilder.Entity("Transport.Domain.Reserves.ReservePayment", b =>
+                {
+                    b.Navigation("ChildPayments");
                 });
 
             modelBuilder.Entity("Transport.Domain.Services.Service", b =>
@@ -1041,6 +1415,8 @@ namespace Transport.Infraestructure.Migrations
                     b.Navigation("ReservePrices");
 
                     b.Navigation("Reserves");
+
+                    b.Navigation("Schedules");
                 });
 
             modelBuilder.Entity("Transport.Domain.Users.Role", b =>

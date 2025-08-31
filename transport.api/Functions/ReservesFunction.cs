@@ -125,11 +125,11 @@ public class ReservesFunction : FunctionBase
 
     [Function("GetCustomerReserveReport")]
     [Authorize("Admin")]
-    [OpenApiOperation(operationId: "customer-reserve-report", tags: new[] { "Reserve" }, Summary = "Get Customer Reserves Report", Description = "Returns paginated list of customer reserves", Visibility = OpenApiVisibilityType.Important)]
+    [OpenApiOperation(operationId: "passenger-reserve-report", tags: new[] { "Reserve" }, Summary = "Get passenger Reserves Report", Description = "Returns paginated list of passenger reserves", Visibility = OpenApiVisibilityType.Important)]
     [OpenApiRequestBody("application/json", typeof(PagedReportRequestDto<PassengerReserveReportFilterRequestDto>), Required = true)]
-    [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(PagedReportResponseDto<PassengerReserveReportResponseDto>), Summary = "Customer Reserve Report")]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(PagedReportResponseDto<PassengerReserveReportResponseDto>), Summary = "passenger Reserve Report")]
     public async Task<HttpResponseData> GetCustomerReserveReport(
-    [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "customer-reserve-report/{reserveId:int}")] HttpRequestData req,
+    [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "passenger-reserve-report/{reserveId:int}")] HttpRequestData req,
     int reserveId)
     {
         var filter = await req.ReadFromJsonAsync<PagedReportRequestDto<PassengerReserveReportFilterRequestDto>>();
@@ -188,26 +188,26 @@ public class ReservesFunction : FunctionBase
         return await MatchResultAsync(req, result);
     }
 
-    [Function("UpdateCustomerReserve")]
+    [Function("UpdatePassengerReserve")]
     [Authorize("Admin")]
     [OpenApiOperation(
-    operationId: "customer-reserve-update",
-    tags: new[] { "CustomerReserve" },
-    Summary = "Update a Customer Reserve",
-    Description = "Updates the specified customer reserve with new pickup/dropoff locations or travel status.",
+    operationId: "passenger-reserve-update",
+    tags: new[] { "passenger" },
+    Summary = "Update a passenger Reserve",
+    Description = "Updates the specified passenger reserve with new pickup/dropoff locations or travel status.",
     Visibility = OpenApiVisibilityType.Important)]
     [OpenApiRequestBody("application/json", typeof(PassengerReserveUpdateRequestDto), Required = true)]
-    [OpenApiParameter(name: "customerReserveId", In = ParameterLocation.Path, Required = true, Type = typeof(int), Summary = "ID of the customer reserve")]
-    [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(Result<bool>), Summary = "Customer reserve updated successfully.")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Summary = "Customer reserve not found.")]
+    [OpenApiParameter(name: "passengerId", In = ParameterLocation.Path, Required = true, Type = typeof(int), Summary = "ID of the customer reserve")]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(Result<bool>), Summary = "Passenger reserve updated successfully.")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Summary = "Passenger reserve not found.")]
     public async Task<HttpResponseData> UpdateCustomerReserve(
-    [HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "customer-reserve-update/{customerReserveId:int}")] HttpRequestData req,
-    int customerReserveId)
+    [HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "passenger-reserve-update/{passengerId:int}")] HttpRequestData req,
+    int passengerId)
     {
         var dto = await req.ReadFromJsonAsync<PassengerReserveUpdateRequestDto>();
 
         var result = await ValidateAndMatchAsync(req, dto, GetValidator<PassengerReserveUpdateRequestDto>())
-                        .BindAsync(update => _reserveBusiness.UpdatePassengerReserveAsync(customerReserveId, update));
+                        .BindAsync(update => _reserveBusiness.UpdatePassengerReserveAsync(passengerId, update));
 
         return await MatchResultAsync(req, result);
     }
