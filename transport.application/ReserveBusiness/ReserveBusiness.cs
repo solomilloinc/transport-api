@@ -140,10 +140,13 @@ public class ReserveBusiness : IReserveBusiness
                 };
 
                 reserve.Passengers.Add(passenger);
-                _context.Reserves.Update(reserve);
+
+                _context.Passengers.Add(passenger);
 
                 totalExpectedAmount += reservePrice.Price;
             }
+
+            await _context.SaveChangesWithOutboxAsync();
 
             var reserveIds = passengerReserves.Items.Select(i => i.ReserveId).Distinct().ToList();
             var description = BuildDescription(reserveIds, reserveMap, servicesCache, passengerReserves);
@@ -359,12 +362,17 @@ public class ReserveBusiness : IReserveBusiness
                 };
 
                 reserve.Passengers.Add(newPassenger);
-
-                _context.Reserves.Update(reserve);
-                reserves.Add(reserve);
+                _context.Passengers.Add(newPassenger);
 
                 totalExpectedAmount += reservePrice.Price;
+
+                if (!reserves.Any(p => p.ReserveId == reserve.ReserveId))
+                {
+                    reserves.Add(reserve);
+                }
             }
+
+            await _context.SaveChangesWithOutboxAsync();
 
             if (dto.Payment is null)
             {
@@ -617,22 +625,52 @@ public class ReserveBusiness : IReserveBusiness
 
     private Result ValidateUserReserveCombination(List<PassengerReserveCreateRequestDto> items)
     {
-        var distinctReserveIds = items.Select(x => x.ReserveId).Distinct().ToList();
+        if (items == null || items.Count == 0)
+            return Result.Failure(ReserveError.InvalidReserveCombination("No hay ítems para validar."));
+
+        // 1) Agrupar por reserva y obtener los tipos distintos por cada reserva
+        var byReserve = items
+            .GroupBy(i => i.ReserveId)
+            .ToDictionary(
+                g => g.Key,
+                g => g.Select(i => (ReserveTypeIdEnum)i.ReserveTypeId).Distinct().ToList()
+            );
+
+        // 2) Dentro de una misma reserva no puede haber más de un tipo
+        var mixedTypeReserveIds = byReserve
+            .Where(kv => kv.Value.Count > 1)
+            .Select(kv => kv.Key)
+            .ToList();
+
+        if (mixedTypeReserveIds.Any())
+            return Result.Failure(ReserveError.InvalidReserveCombination(
+                $"La(s) reserva(s) {string.Join(", ", mixedTypeReserveIds)} tiene(n) más de un tipo asignado."));
+
+        // 3) Máximo 2 reservas
+        var distinctReserveIds = byReserve.Keys.ToList();
         if (distinctReserveIds.Count > 2)
-            return Result.Failure(ReserveError.InvalidReserveCombination("Solo se permite reservar hasta 2 reservas: ida y vuelta."));
+            return Result.Failure(ReserveError.InvalidReserveCombination(
+                "Solo se permite reservar hasta 2 reservas: ida y vuelta."));
 
-        var types = items.Select(x => (ReserveTypeIdEnum)x.ReserveTypeId).ToList();
+        // 4) Tomar el tipo (único) de cada reserva
+        var typesPerReserve = byReserve.ToDictionary(kv => kv.Key, kv => kv.Value.Single());
 
-        if (types.Count > 2)
-            return Result.Failure(ReserveError.InvalidReserveCombination("Solo se permite reservar como máximo ida y vuelta."));
+        if (distinctReserveIds.Count == 1)
+        {
+            var singleType = typesPerReserve.Values.Single();
+            if (singleType == ReserveTypeIdEnum.IdaVuelta)
+                return Result.Failure(ReserveError.InvalidReserveCombination(
+                    "No se puede reservar únicamente la vuelta sin haber reservado ida."));
+            return Result.Success();
+        }
 
-        if (types.Count == 2 && !(types.Contains(ReserveTypeIdEnum.Ida) && types.Contains(ReserveTypeIdEnum.IdaVuelta)))
-            return Result.Failure(ReserveError.InvalidReserveCombination("La combinación válida es Ida + IdaVuelta únicamente."));
+        // 5) Si hay 2 reservas, la combinación válida es exactamente Ida + IdaVuelta
+        var typeSet = new HashSet<ReserveTypeIdEnum>(typesPerReserve.Values);
+        if (typeSet.SetEquals(new[] { ReserveTypeIdEnum.Ida, ReserveTypeIdEnum.IdaVuelta }))
+            return Result.Success();
 
-        if (types.Count == 1 && types.First() == ReserveTypeIdEnum.IdaVuelta)
-            return Result.Failure(ReserveError.InvalidReserveCombination("No se puede reservar únicamente la vuelta sin haber reservado ida."));
-
-        return Result.Success();
+        return Result.Failure(ReserveError.InvalidReserveCombination(
+            "La combinación válida es exactamente Ida + IdaVuelta."));
     }
 
     private async Task<Result<Direction?>> GetDirectionAsync(int? locationId, string type)
