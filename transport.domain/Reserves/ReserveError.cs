@@ -22,9 +22,9 @@ public static class ReserveError
             $"No hay suficientes asientos disponibles. Ya reservados: {existing}, nuevos: {incoming}, capacidad: {capacity}."
         );
 
-    public static Error CustomerAlreadyExists(string documentNumber) =>
+    public static Error PassengerAlreadyExists(string documentNumber) =>
         Error.Validation(
-            "Reserve.CustomerAlreadyExists",
+            "Reserve.PassengerAlreadyExists",
             $"El pasajero con documento {documentNumber} ya existe en la reserva.");
 
     public static Error InvalidPaymentAmount(decimal expected, decimal provided) =>

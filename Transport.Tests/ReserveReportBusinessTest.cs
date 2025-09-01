@@ -12,6 +12,7 @@ using Transport.Domain.Cities;
 using Transport.Business.Authentication;
 using Transport.Business.Services.Payment;
 using Transport.Domain.Customers.Abstraction;
+using Transport.Domain.Passengers;
 
 namespace Transport.Tests;
 
@@ -69,9 +70,9 @@ public class ReserveReportBusinessTest : TestBase
             Service = service,
             OriginName = "Buenos Aires",
             DestinationName = "Córdoba",
-            CustomerReserves = new List<CustomerReserve>
+            Passengers = new List<Passenger>
             {
-                new CustomerReserve
+                new Passenger
                 {
                     ReserveId = 1,
                     CustomerId = 101,
@@ -86,7 +87,11 @@ public class ReserveReportBusinessTest : TestBase
                         Phone1 = "111",
                         Phone2 = "222"
                     },
-                    CustomerFullName = "Ana López"
+                    LastName = "López",
+                    FirstName = "Ana",
+                    DocumentNumber = "98765432",
+                    Email = "ana@example.com",
+                    Phone = "111",
                 }
             }
         }
@@ -147,7 +152,7 @@ public class ReserveReportBusinessTest : TestBase
             },
             OriginName = "Rosario",
             DestinationName = "Santa Fe",
-            CustomerReserves = new List<CustomerReserve>()
+            Passengers = new List<Passenger>()
         },
         new Reserve
         {
@@ -164,7 +169,7 @@ public class ReserveReportBusinessTest : TestBase
             },
             OriginName = "Mendoza",
             DestinationName = "San Juan",
-            CustomerReserves = new List<CustomerReserve>()
+            Passengers = new List<Passenger>()
         }
     };
 
@@ -207,7 +212,7 @@ public class ReserveReportBusinessTest : TestBase
                 Destination = new City { Name = "Jujuy" },
                 Vehicle = new Vehicle { AvailableQuantity = 2 }
             },
-            CustomerReserves = new List<CustomerReserve>()
+            Passengers = new List<Passenger>()
         }
     };
 
@@ -247,7 +252,7 @@ public class ReserveReportBusinessTest : TestBase
                 Destination = new City { Name = "Mar del Plata" },
                 Vehicle = new Vehicle { AvailableQuantity = 2 }
             },
-            CustomerReserves = new List<CustomerReserve>()
+            Passengers = new List<Passenger>()
         }
     };
 
@@ -308,11 +313,11 @@ public class ReserveReportBusinessTest : TestBase
                 Status = ReserveStatusEnum.Confirmed,
                 Service = serviceIda,
                 DepartureHour = new TimeSpan(9,0,0),
-                CustomerReserves = new List<CustomerReserve>
+                Passengers = new List<Passenger>
                 {
-                    new CustomerReserve
+                    new Passenger
                     {
-                        Status = CustomerReserveStatusEnum.Confirmed
+                        Status = PassengerStatusEnum.Confirmed
                     }
                 }
             },
@@ -324,10 +329,10 @@ public class ReserveReportBusinessTest : TestBase
                 Status = ReserveStatusEnum.Confirmed,
                 Service = serviceVuelta,
                 DepartureHour = new TimeSpan(18,0,0),
-                CustomerReserves = new List<CustomerReserve>
+                Passengers = new List<Passenger>
                 {
-                    new CustomerReserve { Status = CustomerReserveStatusEnum.Confirmed },
-                    new CustomerReserve { Status = CustomerReserveStatusEnum.Confirmed }
+                    new Passenger { Status = PassengerStatusEnum.Confirmed },
+                    new Passenger { Status = PassengerStatusEnum.Confirmed }
                 }
             },
             // Vuelta reserve with 0 passengers confirmed (available quantity 3 - 0 = 3 available, meets passengersRequested)
@@ -338,7 +343,7 @@ public class ReserveReportBusinessTest : TestBase
                 Status = ReserveStatusEnum.Confirmed,
                 Service = serviceVuelta,
                 DepartureHour = new TimeSpan(20,0,0),
-                CustomerReserves = new List<CustomerReserve>() // no passengers
+                Passengers = new List<Passenger>() // no passengers
             }
         };
 
@@ -427,10 +432,10 @@ public class ReserveReportBusinessTest : TestBase
             Status = ReserveStatusEnum.Confirmed,
             ServiceSchedule = schedule,
             Service = service,
-            CustomerReserves = new List<CustomerReserve>
+            Passengers = new List<Passenger>
         {
-            new CustomerReserve { Status = CustomerReserveStatusEnum.Confirmed },
-            new CustomerReserve { Status = CustomerReserveStatusEnum.PendingPayment }
+            new Passenger { Status = PassengerStatusEnum.Confirmed },
+            new Passenger { Status = PassengerStatusEnum.PendingPayment }
         }
         };
 
@@ -512,7 +517,7 @@ public class ReserveReportBusinessTest : TestBase
             Status = ReserveStatusEnum.Confirmed,
             ServiceSchedule = schedule,
             Service = serviceOutbound,
-            CustomerReserves = new List<CustomerReserve>()
+            Passengers = new List<Passenger>()
         };
 
         var reserveReturn = new Reserve
@@ -522,7 +527,7 @@ public class ReserveReportBusinessTest : TestBase
             Status = ReserveStatusEnum.Confirmed,
             ServiceSchedule = schedule,
             Service = serviceReturn,
-            CustomerReserves = new List<CustomerReserve>()
+            Passengers = new List<Passenger>()
         };
 
         var reserves = new List<Reserve> { reserveOutbound, reserveReturn };

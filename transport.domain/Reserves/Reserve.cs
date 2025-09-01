@@ -1,6 +1,8 @@
 ﻿using Transport.Domain.Customers;
 using Transport.Domain.Drivers;
+using Transport.Domain.Passengers;
 using Transport.Domain.Services;
+using Transport.Domain.Users;
 using Transport.Domain.Vehicles;
 using Transport.SharedKernel;
 
@@ -24,7 +26,7 @@ public class Reserve: Entity, IAuditable
     public Driver? Driver { get; set; }
     public Service Service { get; set; } = null!;
     public ServiceSchedule ServiceSchedule { get; set; } = null!;
-    public ICollection<CustomerReserve> CustomerReserves { get; set; } = new List<CustomerReserve>();
+    public ICollection<Passenger> Passengers { get; set; } = new List<Passenger>();
 
     public string CreatedBy { get; set; } = null!;
     public string? UpdatedBy { get; set; }

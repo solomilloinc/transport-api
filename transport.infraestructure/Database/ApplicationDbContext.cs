@@ -12,6 +12,7 @@ using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Transport.Domain.Services;
 using Transport.Business.Authentication;
 using Transport.Domain.Directions;
+using Transport.Domain.Passengers;
 
 namespace Transport.Infraestructure.Database;
 
@@ -34,7 +35,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<RefreshToken> RefreshTokens { get; set; }
     public DbSet<Holiday> Holidays { get; set; }
     public DbSet<ReservePrice> ReservePrices { get; set; }
-    public DbSet<CustomerReserve> CustomerReserves { get; set; }
+    public DbSet<Passenger> Passengers { get; set; }
     public DbSet<ServiceSchedule> ServiceSchedules { get; set; }
     public DbSet<ReservePayment> ReservePayments { get; set; }
     public DbSet<CustomerAccountTransaction> CustomerAccountTransactions { get; set; }

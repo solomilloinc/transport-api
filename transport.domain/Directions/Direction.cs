@@ -1,5 +1,6 @@
 ﻿using Transport.Domain.Cities;
 using Transport.Domain.Customers;
+using Transport.Domain.Passengers;
 using Transport.SharedKernel;
 
 namespace Transport.Domain.Directions;
@@ -19,6 +20,6 @@ public class Direction: IAuditable
     public DateTime? UpdatedDate { get; set; }
 
     public City City { get; set; } = null!;
-    public ICollection<CustomerReserve> PickupCustomerReserves { get; set; } = new List<CustomerReserve>();
-    public ICollection<CustomerReserve> DropoffCustomerReserves { get; set; } = new List<CustomerReserve>();
+    public ICollection<Passenger> PickupCustomerReserves { get; set; } = new List<Passenger>();
+    public ICollection<Passenger> DropoffCustomerReserves { get; set; } = new List<Passenger>();
 }
