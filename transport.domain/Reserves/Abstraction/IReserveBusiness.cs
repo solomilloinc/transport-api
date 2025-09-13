@@ -27,4 +27,10 @@ public interface IReserveBusiness
     Task<Result<bool>> UpdatePassengerReserveAsync(int customerReserveId, PassengerReserveUpdateRequestDto request);
     Task<Result<bool>> UpdateReservePaymentsByExternalId(string externalId);
     Task<Result<ReserveGroupedPagedReportResponseDto>> GetReserveReport(PagedReportRequestDto<ReserveReportFilterRequestDto> requestDto);
+
+    // Métodos para bloqueo de cupos
+    Task<Result<LockReserveSlotsResponseDto>> LockReserveSlots(LockReserveSlotsRequestDto request);
+    Task<Result<CreateReserveExternalResult>> CreatePassengerReservesWithLock(CreateReserveWithLockRequestDto request);
+    Task<Result<bool>> CancelReserveSlotLock(string lockToken);
+    Task<Result<bool>> CleanupExpiredReserveSlotLocks();
 }

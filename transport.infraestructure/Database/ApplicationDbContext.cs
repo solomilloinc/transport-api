@@ -38,6 +38,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<Passenger> Passengers { get; set; }
     public DbSet<ServiceSchedule> ServiceSchedules { get; set; }
     public DbSet<ReservePayment> ReservePayments { get; set; }
+    public DbSet<ReserveSlotLock> ReserveSlotLocks { get; set; }
     public DbSet<CustomerAccountTransaction> CustomerAccountTransactions { get; set; }
 
     private readonly IUserContext _userContext;

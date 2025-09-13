@@ -24,6 +24,7 @@ using Transport.SharedKernel.Contracts.Passenger;
 using Transport.SharedKernel.Contracts.Payment;
 using Transport.SharedKernel.Contracts.Reserve;
 using Transport.SharedKernel.Contracts.Service;
+using Transport.SharedKernel.Configuration;
 
 namespace Transport.Business.ReserveBusiness;
 
@@ -34,18 +35,21 @@ public class ReserveBusiness : IReserveBusiness
     private readonly IMercadoPagoPaymentGateway _paymentGateway;
     private readonly IUserContext _userContext;
     private readonly ICustomerBusiness _customerBusiness;
+    private readonly IReserveOption _reserveOptions;
 
     public ReserveBusiness(IApplicationDbContext context,
         IUnitOfWork unitOfWork,
         IUserContext userContext,
         IMercadoPagoPaymentGateway paymentGateway,
-        ICustomerBusiness customerBusiness)
+        ICustomerBusiness customerBusiness,
+        IReserveOption reserveOptions)
     {
         _context = context;
         _unitOfWork = unitOfWork;
         _userContext = userContext;
         _paymentGateway = paymentGateway;
         _customerBusiness = customerBusiness;
+        _reserveOptions = reserveOptions;
     }
 
     public async Task<Result<bool>> CreatePassengerReserves(PassengerReserveCreateRequestWrapperDto passengerReserves)
@@ -1203,5 +1207,191 @@ public class ReserveBusiness : IReserveBusiness
             await _context.SaveChangesWithOutboxAsync();
             return Result.Success(true);
         });
+    }
+
+    public async Task<Result<LockReserveSlotsResponseDto>> LockReserveSlots(LockReserveSlotsRequestDto request)
+    {
+        return await _unitOfWork.ExecuteInTransactionAsync(async () =>
+        {
+            // Obtener información del usuario logueado
+            var userEmail = _userContext.Email;
+            var userId = _userContext.UserId;
+
+            // Buscar Customer asociado al usuario (si existe)
+            Customer? associatedCustomer = null;
+            if (userId != null && userId > 0)
+            {
+                var user = await _context.Users
+                    .Include(u => u.Customer)
+                    .FirstOrDefaultAsync(u => u.UserId == userId);
+                associatedCustomer = user?.Customer;
+            }
+
+            // Verificar límite de bloqueos simultáneos por usuario
+            var activeLocksCount = await _context.ReserveSlotLocks
+                .CountAsync(l => l.UserEmail == userEmail &&
+                               l.Status == ReserveSlotLockStatus.Active &&
+                               l.ExpiresAt > DateTime.UtcNow);
+
+            if (activeLocksCount >= _reserveOptions.MaxSimultaneousLocksPerUser)
+                return Result.Failure<LockReserveSlotsResponseDto>(ReserveSlotLockError.MaxSimultaneousLocksExceeded);
+
+            // Verificar disponibilidad actual incluyendo locks activos
+            var availableSlots = await GetAvailableSlots(request.OutboundReserveId, request.ReturnReserveId);
+
+            if (availableSlots < request.PassengerCount)
+                return Result.Failure<LockReserveSlotsResponseDto>(ReserveSlotLockError.InsufficientSlots);
+
+            var lockToken = Guid.NewGuid().ToString();
+            var expiresAt = DateTime.UtcNow.AddMinutes(_reserveOptions.SlotLockTimeoutMinutes);
+
+            var slotLock = new ReserveSlotLock
+            {
+                LockToken = lockToken,
+                OutboundReserveId = request.OutboundReserveId,
+                ReturnReserveId = request.ReturnReserveId,
+                SlotsLocked = request.PassengerCount,
+                ExpiresAt = expiresAt,
+                Status = ReserveSlotLockStatus.Active,
+                UserEmail = userEmail,
+                UserDocumentNumber = associatedCustomer?.DocumentNumber,
+                CustomerId = associatedCustomer?.CustomerId
+            };
+
+            _context.ReserveSlotLocks.Add(slotLock);
+            await _context.SaveChangesWithOutboxAsync();
+
+            return Result.Success(new LockReserveSlotsResponseDto(
+                lockToken,
+                expiresAt,
+                _reserveOptions.SlotLockTimeoutMinutes
+            ));
+        });
+    }
+
+    private async Task<int> GetAvailableSlots(int outboundReserveId, int? returnReserveId = null)
+    {
+        var reserveIds = new List<int> { outboundReserveId };
+        if (returnReserveId.HasValue) reserveIds.Add(returnReserveId.Value);
+
+        var reserves = await _context.Reserves
+            .Include(r => r.Passengers)
+            .Include(r => r.Service.Vehicle)
+            .Where(r => reserveIds.Contains(r.ReserveId))
+            .ToListAsync();
+
+        var minAvailable = int.MaxValue;
+
+        foreach (var reserve in reserves)
+        {
+            // Pasajeros confirmados/pendientes
+            var confirmedPassengers = reserve.Passengers
+                .Count(p => p.Status == PassengerStatusEnum.Confirmed ||
+                           p.Status == PassengerStatusEnum.PendingPayment);
+
+            // Locks activos para esta reserva
+            var activeLocks = await _context.ReserveSlotLocks
+                .Where(l => (l.OutboundReserveId == reserve.ReserveId || l.ReturnReserveId == reserve.ReserveId) &&
+                           l.Status == ReserveSlotLockStatus.Active &&
+                           l.ExpiresAt > DateTime.UtcNow)
+                .SumAsync(l => l.SlotsLocked);
+
+            var available = reserve.Service.Vehicle.AvailableQuantity - confirmedPassengers - activeLocks;
+            minAvailable = Math.Min(minAvailable, available);
+        }
+
+        return Math.Max(0, minAvailable);
+    }
+
+    public async Task<Result<CreateReserveExternalResult>> CreatePassengerReservesWithLock(CreateReserveWithLockRequestDto request)
+    {
+        return await _unitOfWork.ExecuteInTransactionAsync(async () =>
+        {
+            // Validar token de bloqueo
+            var slotLock = await _context.ReserveSlotLocks
+                .FirstOrDefaultAsync(l => l.LockToken == request.LockToken &&
+                                         l.Status == ReserveSlotLockStatus.Active &&
+                                         l.ExpiresAt > DateTime.UtcNow);
+
+            if (slotLock == null)
+                return Result.Failure<CreateReserveExternalResult>(ReserveSlotLockError.InvalidOrExpiredLock);
+
+            // Validar que las reservas coincidan
+            var requestReserveIds = request.Items.Select(i => i.ReserveId).Distinct().OrderBy(x => x).ToList();
+            var lockReserveIds = new List<int> { slotLock.OutboundReserveId };
+            if (slotLock.ReturnReserveId.HasValue)
+                lockReserveIds.Add(slotLock.ReturnReserveId.Value);
+            lockReserveIds = lockReserveIds.OrderBy(x => x).ToList();
+
+            if (!requestReserveIds.SequenceEqual(lockReserveIds))
+                return Result.Failure<CreateReserveExternalResult>(ReserveSlotLockError.LockReserveMismatch);
+
+            // Validar cantidad de pasajeros
+            if (request.Items.Count != slotLock.SlotsLocked)
+                return Result.Failure<CreateReserveExternalResult>(ReserveSlotLockError.LockReserveMismatch);
+
+            // Crear el DTO compatible con el método existente
+            var externalDto = new PassengerReserveCreateRequestWrapperExternalDto(
+                request.Payment,
+                request.Items
+            );
+
+            // Proceder con la lógica normal de creación
+            var result = await CreatePassengerReservesExternal(externalDto);
+
+            if (result.IsSuccess)
+            {
+                // Marcar lock como utilizado
+                slotLock.Status = ReserveSlotLockStatus.Used;
+                slotLock.UpdatedDate = DateTime.UtcNow;
+                _context.ReserveSlotLocks.Update(slotLock);
+                await _context.SaveChangesWithOutboxAsync();
+            }
+
+            return result;
+        });
+    }
+
+    public async Task<Result<bool>> CancelReserveSlotLock(string lockToken)
+    {
+        return await _unitOfWork.ExecuteInTransactionAsync(async () =>
+        {
+            var slotLock = await _context.ReserveSlotLocks
+                .FirstOrDefaultAsync(l => l.LockToken == lockToken &&
+                                         l.Status == ReserveSlotLockStatus.Active);
+
+            if (slotLock == null)
+                return Result.Failure<bool>(ReserveSlotLockError.LockNotFound);
+
+            slotLock.Status = ReserveSlotLockStatus.Cancelled;
+            slotLock.UpdatedDate = DateTime.UtcNow;
+
+            _context.ReserveSlotLocks.Update(slotLock);
+            await _context.SaveChangesWithOutboxAsync();
+
+            return Result.Success(true);
+        });
+    }
+
+    public async Task<Result<bool>> CleanupExpiredReserveSlotLocks()
+    {
+        var expiredLocks = await _context.ReserveSlotLocks
+            .Where(l => l.Status == ReserveSlotLockStatus.Active &&
+                       l.ExpiresAt < DateTime.UtcNow)
+            .ToListAsync();
+
+        if (expiredLocks.Any())
+        {
+            foreach (var expiredLock in expiredLocks)
+            {
+                expiredLock.Status = ReserveSlotLockStatus.Expired;
+                expiredLock.UpdatedDate = DateTime.UtcNow;
+            }
+
+            _context.ReserveSlotLocks.UpdateRange(expiredLocks);
+            await _context.SaveChangesWithOutboxAsync();
+        }
+
+        return Result.Success(true);
     }
 }

@@ -31,6 +31,7 @@ public interface IApplicationDbContext
     DbSet<Passenger> Passengers { get; }
     DbSet<ServiceSchedule> ServiceSchedules { get; }
     DbSet<ReservePayment> ReservePayments { get; }
+    DbSet<ReserveSlotLock> ReserveSlotLocks { get; }
     DbSet<CustomerAccountTransaction> CustomerAccountTransactions { get; }
     DbSet<OutboxMessage> OutboxMessages { get; }
     EntityEntry<TEntity> Entry<TEntity>(TEntity entity) where TEntity : class;

@@ -47,7 +47,8 @@ public class ReserveBusinessTests : TestBase
             _unitOfWorkMock.Object,
             _userContextMock.Object,
             _paymentGatewayMock.Object,
-            _customerBusinessMock.Object);
+            _customerBusinessMock.Object,
+            new FakeReserveOption());
     }
 
     [Fact]
@@ -391,7 +392,8 @@ public class ReserveBusinessTests : TestBase
             _unitOfWorkMock.Object,
             _userContextMock.Object,
             paymentGatewayMock.Object,
-            _customerBusinessMock.Object);
+            _customerBusinessMock.Object,
+            new FakeReserveOption());
 
         var passengerList = new List<PassengerReserveExternalCreateRequestDto>
         {
