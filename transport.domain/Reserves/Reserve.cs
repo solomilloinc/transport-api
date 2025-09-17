@@ -22,6 +22,9 @@ public class Reserve: Entity, IAuditable
     public TimeSpan DepartureHour { get; set; }
     public bool IsHoliday { get; set; }
 
+    // Optimistic Concurrency Control
+    public byte[] RowVersion { get; set; } = null!;
+
     public Vehicle Vehicle { get; set; } = null!;
     public Driver? Driver { get; set; }
     public Service Service { get; set; } = null!;

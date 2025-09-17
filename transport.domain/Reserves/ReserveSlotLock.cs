@@ -16,6 +16,9 @@ public class ReserveSlotLock : Entity, IAuditable
     public DateTime ExpiresAt { get; set; }
     public ReserveSlotLockStatus Status { get; set; }
 
+    // Optimistic Concurrency Control
+    public byte[] RowVersion { get; set; } = null!;
+
     // Información del usuario que hace la reserva
     public string? UserEmail { get; set; }
     public string? UserDocumentNumber { get; set; }

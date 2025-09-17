@@ -40,6 +40,11 @@ public class ReserveSlotLockConfiguration : IEntityTypeConfiguration<ReserveSlot
 
         builder.Property(r => r.CreatedDate).IsRequired();
 
+        // Optimistic Concurrency Control
+        builder.Property(r => r.RowVersion)
+               .IsRowVersion()
+               .IsRequired();
+
         // Relaciones
         builder.HasOne(r => r.OutboundReserve)
                .WithMany()

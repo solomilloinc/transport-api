@@ -11,10 +11,11 @@ internal class LockReserveSlotsRequestValidator : AbstractValidator<LockReserveS
             .GreaterThan(0)
             .WithMessage("El ID de reserva de ida debe ser mayor a 0.");
 
-        RuleFor(x => x.ReturnReserveId)
-            .GreaterThan(0)
-            .WithMessage("El ID de reserva de vuelta debe ser mayor a 0.")
-            .When(x => x.ReturnReserveId.HasValue);
+        When(x => x.ReturnReserveId.HasValue, () => {
+            RuleFor(x => x.ReturnReserveId.Value)
+                .GreaterThan(0)
+                .WithMessage("El ID de reserva de vuelta debe ser mayor a 0.");
+        });
 
         RuleFor(x => x.PassengerCount)
             .GreaterThan(0)

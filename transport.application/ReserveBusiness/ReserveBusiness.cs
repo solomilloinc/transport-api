@@ -271,6 +271,15 @@ public class ReserveBusiness : IReserveBusiness
     public async Task<Result<CreateReserveExternalResult>> CreatePassengerReservesExternal(
         PassengerReserveCreateRequestWrapperExternalDto dto)
     {
+        return await _unitOfWork.ExecuteInTransactionAsync<CreateReserveExternalResult>(async () =>
+        {
+            return await CreatePassengerReservesExternalCore(dto);
+        });
+    }
+
+    private async Task<Result<CreateReserveExternalResult>> CreatePassengerReservesExternalCore(
+        PassengerReserveCreateRequestWrapperExternalDto dto)
+    {
         var validationResult = ValidateUserReserveCombination(dto.Items);
         if (validationResult.IsFailure)
             return Result.Failure<CreateReserveExternalResult>(validationResult.Error);
@@ -288,130 +297,121 @@ public class ReserveBusiness : IReserveBusiness
         }
 
         List<Reserve> reserves = new List<Reserve>();
+        decimal totalExpectedAmount = 0m;
 
-        return await _unitOfWork.ExecuteInTransactionAsync<CreateReserveExternalResult>(async () =>
+        foreach (var passengerDto in dto.Items)
         {
-            decimal totalExpectedAmount = 0m;
+            var reserve = await _context.Reserves
+               .Include(r => r.Passengers)
+               .SingleOrDefaultAsync(r => r.ReserveId == passengerDto.ReserveId);
 
-            foreach (var passengerDto in dto.Items)
+            if (reserve is null)
+                return Result.Failure<CreateReserveExternalResult>(ReserveError.NotFound);
+
+            if (reserve.Status != ReserveStatusEnum.Confirmed)
+                return Result.Failure<CreateReserveExternalResult>(ReserveError.NotAvailable);
+
+            var service = await _context.Services
+                .Include(s => s.ReservePrices)
+                .Include(s => s.Origin)
+                .Include(s => s.Destination)
+                .SingleOrDefaultAsync(s => s.ServiceId == reserve.ServiceId);
+
+            var vehicle = await _context.Vehicles.FindAsync(reserve.VehicleId);
+
+            var existingPassengerCount = reserve.Passengers.Count;
+            var totalAfterInsert = existingPassengerCount + dto.Items.Count;
+
+            if (totalAfterInsert > vehicle.AvailableQuantity)
+                return Result.Failure<CreateReserveExternalResult>(
+                    ReserveError.VehicleQuantityNotAvailable(existingPassengerCount, dto.Items.Count, vehicle.AvailableQuantity));
+
+            var reservePrice = service.ReservePrices
+                .SingleOrDefault(p => p.ReserveTypeId == (ReserveTypeIdEnum)passengerDto.ReserveTypeId);
+
+            if (reservePrice is null)
+                return Result.Failure<CreateReserveExternalResult>(ReserveError.PriceNotAvailable);
+
+            if (reserve.Passengers.Any(p => p.DocumentNumber == passengerDto.DocumentNumber))
+                return Result.Failure<CreateReserveExternalResult>(
+                    ReserveError.PassengerAlreadyExists(passengerDto.DocumentNumber));
+
+            var pickupResult = await GetDirectionAsync(passengerDto.PickupLocationId, "Pickup");
+            if (pickupResult.IsFailure)
+                return Result.Failure<CreateReserveExternalResult>(pickupResult.Error);
+
+            var dropoffResult = await GetDirectionAsync(passengerDto.DropoffLocationId, "Dropoff");
+            if (dropoffResult.IsFailure)
+                return Result.Failure<CreateReserveExternalResult>(dropoffResult.Error);
+
+            Customer existingCustomer = await _context.Customers
+                    .SingleOrDefaultAsync(c => c.DocumentNumber == passengerDto.DocumentNumber);
+
+            var newPassenger = new Passenger
             {
-                var reserve = await _context.Reserves
-                   .Include(r => r.Passengers)
-                   .SingleOrDefaultAsync(r => r.ReserveId == passengerDto.ReserveId);
+                ReserveId = reserve.ReserveId,
+                FirstName = passengerDto.FirstName,
+                LastName = passengerDto.LastName,
+                DocumentNumber = passengerDto.DocumentNumber,
+                Email = passengerDto.Email,
+                Phone = passengerDto.Phone1,
+                PickupLocationId = passengerDto.PickupLocationId,
+                DropoffLocationId = passengerDto.DropoffLocationId,
+                PickupAddress = pickupResult.Value?.Name,
+                DropoffAddress = dropoffResult.Value?.Name,
+                HasTraveled = false,
+                Price = reservePrice.Price,
+                Status = dto.Payment is null ? PassengerStatusEnum.PendingPayment : PassengerStatusEnum.Confirmed,
+                CustomerId = existingCustomer?.CustomerId,
+            };
 
-                if (reserve is null)
-                    return Result.Failure<CreateReserveExternalResult>(ReserveError.NotFound);
+            reserve.Passengers.Add(newPassenger);
+            _context.Passengers.Add(newPassenger);
 
-                if (reserve.Status != ReserveStatusEnum.Confirmed)
-                    return Result.Failure<CreateReserveExternalResult>(ReserveError.NotAvailable);
+            totalExpectedAmount += reservePrice.Price;
 
-                var service = await _context.Services
-                    .Include(s => s.ReservePrices)
-                    .Include(s => s.Origin)
-                    .Include(s => s.Destination)
-                    .SingleOrDefaultAsync(s => s.ServiceId == reserve.ServiceId);
-
-                var vehicle = await _context.Vehicles.FindAsync(reserve.VehicleId);
-
-                var existingPassengerCount = reserve.Passengers.Count;
-                var totalAfterInsert = existingPassengerCount + dto.Items.Count;
-
-                if (totalAfterInsert > vehicle.AvailableQuantity)
-                    return Result.Failure<CreateReserveExternalResult>(
-                        ReserveError.VehicleQuantityNotAvailable(existingPassengerCount, dto.Items.Count, vehicle.AvailableQuantity));
-
-                var reservePrice = service.ReservePrices
-                    .SingleOrDefault(p => p.ReserveTypeId == (ReserveTypeIdEnum)passengerDto.ReserveTypeId);
-
-                if (reservePrice is null)
-                    return Result.Failure<CreateReserveExternalResult>(ReserveError.PriceNotAvailable);
-
-                // Verificar si el pasajero ya existe
-                if (reserve.Passengers.Any(p => p.DocumentNumber == passengerDto.DocumentNumber))
-                    return Result.Failure<CreateReserveExternalResult>(
-                        ReserveError.PassengerAlreadyExists(passengerDto.DocumentNumber));
-
-                var pickupResult = await GetDirectionAsync(passengerDto.PickupLocationId, "Pickup");
-                if (pickupResult.IsFailure)
-                    return Result.Failure<CreateReserveExternalResult>(pickupResult.Error);
-
-                var dropoffResult = await GetDirectionAsync(passengerDto.DropoffLocationId, "Dropoff");
-                if (dropoffResult.IsFailure)
-                    return Result.Failure<CreateReserveExternalResult>(dropoffResult.Error);
-
-                // Verificar si es cliente existente
-                Customer existingCustomer = await _context.Customers
-                        .SingleOrDefaultAsync(c => c.DocumentNumber == passengerDto.DocumentNumber);
-
-                var newPassenger = new Passenger
-                {
-                    ReserveId = reserve.ReserveId,
-                    FirstName = passengerDto.FirstName,
-                    LastName = passengerDto.LastName,
-                    DocumentNumber = passengerDto.DocumentNumber,
-                    Email = passengerDto.Email,
-                    Phone = passengerDto.Phone1,
-                    PickupLocationId = passengerDto.PickupLocationId,
-                    DropoffLocationId = passengerDto.DropoffLocationId,
-                    PickupAddress = pickupResult.Value?.Name,
-                    DropoffAddress = dropoffResult.Value?.Name,
-                    HasTraveled = false,
-                    Price = reservePrice.Price,
-                    Status = dto.Payment is null ? PassengerStatusEnum.PendingPayment : PassengerStatusEnum.Confirmed,
-                    CustomerId = existingCustomer?.CustomerId,
-                };
-
-                reserve.Passengers.Add(newPassenger);
-                _context.Passengers.Add(newPassenger);
-
-                totalExpectedAmount += reservePrice.Price;
-
-                if (!reserves.Any(p => p.ReserveId == reserve.ReserveId))
-                {
-                    reserves.Add(reserve);
-                }
+            if (!reserves.Any(p => p.ReserveId == reserve.ReserveId))
+            {
+                reserves.Add(reserve);
             }
+        }
+
+        await _context.SaveChangesWithOutboxAsync();
+
+        if (dto.Payment is null)
+        {
+            var resultPayment = await CreatePendingPayment(totalExpectedAmount, reserves, dto.Items.First());
+            if (resultPayment.IsFailure)
+                return Result.Failure<CreateReserveExternalResult>(resultPayment.Error);
+
+            string preferenceId = await _paymentGateway.CreatePreferenceAsync(
+                resultPayment.Value.ToString(),
+                totalExpectedAmount,
+                dto.Items
+            );
 
             await _context.SaveChangesWithOutboxAsync();
+            return Result.Success(new CreateReserveExternalResult(PaymentStatus.Pending, preferenceId));
+        }
+        else
+        {
+            var totalProvidedAmount = dto.Payment.TransactionAmount;
 
-            if (dto.Payment is null)
-            {
-                // Crear pago pendiente (padre + hijos link 0 para los otros tramos)
-                var resultPayment = await CreatePendingPayment(totalExpectedAmount, reserves, dto.Items.First());
-                if (resultPayment.IsFailure)
-                    return Result.Failure<CreateReserveExternalResult>(resultPayment.Error);
+            if (totalExpectedAmount != totalProvidedAmount)
+                return Result.Failure<CreateReserveExternalResult>(
+                    ReserveError.InvalidPaymentAmount(totalExpectedAmount, totalProvidedAmount));
 
-                string preferenceId = await _paymentGateway.CreatePreferenceAsync(
-                    resultPayment.Value.ToString(),
-                    totalExpectedAmount,
-                    dto.Items
-                );
+            var resultPayment = await CreatePayment(dto.Payment, reserves);
+            if (resultPayment.IsFailure)
+                return Result.Failure<CreateReserveExternalResult>(resultPayment.Error);
 
-                await _context.SaveChangesWithOutboxAsync();
-                return Result.Success(new CreateReserveExternalResult(PaymentStatus.Pending, preferenceId));
-            }
-            else
-            {
-                var totalProvidedAmount = dto.Payment.TransactionAmount;
-
-                if (totalExpectedAmount != totalProvidedAmount)
-                    return Result.Failure<CreateReserveExternalResult>(
-                        ReserveError.InvalidPaymentAmount(totalExpectedAmount, totalProvidedAmount));
-
-                // Crear pago (padre + hijos link 0) usando orden de reservas
-                var resultPayment = await CreatePayment(dto.Payment, reserves);
-                if (resultPayment.IsFailure)
-                    return Result.Failure<CreateReserveExternalResult>(resultPayment.Error);
-
-                await _context.SaveChangesWithOutboxAsync();
-                return Result.Success(new CreateReserveExternalResult(PaymentStatus.Approved, null));
-            }
-        });
+            await _context.SaveChangesWithOutboxAsync();
+            return Result.Success(new CreateReserveExternalResult(PaymentStatus.Approved, null));
+        }
     }
 
     private async Task<Result<bool>> CreatePayment(CreatePaymentExternalRequestDto paymentData, List<Reserve> reserves)
     {
-        // Ordenar reservas para decidir padre/hijos sin depender de ReserveTypeId
         var orderedReserves = reserves
             .OrderBy(r => r.ReserveDate)
             .ThenBy(r => r.ReserveId)
@@ -419,11 +419,9 @@ public class ReserveBusiness : IReserveBusiness
 
         var mainReserve = orderedReserves.First();
 
-        // Determinar pagador (si es Customer) por DNI
         var payingCustomer = await _context.Customers
             .SingleOrDefaultAsync(c => c.DocumentNumber == paymentData.IdentificationNumber);
 
-        // 1) Crear PAGO PADRE en Pending para obtener Id (lo usamos como ExternalReference)
         var parentPayment = new ReservePayment
         {
             Amount = paymentData.TransactionAmount,
@@ -1211,65 +1209,83 @@ public class ReserveBusiness : IReserveBusiness
 
     public async Task<Result<LockReserveSlotsResponseDto>> LockReserveSlots(LockReserveSlotsRequestDto request)
     {
-        return await _unitOfWork.ExecuteInTransactionAsync(async () =>
+        const int maxRetries = 3;
+
+        for (int attempt = 0; attempt < maxRetries; attempt++)
         {
-            // Obtener información del usuario logueado
-            var userEmail = _userContext.Email;
-            var userId = _userContext.UserId;
-
-            // Buscar Customer asociado al usuario (si existe)
-            Customer? associatedCustomer = null;
-            if (userId != null && userId > 0)
+            try
             {
-                var user = await _context.Users
-                    .Include(u => u.Customer)
-                    .FirstOrDefaultAsync(u => u.UserId == userId);
-                associatedCustomer = user?.Customer;
+                return await _unitOfWork.ExecuteInTransactionAsync(async () =>
+                {
+                    var userEmail = _userContext.Email;
+                    var userId = _userContext.UserId;
+
+                    Customer? associatedCustomer = null;
+                    if (userId != null && userId > 0)
+                    {
+                        var user = await _context.Users
+                            .Include(u => u.Customer)
+                            .FirstOrDefaultAsync(u => u.UserId == userId);
+                        associatedCustomer = user?.Customer;
+                    }
+
+                    var activeLocksCount = await _context.ReserveSlotLocks
+                        .CountAsync(l => l.UserEmail == userEmail &&
+                                       l.Status == ReserveSlotLockStatus.Active &&
+                                       l.ExpiresAt > DateTime.UtcNow);
+
+                    if (activeLocksCount >= _reserveOptions.MaxSimultaneousLocksPerUser)
+                        return Result.Failure<LockReserveSlotsResponseDto>(ReserveSlotLockError.MaxSimultaneousLocksExceeded);
+
+                    var availableSlots = await GetAvailableSlotsWithOptimisticLocking(request.OutboundReserveId, request.ReturnReserveId);
+
+                    if (availableSlots < request.PassengerCount)
+                        return Result.Failure<LockReserveSlotsResponseDto>(ReserveSlotLockError.InsufficientSlots);
+
+                    var lockToken = Guid.NewGuid().ToString();
+                    var expiresAt = DateTime.UtcNow.AddMinutes(_reserveOptions.SlotLockTimeoutMinutes);
+
+                    var slotLock = new ReserveSlotLock
+                    {
+                        LockToken = lockToken,
+                        OutboundReserveId = request.OutboundReserveId,
+                        ReturnReserveId = request.ReturnReserveId,
+                        SlotsLocked = request.PassengerCount,
+                        ExpiresAt = expiresAt,
+                        Status = ReserveSlotLockStatus.Active,
+                        UserEmail = userEmail,
+                        UserDocumentNumber = associatedCustomer?.DocumentNumber,
+                        CustomerId = associatedCustomer?.CustomerId,
+                        RowVersion = new byte[8]
+                    };
+
+                    _context.ReserveSlotLocks.Add(slotLock);
+                    await _context.SaveChangesWithOutboxAsync();
+
+                    return Result.Success(new LockReserveSlotsResponseDto(
+                        lockToken,
+                        expiresAt,
+                        _reserveOptions.SlotLockTimeoutMinutes
+                    ));
+                });
             }
-
-            // Verificar límite de bloqueos simultáneos por usuario
-            var activeLocksCount = await _context.ReserveSlotLocks
-                .CountAsync(l => l.UserEmail == userEmail &&
-                               l.Status == ReserveSlotLockStatus.Active &&
-                               l.ExpiresAt > DateTime.UtcNow);
-
-            if (activeLocksCount >= _reserveOptions.MaxSimultaneousLocksPerUser)
-                return Result.Failure<LockReserveSlotsResponseDto>(ReserveSlotLockError.MaxSimultaneousLocksExceeded);
-
-            // Verificar disponibilidad actual incluyendo locks activos
-            var availableSlots = await GetAvailableSlots(request.OutboundReserveId, request.ReturnReserveId);
-
-            if (availableSlots < request.PassengerCount)
-                return Result.Failure<LockReserveSlotsResponseDto>(ReserveSlotLockError.InsufficientSlots);
-
-            var lockToken = Guid.NewGuid().ToString();
-            var expiresAt = DateTime.UtcNow.AddMinutes(_reserveOptions.SlotLockTimeoutMinutes);
-
-            var slotLock = new ReserveSlotLock
+            catch (DbUpdateConcurrencyException) when (attempt < maxRetries - 1)
             {
-                LockToken = lockToken,
-                OutboundReserveId = request.OutboundReserveId,
-                ReturnReserveId = request.ReturnReserveId,
-                SlotsLocked = request.PassengerCount,
-                ExpiresAt = expiresAt,
-                Status = ReserveSlotLockStatus.Active,
-                UserEmail = userEmail,
-                UserDocumentNumber = associatedCustomer?.DocumentNumber,
-                CustomerId = associatedCustomer?.CustomerId
-            };
+                await Task.Delay(Random.Shared.Next(10, 100)); // Jitter to avoid thundering herd
+                continue;
+            }
+            catch (DbUpdateException ex) when (ex.InnerException?.Message.Contains("deadlock") == true && attempt < maxRetries - 1)
+            {
+                await Task.Delay(Random.Shared.Next(50, 200));
+                continue;
+            }
+        }
 
-            _context.ReserveSlotLocks.Add(slotLock);
-            await _context.SaveChangesWithOutboxAsync();
-
-            return Result.Success(new LockReserveSlotsResponseDto(
-                lockToken,
-                expiresAt,
-                _reserveOptions.SlotLockTimeoutMinutes
-            ));
-        });
+        return Result.Failure<LockReserveSlotsResponseDto>(
+            Error.Failure("ConcurrencyConflict", "Unable to acquire slot lock due to high concurrency. Please try again."));
     }
 
-    private async Task<int> GetAvailableSlots(int outboundReserveId, int? returnReserveId = null)
+    private async Task<int> GetAvailableSlotsWithOptimisticLocking(int outboundReserveId, int? returnReserveId = null)
     {
         var reserveIds = new List<int> { outboundReserveId };
         if (returnReserveId.HasValue) reserveIds.Add(returnReserveId.Value);
@@ -1278,26 +1294,29 @@ public class ReserveBusiness : IReserveBusiness
             .Include(r => r.Passengers)
             .Include(r => r.Service.Vehicle)
             .Where(r => reserveIds.Contains(r.ReserveId))
-            .ToListAsync();
+            .ToListAsync(); 
 
         var minAvailable = int.MaxValue;
 
         foreach (var reserve in reserves)
         {
-            // Pasajeros confirmados/pendientes
             var confirmedPassengers = reserve.Passengers
                 .Count(p => p.Status == PassengerStatusEnum.Confirmed ||
                            p.Status == PassengerStatusEnum.PendingPayment);
 
-            // Locks activos para esta reserva
             var activeLocks = await _context.ReserveSlotLocks
                 .Where(l => (l.OutboundReserveId == reserve.ReserveId || l.ReturnReserveId == reserve.ReserveId) &&
                            l.Status == ReserveSlotLockStatus.Active &&
                            l.ExpiresAt > DateTime.UtcNow)
-                .SumAsync(l => l.SlotsLocked);
+                .ToListAsync();
 
-            var available = reserve.Service.Vehicle.AvailableQuantity - confirmedPassengers - activeLocks;
+            var totalActiveLocks = activeLocks.Sum(l => l.SlotsLocked);
+
+            var available = reserve.Service.Vehicle.AvailableQuantity - confirmedPassengers - totalActiveLocks;
             minAvailable = Math.Min(minAvailable, available);
+
+            reserve.UpdatedDate = DateTime.UtcNow;
+            reserve.UpdatedBy = "SlotLockSystem";
         }
 
         return Math.Max(0, minAvailable);
@@ -1307,7 +1326,6 @@ public class ReserveBusiness : IReserveBusiness
     {
         return await _unitOfWork.ExecuteInTransactionAsync(async () =>
         {
-            // Validar token de bloqueo
             var slotLock = await _context.ReserveSlotLocks
                 .FirstOrDefaultAsync(l => l.LockToken == request.LockToken &&
                                          l.Status == ReserveSlotLockStatus.Active &&
@@ -1316,7 +1334,6 @@ public class ReserveBusiness : IReserveBusiness
             if (slotLock == null)
                 return Result.Failure<CreateReserveExternalResult>(ReserveSlotLockError.InvalidOrExpiredLock);
 
-            // Validar que las reservas coincidan
             var requestReserveIds = request.Items.Select(i => i.ReserveId).Distinct().OrderBy(x => x).ToList();
             var lockReserveIds = new List<int> { slotLock.OutboundReserveId };
             if (slotLock.ReturnReserveId.HasValue)
@@ -1326,22 +1343,18 @@ public class ReserveBusiness : IReserveBusiness
             if (!requestReserveIds.SequenceEqual(lockReserveIds))
                 return Result.Failure<CreateReserveExternalResult>(ReserveSlotLockError.LockReserveMismatch);
 
-            // Validar cantidad de pasajeros
             if (request.Items.Count != slotLock.SlotsLocked)
                 return Result.Failure<CreateReserveExternalResult>(ReserveSlotLockError.LockReserveMismatch);
 
-            // Crear el DTO compatible con el método existente
             var externalDto = new PassengerReserveCreateRequestWrapperExternalDto(
                 request.Payment,
                 request.Items
             );
 
-            // Proceder con la lógica normal de creación
-            var result = await CreatePassengerReservesExternal(externalDto);
+            var result = await CreatePassengerReservesExternalCore(externalDto);
 
             if (result.IsSuccess)
             {
-                // Marcar lock como utilizado
                 slotLock.Status = ReserveSlotLockStatus.Used;
                 slotLock.UpdatedDate = DateTime.UtcNow;
                 _context.ReserveSlotLocks.Update(slotLock);
