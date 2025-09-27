@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Transport.Infraestructure.Database;
 
@@ -11,9 +12,11 @@ using Transport.Infraestructure.Database;
 namespace Transport.Infraestructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250913190337_ReserveLockSlot")]
+    partial class ReserveLockSlot
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -485,12 +488,6 @@ namespace Transport.Infraestructure.Migrations
                     b.Property<DateTime>("ReserveDate")
                         .HasColumnType("datetime2");
 
-                    b.Property<byte[]>("RowVersion")
-                        .IsConcurrencyToken()
-                        .IsRequired()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("rowversion");
-
                     b.Property<int>("ServiceId")
                         .HasColumnType("int");
 
@@ -686,12 +683,6 @@ namespace Transport.Infraestructure.Migrations
 
                     b.Property<int?>("ReturnReserveId")
                         .HasColumnType("int");
-
-                    b.Property<byte[]>("RowVersion")
-                        .IsConcurrencyToken()
-                        .IsRequired()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("rowversion");
 
                     b.Property<int>("SlotsLocked")
                         .HasColumnType("int");
@@ -977,14 +968,14 @@ namespace Transport.Infraestructure.Migrations
                         {
                             RoleId = 1,
                             CreatedBy = "System",
-                            CreatedDate = new DateTime(2025, 9, 17, 21, 36, 42, 866, DateTimeKind.Utc).AddTicks(3697),
+                            CreatedDate = new DateTime(2025, 9, 13, 19, 3, 37, 343, DateTimeKind.Utc).AddTicks(1672),
                             Name = "Administrador"
                         },
                         new
                         {
                             RoleId = 2,
                             CreatedBy = "System",
-                            CreatedDate = new DateTime(2025, 9, 17, 21, 36, 42, 866, DateTimeKind.Utc).AddTicks(3699),
+                            CreatedDate = new DateTime(2025, 9, 13, 19, 3, 37, 343, DateTimeKind.Utc).AddTicks(1673),
                             Name = "Cliente"
                         });
                 });

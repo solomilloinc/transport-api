@@ -43,30 +43,30 @@ public static class DependencyInjection
         services.AddSingleton<IDateTimeProvider, DateTimeProvider>();
         services.AddScoped<IMercadoPagoPaymentGateway, MercadoPagoPaymentGateway>();
 
-        var smtpSection = configuration.GetSection("SmtpSettingOption");
-        var smtpHost = smtpSection.GetValue<string>("Host");
-        var smtpPort = smtpSection.GetValue<int>("Port");
-        var smtpUser = smtpSection.GetValue<string>("User");
-        var smtpPass = smtpSection.GetValue<string>("Password");
-        var smtpFromEmail = smtpSection.GetValue<string>("FromEmail");
-        var smtpFromName = smtpSection.GetValue<string>("FromName");
+        //var smtpSection = configuration.GetSection("SmtpSettingOption");
+        //var smtpHost = smtpSection.GetValue<string>("Host");
+        //var smtpPort = smtpSection.GetValue<int>("Port");
+        //var smtpUser = smtpSection.GetValue<string>("User");
+        //var smtpPass = smtpSection.GetValue<string>("Password");
+        //var smtpFromEmail = smtpSection.GetValue<string>("FromEmail");
+        //var smtpFromName = smtpSection.GetValue<string>("FromName");
 
-        var smtpClient = new System.Net.Mail.SmtpClient(smtpHost)
-        {
-            Port = smtpPort,
-            Credentials = new System.Net.NetworkCredential(smtpUser, smtpPass),
-            EnableSsl = true,
-        };
+        //var smtpClient = new System.Net.Mail.SmtpClient(smtpHost)
+        //{
+        //    Port = smtpPort,
+        //    Credentials = new System.Net.NetworkCredential(smtpUser, smtpPass),
+        //    EnableSsl = true,
+        //};
 
-        var sender = new SmtpSender(() => smtpClient);
+        //var sender = new SmtpSender(() => smtpClient);
 
-        Email.DefaultSender = sender;
+        //Email.DefaultSender = sender;
 
-        services
-            .AddFluentEmail(smtpFromEmail, smtpFromName)
-            .AddSmtpSender(smtpClient);
+        //services
+        //    .AddFluentEmail(smtpFromEmail, smtpFromName)
+        //    .AddSmtpSender(smtpClient);
 
-        services.AddScoped<IEmailSender, EmailSender>();
+        //services.AddScoped<IEmailSender, EmailSender>();
 
         return services;
     }

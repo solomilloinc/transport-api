@@ -474,3 +474,93 @@ GO
 COMMIT;
 GO
 
+BEGIN TRANSACTION;
+GO
+
+CREATE TABLE [ReserveSlotLock] (
+    [ReserveSlotLockId] int NOT NULL IDENTITY,
+    [LockToken] VARCHAR(50) NOT NULL,
+    [OutboundReserveId] int NOT NULL,
+    [ReturnReserveId] int NULL,
+    [SlotsLocked] int NOT NULL,
+    [ExpiresAt] datetime2 NOT NULL,
+    [Status] VARCHAR(20) NOT NULL,
+    [UserEmail] VARCHAR(100) NULL,
+    [UserDocumentNumber] VARCHAR(20) NULL,
+    [CustomerId] int NULL,
+    [CreatedBy] VARCHAR(256) NOT NULL DEFAULT 'System',
+    [CreatedDate] datetime2 NOT NULL DEFAULT (GETDATE()),
+    [UpdatedBy] VARCHAR(256) NULL,
+    [UpdatedDate] datetime2 NULL,
+    CONSTRAINT [PK_ReserveSlotLock] PRIMARY KEY ([ReserveSlotLockId]),
+    CONSTRAINT [FK_ReserveSlotLock_Customer_CustomerId] FOREIGN KEY ([CustomerId]) REFERENCES [Customer] ([CustomerId]) ON DELETE SET NULL,
+    CONSTRAINT [FK_ReserveSlotLock_Reserve_OutboundReserveId] FOREIGN KEY ([OutboundReserveId]) REFERENCES [Reserve] ([ReserveId]) ON DELETE NO ACTION,
+    CONSTRAINT [FK_ReserveSlotLock_Reserve_ReturnReserveId] FOREIGN KEY ([ReturnReserveId]) REFERENCES [Reserve] ([ReserveId]) ON DELETE NO ACTION
+);
+GO
+
+UPDATE [Role] SET [CreatedDate] = '2025-09-13T19:03:37.3431672Z'
+WHERE [RoleId] = 1;
+SELECT @@ROWCOUNT;
+
+GO
+
+UPDATE [Role] SET [CreatedDate] = '2025-09-13T19:03:37.3431673Z'
+WHERE [RoleId] = 2;
+SELECT @@ROWCOUNT;
+
+GO
+
+CREATE INDEX [IX_ReserveSlotLock_CreatedDate] ON [ReserveSlotLock] ([CreatedDate]);
+GO
+
+CREATE INDEX [IX_ReserveSlotLock_CustomerId] ON [ReserveSlotLock] ([CustomerId]);
+GO
+
+CREATE UNIQUE INDEX [IX_ReserveSlotLock_LockToken] ON [ReserveSlotLock] ([LockToken]);
+GO
+
+CREATE INDEX [IX_ReserveSlotLock_OutboundReserveId] ON [ReserveSlotLock] ([OutboundReserveId]);
+GO
+
+CREATE INDEX [IX_ReserveSlotLock_ReturnReserveId] ON [ReserveSlotLock] ([ReturnReserveId]);
+GO
+
+CREATE INDEX [IX_ReserveSlotLock_Status_ExpiresAt] ON [ReserveSlotLock] ([Status], [ExpiresAt]);
+GO
+
+INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+VALUES (N'20250913190337_ReserveLockSlot', N'8.0.14');
+GO
+
+COMMIT;
+GO
+
+BEGIN TRANSACTION;
+GO
+
+ALTER TABLE [ReserveSlotLock] ADD [RowVersion] rowversion NOT NULL;
+GO
+
+ALTER TABLE [Reserve] ADD [RowVersion] rowversion NOT NULL;
+GO
+
+UPDATE [Role] SET [CreatedDate] = '2025-09-17T21:36:42.8663697Z'
+WHERE [RoleId] = 1;
+SELECT @@ROWCOUNT;
+
+GO
+
+UPDATE [Role] SET [CreatedDate] = '2025-09-17T21:36:42.8663699Z'
+WHERE [RoleId] = 2;
+SELECT @@ROWCOUNT;
+
+GO
+
+INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+VALUES (N'20250917213643_AddOptimisticConcurrencySupport', N'8.0.14');
+GO
+
+COMMIT;
+GO
+

@@ -52,27 +52,6 @@ public class ReservesFunction : FunctionBase
         return await MatchResultAsync(req, result);
     }
 
-    [Function("CreatePassengerReserveExternal")]
-    [AllowAnonymous]
-    [OpenApiOperation(
-    operationId: "passenger-reserves-create",
-    tags: new[] { "Reserve" },
-    Summary = "Create Passenger Reserves external",
-    Description = "Creates customer reserves for passengers, creating customers if needed in user final",
-    Visibility = OpenApiVisibilityType.Important)]
-    [OpenApiRequestBody("application/json", typeof(PassengerReserveCreateRequestWrapperExternalDto), Required = true)]
-    [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(Result<bool>), Summary = "Passenger reserves created successfully.")]
-    public async Task<HttpResponseData> CreatePassengerReserveExternal(
-    [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "passenger-reserves-create-external")] HttpRequestData req)
-    {
-        var dto = await req.ReadFromJsonAsync<PassengerReserveCreateRequestWrapperExternalDto>();
-
-        var result = await ValidateAndMatchAsync(req, dto, GetValidator<PassengerReserveCreateRequestWrapperExternalDto>())
-                        .BindAsync(_reserveBusiness.CreatePassengerReservesExternal);
-
-        return await MatchResultAsync(req, result);
-    }
-
 
     [Function("GetReservePriceReport")]
     [Authorize("Admin")]
@@ -208,6 +187,67 @@ public class ReservesFunction : FunctionBase
 
         var result = await ValidateAndMatchAsync(req, dto, GetValidator<PassengerReserveUpdateRequestDto>())
                         .BindAsync(update => _reserveBusiness.UpdatePassengerReserveAsync(passengerId, update));
+
+        return await MatchResultAsync(req, result);
+    }
+
+    [Function("LockReserveSlots")]
+    [AllowAnonymous]
+    [OpenApiOperation(
+        operationId: "lock-reserve-slots",
+        tags: new[] { "Reserve" },
+        Summary = "Lock Reserve Slots",
+        Description = "Locks slots for a reserve temporarily for external checkout process.",
+        Visibility = OpenApiVisibilityType.Important)]
+    [OpenApiRequestBody("application/json", typeof(LockReserveSlotsRequestDto), Required = true)]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(Result<LockReserveSlotsResponseDto>), Summary = "Slots locked successfully.")]
+    public async Task<HttpResponseData> LockReserveSlots(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "reserve-slots-lock")] HttpRequestData req)
+    {
+        var dto = await req.ReadFromJsonAsync<LockReserveSlotsRequestDto>();
+
+        var result = await ValidateAndMatchAsync(req, dto, GetValidator<LockReserveSlotsRequestDto>())
+                        .BindAsync(_reserveBusiness.LockReserveSlots);
+
+        return await MatchResultAsync(req, result);
+    }
+
+    [Function("CreatePassengerReservesWithLock")]
+    [AllowAnonymous]
+    [OpenApiOperation(
+        operationId: "passenger-reserves-create-with-lock",
+        tags: new[] { "Reserve" },
+        Summary = "Create Passenger Reserves with Lock",
+        Description = "Creates passenger reserves using a previously acquired slot lock token.",
+        Visibility = OpenApiVisibilityType.Important)]
+    [OpenApiRequestBody("application/json", typeof(CreateReserveWithLockRequestDto), Required = true)]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(Result<CreateReserveExternalResult>), Summary = "Passenger reserves created successfully.")]
+    public async Task<HttpResponseData> CreatePassengerReservesWithLock(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "passenger-reserves-create-with-lock")] HttpRequestData req)
+    {
+        var dto = await req.ReadFromJsonAsync<CreateReserveWithLockRequestDto>();
+
+        var result = await ValidateAndMatchAsync(req, dto, GetValidator<CreateReserveWithLockRequestDto>())
+                        .BindAsync(_reserveBusiness.CreatePassengerReservesWithLock);
+
+        return await MatchResultAsync(req, result);
+    }
+
+    [Function("CancelReserveSlotLock")]
+    [AllowAnonymous]
+    [OpenApiOperation(
+        operationId: "cancel-reserve-slot-lock",
+        tags: new[] { "Reserve" },
+        Summary = "Cancel Reserve Slot Lock",
+        Description = "Cancels an active slot lock, freeing the reserved slots.",
+        Visibility = OpenApiVisibilityType.Important)]
+    [OpenApiParameter(name: "lockToken", In = ParameterLocation.Path, Required = true, Type = typeof(string), Summary = "Lock token to cancel")]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(Result<bool>), Summary = "Lock cancelled successfully.")]
+    public async Task<HttpResponseData> CancelReserveSlotLock(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "delete", Route = "reserve-slots-lock/{lockToken}")] HttpRequestData req,
+        string lockToken)
+    {
+        var result = await _reserveBusiness.CancelReserveSlotLock(lockToken);
 
         return await MatchResultAsync(req, result);
     }

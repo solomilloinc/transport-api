@@ -39,6 +39,11 @@ public class ReserveConfiguration : IEntityTypeConfiguration<Reserve>
         builder.Property(r => r.DepartureHour).IsRequired();
         builder.Property(r => r.IsHoliday).IsRequired();
 
+        // Optimistic Concurrency Control
+        builder.Property(r => r.RowVersion)
+               .IsRowVersion()
+               .IsRequired();
+
         builder.HasOne(r => r.Service)
                .WithMany(s => s.Reserves)
                .HasForeignKey(r => r.ServiceId)

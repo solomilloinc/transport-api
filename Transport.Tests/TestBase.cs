@@ -118,11 +118,10 @@ public abstract class TestBase
 
     public class FakeReserveOption : IReserveOption
     {
-        public int ReserveGenerationDays
-        {
-            get => ReserveGenerationDays;
-            set => this.ReserveGenerationDays = 15;
-        }
+        public int ReserveGenerationDays { get; set; } = 15;
+        public int SlotLockTimeoutMinutes { get; set; } = 10;
+        public int SlotLockCleanupIntervalMinutes { get; set; } = 1;
+        public int MaxSimultaneousLocksPerUser { get; set; } = 5;
     }
 
 }
