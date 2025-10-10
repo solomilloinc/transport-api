@@ -12,4 +12,5 @@ public record PassengerReserveReportResponseDto(
     string? DropoffLocationName,
     int PickupLocationId,
     string? PickupLocationName,
-    decimal? CurrentBalance);
+    decimal? CurrentBalance,
+    int AvailableQuantity);

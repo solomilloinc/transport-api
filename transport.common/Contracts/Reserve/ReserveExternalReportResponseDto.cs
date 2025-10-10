@@ -4,4 +4,9 @@ public record ReserveExternalReportResponseDto(int ReserveId,
     string OriginName,
     string DestinationName,
     string DepartureHour,
-    decimal Price);
+    DateTime DepartureDate,
+    string EstimatedDuration,
+    string ArrivalHour,
+    decimal Price,
+    int AvailableQuantity,
+    string VehicleName);

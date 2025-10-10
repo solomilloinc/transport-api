@@ -43,7 +43,7 @@ public class ServiceBusinessTests : TestBase
 
         var schedules = new List<ServiceScheduleCreateDto>
     {
-        new(0,DayOfWeek.Monday, DayOfWeek.Friday, false, TimeSpan.FromHours(8))
+        new(0, false, TimeSpan.FromHours(8))
     };
 
         var requestDto = new ServiceCreateRequestDto(
@@ -69,7 +69,7 @@ public class ServiceBusinessTests : TestBase
 
         var schedules = new List<ServiceScheduleCreateDto>
     {
-        new(0,DayOfWeek.Monday, DayOfWeek.Friday, false, TimeSpan.FromHours(8))
+        new(0, false, TimeSpan.FromHours(8))
     };
 
         var request = new ServiceCreateRequestDto(
@@ -98,7 +98,7 @@ public class ServiceBusinessTests : TestBase
 
         var schedules = new List<ServiceScheduleCreateDto>
     {
-        new(0,DayOfWeek.Monday, DayOfWeek.Friday, false, TimeSpan.FromHours(8))
+        new(0, false, TimeSpan.FromHours(8))
     };
 
         var request = new ServiceCreateRequestDto(
@@ -128,7 +128,7 @@ public class ServiceBusinessTests : TestBase
 
         var schedules = new List<ServiceScheduleCreateDto>
     {
-        new(0,DayOfWeek.Monday, DayOfWeek.Friday, false, TimeSpan.FromHours(8))
+        new(0, false, TimeSpan.FromHours(8))
     };
 
         var request = new ServiceCreateRequestDto(
@@ -166,7 +166,7 @@ public class ServiceBusinessTests : TestBase
 
         var schedules = new List<ServiceScheduleCreateDto>
     {
-        new(0,  DayOfWeek.Monday, DayOfWeek.Friday, false, TimeSpan.FromHours(8))
+        new(0, false, TimeSpan.FromHours(8))
     };
 
         var request = new ServiceCreateRequestDto(
@@ -271,7 +271,7 @@ public class ServiceBusinessTests : TestBase
 
         var schedules = new List<ServiceScheduleCreateDto>
     {
-        new(0,DayOfWeek.Monday, DayOfWeek.Friday, false, TimeSpan.FromHours(8))
+        new(0, false, TimeSpan.FromHours(8))
     };
 
         var result = await _serviceBusiness.Update(1, new ServiceCreateRequestDto(
@@ -306,7 +306,7 @@ public class ServiceBusinessTests : TestBase
 
         var schedules = new List<ServiceScheduleCreateDto>
     {
-        new(0,DayOfWeek.Monday, DayOfWeek.Friday, false, TimeSpan.FromHours(8))
+        new(0, false, TimeSpan.FromHours(8))
     };
 
         var dto = new ServiceCreateRequestDto(
@@ -352,6 +352,8 @@ public class ServiceBusinessTests : TestBase
             Origin = new City() { CityId = 1, Name = "Origin City" },
             DestinationId = 2,
             Destination = new City() { CityId = 2, Name = "Destination City" },
+            StartDay = today.DayOfWeek,
+            EndDay = today.DayOfWeek,
             ReservePrices = new List<ReservePrice>
         {
             new ReservePrice
@@ -366,8 +368,6 @@ public class ServiceBusinessTests : TestBase
             new ServiceSchedule
             {
                 ServiceScheduleId = 1,
-                StartDay = today.DayOfWeek,
-                EndDay = today.DayOfWeek,
                 DepartureHour = TimeSpan.FromHours(8),
                 IsHoliday = false
             }
@@ -423,13 +423,13 @@ public class ServiceBusinessTests : TestBase
             EstimatedDuration = TimeSpan.FromHours(2),
             VehicleId = vehicle.VehicleId,
             Vehicle = vehicle,
+            StartDay = DayOfWeek.Sunday,
+            EndDay = DayOfWeek.Sunday,
             Schedules = new List<ServiceSchedule>
         {
             new ServiceSchedule
             {
                 ServiceScheduleId = 1,
-                StartDay = DayOfWeek.Sunday,
-                EndDay = DayOfWeek.Sunday, // Solo domingo
                 DepartureHour = TimeSpan.FromHours(8),
                 IsHoliday = false
             }
@@ -485,13 +485,13 @@ public class ServiceBusinessTests : TestBase
             Origin = new City() { CityId = 1, Name = "Origin City" },
             DestinationId = 2,
             Destination = new City() { CityId = 2, Name = "Destination City" },
+            StartDay = DayOfWeek.Monday,
+            EndDay = DayOfWeek.Tuesday,
             Schedules = new List<ServiceSchedule>
         {
             new ServiceSchedule
             {
                 ServiceScheduleId = 1,
-                StartDay = DayOfWeek.Monday,
-                EndDay = DayOfWeek.Tuesday,
                 DepartureHour = TimeSpan.FromHours(8),
                 IsHoliday = false // NO opera en feriados
             }
@@ -551,13 +551,13 @@ public class ServiceBusinessTests : TestBase
             Origin = new City() { CityId = 1, Name = "Origin City" },
             DestinationId = 2,
             Destination = new City() { CityId = 2, Name = "Destination City" },
+            StartDay = DayOfWeek.Monday,
+            EndDay = DayOfWeek.Friday,
             Schedules = new List<ServiceSchedule>
         {
             new ServiceSchedule
             {
                 ServiceScheduleId = 1,
-                StartDay = DayOfWeek.Monday,
-                EndDay = DayOfWeek.Tuesday,
                 DepartureHour = TimeSpan.FromHours(8),
                 IsHoliday = true // Sí opera en feriados
             }
@@ -617,14 +617,14 @@ public class ServiceBusinessTests : TestBase
             VehicleId = vehicle.VehicleId,
             OriginId = 1,
             DestinationId = 2,
+            StartDay = dayOfWeek,
+            EndDay = dayOfWeek,
             ReservePrices = new List<ReservePrice>(), // Sin precios
             Schedules = new List<ServiceSchedule>
         {
             new ServiceSchedule
             {
                 ServiceScheduleId = 1,
-                StartDay = dayOfWeek,
-                EndDay = dayOfWeek,
                 DepartureHour = TimeSpan.FromHours(8),
                 IsHoliday = false
             }

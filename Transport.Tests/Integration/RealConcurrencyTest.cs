@@ -142,8 +142,6 @@ public class RealConcurrencyTest : IDisposable
         var serviceSchedule = new ServiceSchedule
         {
             ServiceId = service.ServiceId,
-            StartDay = DayOfWeek.Monday,
-            EndDay = DayOfWeek.Friday,
             DepartureHour = TimeSpan.FromHours(9),
             IsHoliday = false,
             Status = Transport.SharedKernel.EntityStatusEnum.Active,

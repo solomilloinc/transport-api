@@ -823,7 +823,8 @@ public class ReserveBusiness : IReserveBusiness
                              p.DropoffAddress,
                              p.PickupLocationId ?? 0,
                              p.PickupAddress,
-                             p.Customer != null ? p.Customer.CurrentBalance : 0))
+                             p.Customer != null ? p.Customer.CurrentBalance : 0,
+                             rp.Service.Vehicle.AvailableQuantity - rp.Passengers.Count))
                          .ToList(),
                        rp.Service.ReservePrices.Select(p => new ReservePriceReport((int)p.ReserveTypeId, p.Price)).ToList()
                    ),
@@ -868,13 +869,25 @@ public class ReserveBusiness : IReserveBusiness
                 var available = rp.Service.Vehicle.AvailableQuantity - totalReserved;
                 return available >= passengersRequested;
             })
-            .Select(rp => new ReserveExternalReportResponseDto(
-                rp.ReserveId,
-                rp.Service.Origin.Name,
-                rp.Service.Destination.Name,
-                rp.DepartureHour.ToString(@"hh\:mm"),
-                rp.Service.ReservePrices.FirstOrDefault(p => p.ReserveTypeId == ReserveTypeIdEnum.Ida)?.Price ?? 0
-            ))
+            .Select(rp =>
+            {
+                int totalReserved = rp.Passengers
+                    .Count(p => p.Status == PassengerStatusEnum.Confirmed
+                             || p.Status == PassengerStatusEnum.PendingPayment);
+                var arrivalTime = rp.DepartureHour.Add(rp.Service.EstimatedDuration);
+                return new ReserveExternalReportResponseDto(
+                    rp.ReserveId,
+                    rp.Service.Origin.Name,
+                    rp.Service.Destination.Name,
+                    rp.DepartureHour.ToString(@"hh\:mm"),
+                    rp.ReserveDate,
+                    rp.Service.EstimatedDuration.ToString(@"hh\:mm"),
+                    arrivalTime.ToString(@"hh\:mm"),
+                    rp.Service.ReservePrices.FirstOrDefault(p => p.ReserveTypeId == ReserveTypeIdEnum.Ida)?.Price ?? 0,
+                    rp.Service.Vehicle.AvailableQuantity - totalReserved,
+                    rp.Service.Vehicle.InternalNumber
+                );
+            })
             .ToList();
 
         var vueltaItems = vueltaDate.HasValue
@@ -889,13 +902,25 @@ public class ReserveBusiness : IReserveBusiness
                     var available = rp.Service.Vehicle.AvailableQuantity - totalReserved;
                     return available >= passengersRequested;
                 })
-                .Select(rp => new ReserveExternalReportResponseDto(
-                    rp.ReserveId,
-                    rp.Service.Origin.Name,
-                    rp.Service.Destination.Name,
-                    rp.DepartureHour.ToString(@"hh\:mm"),
-                    rp.Service.ReservePrices.FirstOrDefault(p => p.ReserveTypeId == ReserveTypeIdEnum.Ida)?.Price ?? 0
-                ))
+                .Select(rp =>
+                {
+                    int totalReserved = rp.Passengers
+                        .Count(p => p.Status == PassengerStatusEnum.Confirmed
+                                 || p.Status == PassengerStatusEnum.PendingPayment);
+                    var arrivalTime = rp.DepartureHour.Add(rp.Service.EstimatedDuration);
+                    return new ReserveExternalReportResponseDto(
+                        rp.ReserveId,
+                        rp.Service.Origin.Name,
+                        rp.Service.Destination.Name,
+                        rp.DepartureHour.ToString(@"hh\:mm"),
+                        rp.ReserveDate,
+                        rp.Service.EstimatedDuration.ToString(@"hh\:mm"),
+                        arrivalTime.ToString(@"hh\:mm"),
+                        rp.Service.ReservePrices.FirstOrDefault(p => p.ReserveTypeId == ReserveTypeIdEnum.Ida)?.Price ?? 0,
+                        rp.Service.Vehicle.AvailableQuantity - totalReserved,
+                        rp.Service.Vehicle.InternalNumber
+                    );
+                })
                 .ToList()
             : new List<ReserveExternalReportResponseDto>();
 
@@ -926,6 +951,9 @@ public class ReserveBusiness : IReserveBusiness
     {
         var query = _context.Passengers
             .Include(p => p.Customer)
+            .Include(p => p.Reserve)
+                .ThenInclude(r => r.Service)
+                    .ThenInclude(s => s.Vehicle)
             .Where(p => p.ReserveId == reserveId);
 
         if (!string.IsNullOrWhiteSpace(requestDto.Filters.PassengerFullName))
@@ -968,7 +996,8 @@ public class ReserveBusiness : IReserveBusiness
                 p.DropoffAddress,
                 p.PickupLocationId ?? 0,
                 p.PickupAddress,
-                p.Customer != null ? p.Customer.CurrentBalance : 0),
+                p.Customer != null ? p.Customer.CurrentBalance : 0,
+                p.Reserve.Service.Vehicle.AvailableQuantity - p.Reserve.Passengers.Count),
             sortMappings: sortMappings
         );
 
@@ -1294,7 +1323,7 @@ public class ReserveBusiness : IReserveBusiness
             .Include(r => r.Passengers)
             .Include(r => r.Service.Vehicle)
             .Where(r => reserveIds.Contains(r.ReserveId))
-            .ToListAsync(); 
+            .ToListAsync();
 
         var minAvailable = int.MaxValue;
 

@@ -44,8 +44,6 @@ public class ReserveReportBusinessTest : TestBase
         var schedule = new ServiceSchedule
         {
             ServiceScheduleId = 1,
-            StartDay = DayOfWeek.Monday,
-            EndDay = DayOfWeek.Friday,
             DepartureHour = new TimeSpan(8, 0, 0),
             IsHoliday = false,
             Status = EntityStatusEnum.Active
@@ -128,8 +126,6 @@ public class ReserveReportBusinessTest : TestBase
         var schedule = new ServiceSchedule
         {
             ServiceScheduleId = 1,
-            StartDay = DayOfWeek.Monday,
-            EndDay = DayOfWeek.Friday,
             DepartureHour = new TimeSpan(8, 0, 0),
             IsHoliday = false,
             Status = EntityStatusEnum.Active
@@ -404,8 +400,6 @@ public class ReserveReportBusinessTest : TestBase
         var schedule = new ServiceSchedule
         {
             ServiceScheduleId = 1,
-            StartDay = DayOfWeek.Monday,
-            EndDay = DayOfWeek.Friday,
             DepartureHour = new TimeSpan(9, 0, 0),
             IsHoliday = false,
             Status = EntityStatusEnum.Active
@@ -476,8 +470,6 @@ public class ReserveReportBusinessTest : TestBase
         var schedule = new ServiceSchedule
         {
             ServiceScheduleId = 1,
-            StartDay = DayOfWeek.Monday,
-            EndDay = DayOfWeek.Friday,
             DepartureHour = new TimeSpan(9, 0, 0),
             IsHoliday = false,
             Status = EntityStatusEnum.Active

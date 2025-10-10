@@ -12,6 +12,8 @@ public class Service : Entity, IAuditable
     public int DestinationId { get; set; }
     public TimeSpan EstimatedDuration { get; set; }
     public int VehicleId { get; set; }
+    public DayOfWeek StartDay { get; set; }
+    public DayOfWeek EndDay { get; set; }
     public EntityStatusEnum Status { get; set; } = EntityStatusEnum.Active;
 
     public string CreatedBy { get; set; } = null!;
@@ -28,15 +30,15 @@ public class Service : Entity, IAuditable
     public ICollection<ReservePrice> ReservePrices { get; set; } = new List<ReservePrice>();
     public ICollection<ServiceSchedule> Schedules { get; set; } = new List<ServiceSchedule>();
 
-    public bool IsDayWithinScheduleRange(ServiceSchedule schedule, DayOfWeek day)
+    public bool IsDayWithinScheduleRange(DayOfWeek day)
     {
-        if (schedule.StartDay == schedule.EndDay)
-            return day == schedule.StartDay;
+        if (StartDay == EndDay)
+            return day == StartDay;
 
-        if (schedule.StartDay < schedule.EndDay)
-            return day >= schedule.StartDay && day <= schedule.EndDay;
+        if (StartDay < EndDay)
+            return day >= StartDay && day <= EndDay;
 
-        return day >= schedule.StartDay || day <= schedule.EndDay;
+        return day >= StartDay || day <= EndDay;
     }
 }
 

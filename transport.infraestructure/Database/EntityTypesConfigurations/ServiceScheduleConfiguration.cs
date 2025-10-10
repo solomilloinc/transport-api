@@ -16,8 +16,6 @@ public class ServiceScheduleConfiguration : IEntityTypeConfiguration<ServiceSche
 
         builder.HasKey(s => s.ServiceScheduleId);
 
-        builder.Property(s => s.StartDay).IsRequired();
-        builder.Property(s => s.EndDay).IsRequired();
         builder.Property(s => s.DepartureHour).IsRequired();
         builder.Property(s => s.IsHoliday).IsRequired();
         builder.Property(s => s.Status).IsRequired();
@@ -26,6 +24,6 @@ public class ServiceScheduleConfiguration : IEntityTypeConfiguration<ServiceSche
                .WithMany(service => service.Schedules)
                .HasForeignKey(s => s.ServiceId)
                .IsRequired()
-               .OnDelete(DeleteBehavior.Restrict); 
+               .OnDelete(DeleteBehavior.Restrict);
     }
 }

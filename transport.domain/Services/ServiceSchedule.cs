@@ -6,8 +6,6 @@ public class ServiceSchedule : Entity, IAuditable
 {
     public int ServiceScheduleId { get; set; }
     public int ServiceId { get; set; }
-    public DayOfWeek StartDay { get; set; }
-    public DayOfWeek EndDay { get; set; }
     public TimeSpan DepartureHour { get; set; }
     public bool IsHoliday { get; set; }
     public EntityStatusEnum Status { get; set; } = EntityStatusEnum.Active;
