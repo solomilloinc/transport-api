@@ -8,6 +8,8 @@ public record ServiceReportResponseDto(
     int DestinationId,
     string DestinationName,
     TimeSpan EstimatedDuration,
+    DayOfWeek StartDay,
+    DayOfWeek EndDay,
     ServiceVehicleResponseDto Vehicle,
     string Status,
     List<ReservePriceReport> ReservePrices,

@@ -564,3 +564,49 @@ GO
 COMMIT;
 GO
 
+BEGIN TRANSACTION;
+GO
+
+DECLARE @var0 sysname;
+SELECT @var0 = [d].[name]
+FROM [sys].[default_constraints] [d]
+INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
+WHERE ([d].[parent_object_id] = OBJECT_ID(N'[ServiceSchedule]') AND [c].[name] = N'EndDay');
+IF @var0 IS NOT NULL EXEC(N'ALTER TABLE [ServiceSchedule] DROP CONSTRAINT [' + @var0 + '];');
+ALTER TABLE [ServiceSchedule] DROP COLUMN [EndDay];
+GO
+
+DECLARE @var1 sysname;
+SELECT @var1 = [d].[name]
+FROM [sys].[default_constraints] [d]
+INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
+WHERE ([d].[parent_object_id] = OBJECT_ID(N'[ServiceSchedule]') AND [c].[name] = N'StartDay');
+IF @var1 IS NOT NULL EXEC(N'ALTER TABLE [ServiceSchedule] DROP CONSTRAINT [' + @var1 + '];');
+ALTER TABLE [ServiceSchedule] DROP COLUMN [StartDay];
+GO
+
+ALTER TABLE [Service] ADD [EndDay] int NOT NULL DEFAULT 0;
+GO
+
+ALTER TABLE [Service] ADD [StartDay] int NOT NULL DEFAULT 0;
+GO
+
+UPDATE [Role] SET [CreatedDate] = '2025-10-10T16:07:25.6087124Z'
+WHERE [RoleId] = 1;
+SELECT @@ROWCOUNT;
+
+GO
+
+UPDATE [Role] SET [CreatedDate] = '2025-10-10T16:07:25.6087128Z'
+WHERE [RoleId] = 2;
+SELECT @@ROWCOUNT;
+
+GO
+
+INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+VALUES (N'20251010160726_StartDayEndDayToServiceSchedule', N'8.0.14');
+GO
+
+COMMIT;
+GO
+

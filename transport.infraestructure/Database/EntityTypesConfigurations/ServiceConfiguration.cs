@@ -12,7 +12,9 @@ public class ServiceConfiguration : IEntityTypeConfiguration<Service>
         builder.HasKey(s => s.ServiceId);
         builder.Property(s => s.Name).HasMaxLength(250).IsRequired();
         builder.Property(s => s.EstimatedDuration).IsRequired();
-        builder.Property(s => s.Status).IsRequired();        
+        builder.Property(s => s.StartDay).IsRequired();
+        builder.Property(s => s.EndDay).IsRequired();
+        builder.Property(s => s.Status).IsRequired();
 
         builder.HasOne(s => s.Origin)
             .WithMany(c => c.OriginServices)
