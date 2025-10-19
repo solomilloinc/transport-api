@@ -177,25 +177,64 @@ public class ReserveBusiness : IReserveBusiness
             if (totalExpectedAmount != totalProvidedAmount)
                 return Result.Failure<bool>(ReserveError.InvalidPaymentAmount(totalExpectedAmount, totalProvidedAmount));
 
-            // Identificar ida/vuelta
+            // Identificar reservas seleccionadas por el admin (pueden ser 1=Ida o 2=Ida/Vuelta)
             var distinctReserveIds = passengerReserves.Items
-      .Select(i => i.ReserveId)
-      .Distinct()
-      .ToList();
+                .Select(i => i.ReserveId)
+                .Distinct()
+                .ToList();
 
-            // Si tenés reserveMap cargado (lo venís armando arriba), ordená por fecha/hora; si faltara, queda por Id
-            var orderedReserveIds = distinctReserveIds
+            // Ordenar las seleccionadas: la primera es la IDA (más próxima de las seleccionadas)
+            var orderedSelectedReserveIds = distinctReserveIds
                 .OrderBy(id => reserveMap.TryGetValue(id, out var r) ? r.ReserveDate : DateTime.MaxValue)
+                .ThenBy(id => reserveMap.TryGetValue(id, out var r) ? r.DepartureHour : TimeSpan.MaxValue)
                 .ThenBy(id => id)
                 .ToList();
 
-            var parentReserveId = orderedReserveIds.First();
-            var childReserveIds = orderedReserveIds.Skip(1).ToList();
+            var idaReserveId = orderedSelectedReserveIds.First();
+            var idaReserve = reserveMap[idaReserveId];
 
-            // b) Total efectivamente abonado (uno o varios medios)
+            // BUSCAR la reserva MÁS PRÓXIMA a salir (independiente del cliente)
+            // Esto representa la "caja actual" donde debe quedar el pago
+            var now = DateTime.UtcNow;
+            var closestReserveInDb = await _context.Reserves
+                .OrderBy(r => r.ReserveDate)
+                .ThenBy(r => r.DepartureHour)
+                .ThenBy(r => r.ReserveId)
+                .FirstOrDefaultAsync();
+
+            // Determinar dónde va el pago y el estado
+            int parentReserveId;
+            List<int> childReserveIds;
+            StatusPaymentEnum paymentStatus;
+
+            // Comparar: ¿La IDA seleccionada es la más próxima a salir?
+            bool idaIsClosest = closestReserveInDb == null || closestReserveInDb.ReserveId == idaReserveId;
+
+            if (idaIsClosest)
+            {
+                // La IDA ES la más próxima → Pago va a la IDA, estado = Paid
+                parentReserveId = idaReserveId;
+                childReserveIds = orderedSelectedReserveIds.Skip(1).ToList(); // Vuelta si existe
+                paymentStatus = StatusPaymentEnum.Paid;
+            }
+            else
+            {
+                // Hay otra reserva más próxima → Pago va a esa, estado = PrePayment
+                parentReserveId = closestReserveInDb.ReserveId;
+                childReserveIds = orderedSelectedReserveIds.ToList(); // TODAS las seleccionadas son hijas
+                paymentStatus = StatusPaymentEnum.PrePayment;
+
+                // Agregar la más próxima al mapa si no está
+                if (!reserveMap.ContainsKey(parentReserveId))
+                {
+                    reserveMap[parentReserveId] = closestReserveInDb;
+                }
+            }
+
+            // Total efectivamente abonado (uno o varios medios)
             var primaryMethod = (PaymentMethodEnum)passengerReserves.Payments.First().PaymentMethod;
 
-            // c) PAGO PADRE (reserva "ida" por orden)
+            // c) PAGO PADRE (reserva más reciente por orden cronológico)
             var parentPayment = new ReservePayment
             {
                 ReserveId = parentReserveId,
@@ -204,8 +243,11 @@ public class ReserveBusiness : IReserveBusiness
                 PayerName = $"{payer.FirstName} {payer.LastName}",
                 PayerEmail = payer.Email,
                 Amount = totalProvidedAmount,             // total consolidado
-                Method = primaryMethod,                   // método “principal” informativo
-                Status = StatusPaymentEnum.Paid
+                Method = primaryMethod,                   // método "principal" informativo
+                Status = paymentStatus,
+                StatusDetail = paymentStatus == StatusPaymentEnum.PrePayment
+                    ? "paid_in_advance"
+                    : "paid_on_departure"
             };
             _context.ReservePayments.Add(parentPayment);
             await _context.SaveChangesWithOutboxAsync(); // necesitamos el Id del padre
@@ -224,14 +266,14 @@ public class ReserveBusiness : IReserveBusiness
                         PayerEmail = payer.Email,
                         Amount = p.TransactionAmount,                      // importe de ese medio
                         Method = (PaymentMethodEnum)p.PaymentMethod,
-                        Status = StatusPaymentEnum.Paid,
+                        Status = paymentStatus,
                         ParentReservePaymentId = parentPayment.ReservePaymentId
                     };
                     _context.ReservePayments.Add(breakdownChild);
                 }
             }
 
-            // e) “Link children” (monto 0) para cada tramo adicional (vuelta, etc.)
+            // e) "Link children" (monto 0) para cada tramo adicional (vuelta, etc.)
             foreach (var childReserveId in childReserveIds)
             {
                 var linkChild = new ReservePayment
@@ -243,7 +285,7 @@ public class ReserveBusiness : IReserveBusiness
                     PayerEmail = payer.Email,
                     Amount = 0m,                                          // sólo vínculo contable
                     Method = primaryMethod,                               // reutilizamos el del padre
-                    Status = StatusPaymentEnum.Paid,
+                    Status = paymentStatus,
                     ParentReservePaymentId = parentPayment.ReservePaymentId
                 };
                 _context.ReservePayments.Add(linkChild);
@@ -1127,9 +1169,9 @@ public class ReserveBusiness : IReserveBusiness
     }
 
     public async Task<Result<bool>> CreatePaymentsAsync(
-     int customerId,
-     int reserveId,
-     List<CreatePaymentRequestDto> payments)
+      int customerId,
+      int reserveId,
+      List<CreatePaymentRequestDto> payments)
     {
         return await _unitOfWork.ExecuteInTransactionAsync(async () =>
         {
