@@ -649,7 +649,7 @@ public class ReserveBusinessTests : TestBase
     public async Task CreatePaymentsAsync_ShouldSucceed_WhenValidPaymentsProvided()
     {
         var paymentsDb = new List<ReservePayment>();
-        var passengers = new List<Passenger> { new Passenger { PassengerId = 1, ReserveId = 1, Price = 100 } };
+        var passengers = new List<Passenger> { new Passenger { PassengerId = 1, ReserveId = 1, CustomerId = 1, Price = 100, Status = PassengerStatusEnum.PendingPayment } };
         var reserve = new Reserve { ReserveId = 1, ServiceId = 1, Passengers = passengers };
         var reserves = new List<Reserve> { reserve };
         var customer = new Customer { CustomerId = 1, DocumentNumber = "12345678" };
@@ -657,9 +657,10 @@ public class ReserveBusinessTests : TestBase
 
         var customers = new List<Customer> { customer };
         _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(reserves).Object);
+        _contextMock.Setup(c => c.Passengers).Returns(GetQueryableMockDbSet(passengers).Object);
         _contextMock.Setup(c => c.Customers).Returns(GetQueryableMockDbSet(customers).Object);
         _contextMock.Setup(c => c.Customers.FindAsync(1)).ReturnsAsync(customer);
-        _contextMock.Setup(c => c.Services).Returns(GetMockDbSetWithIdentity(new List<Service> { service }).Object);
+        _contextMock.Setup(c => c.Services).Returns(GetQueryableMockDbSet(new List<Service> { service }).Object);
 
         var customerAccountTransactions = new List<CustomerAccountTransaction>();
         var reservePaymentsDbSet = GetMockDbSetWithIdentity(paymentsDb);
@@ -693,7 +694,17 @@ public class ReserveBusinessTests : TestBase
         // Arrange
         var reserveId = 1;
         var customerId = 1;
-        var passengers = new List<Passenger> { new Passenger { PassengerId = 1, ReserveId = reserveId, Price = 5000 } };
+        var passengers = new List<Passenger>
+        {
+            new Passenger
+            {
+                PassengerId = 1,
+                ReserveId = reserveId,
+                CustomerId = customerId,
+                Price = 5000,
+                Status = PassengerStatusEnum.PendingPayment
+            }
+        };
         var reserve = new Reserve
         {
             ReserveId = reserveId,
@@ -724,7 +735,8 @@ public class ReserveBusinessTests : TestBase
     };
 
         _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(reserves).Object);
-
+        _contextMock.Setup(c => c.Passengers).Returns(GetQueryableMockDbSet(passengers).Object);
+        _contextMock.Setup(c => c.Customers).Returns(GetQueryableMockDbSet(new List<Customer> { customer }).Object);
         _contextMock.Setup(c => c.Customers.FindAsync(customerId))
             .ReturnsAsync(customer);
         _contextMock.Setup(c => c.Services)
@@ -1234,6 +1246,471 @@ public class ReserveBusinessTests : TestBase
             null, // Sin pago directo
             new List<PassengerReserveExternalCreateRequestDto> { passengerItem }
         );
+    }
+
+    #endregion
+
+    #region Payment Status Tests (Paid vs PrePayment)
+
+    [Fact]
+    public async Task CreatePassengerReserves_WithPayment_ShouldSetCorrectStatus_BasedOnReserveDateTime()
+    {
+        // Arrange - Reserva para el futuro y una reserva de HOY (más próxima)
+        var today = DateTime.UtcNow.Date;
+        var futureDate = DateTime.UtcNow.AddDays(1).Date;
+        var futureTime = TimeSpan.FromHours(10);
+
+        // Reserva de HOY (más próxima en el sistema)
+        var todayReserve = new Reserve
+        {
+            ReserveId = 99,
+            Status = ReserveStatusEnum.Confirmed,
+            ReserveDate = today,
+            DepartureHour = TimeSpan.FromHours(8),
+            Passengers = new List<Passenger>(),
+            VehicleId = 1,
+            ServiceId = 1,
+            Driver = new Driver { FirstName = "Driver", LastName = "Today" }
+        };
+
+        // Reserva seleccionada (mañana)
+        var reserve = new Reserve
+        {
+            ReserveId = 1,
+            Status = ReserveStatusEnum.Confirmed,
+            ReserveDate = futureDate,
+            DepartureHour = futureTime,
+            Passengers = new List<Passenger>(),
+            VehicleId = 1,
+            ServiceId = 1,
+            Driver = new Driver { FirstName = "Driver", LastName = "Test" }
+        };
+
+        var vehicle = new Vehicle { VehicleId = 1, AvailableQuantity = 10 };
+        var service = new Service
+        {
+            ServiceId = 1,
+            ReservePrices = new List<ReservePrice>
+            {
+                new ReservePrice { ReserveTypeId = ReserveTypeIdEnum.Ida, Price = 100 }
+            },
+            Origin = new City { Name = "Origin" },
+            Destination = new City { Name = "Dest" }
+        };
+
+        var customer = new Customer
+        {
+            CustomerId = 1,
+            FirstName = "Test",
+            LastName = "User",
+            DocumentNumber = "11111111",
+            Email = "test@test.com",
+            CurrentBalance = 0
+        };
+
+        var direction = new Direction { DirectionId = 1, Name = "Location" };
+
+        var paymentsDb = new List<ReservePayment>();
+        var accountTransactions = new List<CustomerAccountTransaction>();
+        var passengers = new List<Passenger>();
+
+        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(new List<Reserve> { todayReserve, reserve }).Object);
+        _contextMock.Setup(c => c.Vehicles.FindAsync(It.IsAny<int>())).ReturnsAsync(vehicle);
+        _contextMock.Setup(c => c.Services).Returns(GetQueryableMockDbSet(new List<Service> { service }).Object);
+        _contextMock.Setup(c => c.Customers).Returns(GetQueryableMockDbSet(new List<Customer> { customer }).Object);
+        _contextMock.Setup(c => c.Customers.FindAsync(1)).ReturnsAsync(customer);
+        _contextMock.Setup(c => c.Directions.FindAsync(It.IsAny<int>())).ReturnsAsync(direction);
+        _contextMock.Setup(c => c.Passengers).Returns(GetMockDbSetWithIdentity(passengers).Object);
+        _contextMock.Setup(c => c.ReservePayments).Returns(GetMockDbSetWithIdentity(paymentsDb).Object);
+        _contextMock.Setup(c => c.CustomerAccountTransactions).Returns(GetMockDbSetWithIdentity(accountTransactions).Object);
+
+        SetupSaveChangesWithOutboxAsync(_contextMock);
+
+        _unitOfWorkMock
+            .Setup(uow => uow.ExecuteInTransactionAsync<bool>(
+                It.IsAny<Func<Task<Result<bool>>>>(),
+                It.IsAny<IsolationLevel>()))
+            .Returns<Func<Task<Result<bool>>>, IsolationLevel>((func, _) => func());
+
+        var passengerItem = new PassengerReserveCreateRequestDto(
+            ReserveId: 1,
+            ReserveTypeId: (int)ReserveTypeIdEnum.Ida,
+            CustomerId: 1,
+            IsPayment: true,
+            PickupLocationId: 1,
+            DropoffLocationId: 1,
+            HasTraveled: false,
+            Price: 100
+        );
+
+        var paymentItem = new CreatePaymentRequestDto(100, (int)PaymentMethodEnum.Cash);
+        var request = new PassengerReserveCreateRequestWrapperDto(
+            new List<CreatePaymentRequestDto> { paymentItem },
+            new List<PassengerReserveCreateRequestDto> { passengerItem }
+        );
+
+        // Act
+        var result = await _reserveBusiness.CreatePassengerReserves(request);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+
+        // Debe haber 2 pagos: padre en HOY (99) + hijo en mañana (1)
+        paymentsDb.Should().HaveCount(2, "Pago padre en reserva de HOY + hijo en reserva de mañana");
+
+        var parentPayment = paymentsDb.First(p => p.ParentReservePaymentId == null);
+        var childPayment = paymentsDb.First(p => p.ParentReservePaymentId != null);
+
+        // El pago padre debe estar en la reserva de HOY (la más próxima)
+        parentPayment.ReserveId.Should().Be(99, "El pago va a la reserva más próxima (HOY)");
+        parentPayment.Status.Should().Be(StatusPaymentEnum.PrePayment,
+            "Debe ser PrePayment porque estamos pagando anticipadamente para otra reserva");
+        parentPayment.StatusDetail.Should().Be("paid_in_advance");
+        parentPayment.Amount.Should().Be(100);
+
+        // El hijo debe estar en la reserva seleccionada (mañana)
+        childPayment.ReserveId.Should().Be(1, "La reserva seleccionada es hija");
+        childPayment.Amount.Should().Be(0, "Los hijos tienen amount 0");
+        childPayment.ParentReservePaymentId.Should().Be(parentPayment.ReservePaymentId);
+    }
+
+    [Fact]
+    public async Task CreatePassengerReserves_IdaYVuelta_WithPayment_ShouldAssignPaymentToEarliestReserve()
+    {
+        // Arrange - Ida y vuelta mañana + reserva de HOY (más próxima)
+        var today = DateTime.UtcNow.Date;
+        var tomorrow = DateTime.UtcNow.AddDays(1).Date;
+
+        // Reserva de HOY (más próxima en el sistema)
+        var todayReserve = new Reserve
+        {
+            ReserveId = 99,
+            ReserveDate = today,
+            DepartureHour = TimeSpan.FromHours(8),
+            Status = ReserveStatusEnum.Confirmed,
+            Passengers = new List<Passenger>(),
+            VehicleId = 1,
+            ServiceId = 1,
+            Driver = new Driver { FirstName = "Driver", LastName = "Today" },
+            ServiceName = "TestService",
+            OriginName = "Origin",
+            DestinationName = "Dest"
+        };
+
+        var reserveIda = new Reserve
+        {
+            ReserveId = 1,
+            ReserveDate = tomorrow,
+            DepartureHour = TimeSpan.FromHours(10), // Ida: 10:00 AM mañana
+            Status = ReserveStatusEnum.Confirmed,
+            Passengers = new List<Passenger>(),
+            VehicleId = 1,
+            ServiceId = 1,
+            Driver = new Driver { FirstName = "Driver", LastName = "Ida" },
+            ServiceName = "TestService",
+            OriginName = "Origin",
+            DestinationName = "Dest"
+        };
+
+        var reserveVuelta = new Reserve
+        {
+            ReserveId = 2,
+            ReserveDate = tomorrow,
+            DepartureHour = TimeSpan.FromHours(17), // Vuelta: 5:00 PM mañana
+            Status = ReserveStatusEnum.Confirmed,
+            Passengers = new List<Passenger>(),
+            VehicleId = 1,
+            ServiceId = 1,
+            Driver = new Driver { FirstName = "Driver", LastName = "Vuelta" },
+            ServiceName = "TestService",
+            OriginName = "Origin",
+            DestinationName = "Dest"
+        };
+
+        var vehicle = new Vehicle { VehicleId = 1, AvailableQuantity = 10 };
+        var service = new Service
+        {
+            ServiceId = 1,
+            ReservePrices = new List<ReservePrice>
+            {
+                new ReservePrice { ReserveTypeId = ReserveTypeIdEnum.Ida, Price = 100 },
+                new ReservePrice { ReserveTypeId = ReserveTypeIdEnum.IdaVuelta, Price = 200 }
+            },
+            Origin = new City { Name = "Origin" },
+            Destination = new City { Name = "Dest" }
+        };
+
+        var customer = new Customer
+        {
+            CustomerId = 1,
+            FirstName = "Test",
+            LastName = "IdaVuelta",
+            DocumentNumber = "22222222",
+            Email = "idavuelta@test.com",
+            CurrentBalance = 0
+        };
+
+        var direction = new Direction { DirectionId = 1, Name = "Location" };
+        var paymentsDb = new List<ReservePayment>();
+        var accountTransactions = new List<CustomerAccountTransaction>();
+        var passengers = new List<Passenger>();
+        var users = new List<User>();
+
+        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(new List<Reserve> { todayReserve, reserveIda, reserveVuelta }).Object);
+        _contextMock.Setup(c => c.Vehicles.FindAsync(It.IsAny<int>())).ReturnsAsync(vehicle);
+        _contextMock.Setup(c => c.Services).Returns(GetQueryableMockDbSet(new List<Service> { service }).Object);
+        _contextMock.Setup(c => c.Customers).Returns(GetQueryableMockDbSet(new List<Customer> { customer }).Object);
+        _contextMock.Setup(c => c.Customers.FindAsync(1)).ReturnsAsync(customer);
+        _contextMock.Setup(c => c.Directions.FindAsync(It.IsAny<int>())).ReturnsAsync(direction);
+        _contextMock.Setup(c => c.Passengers).Returns(GetMockDbSetWithIdentity(passengers).Object);
+        _contextMock.Setup(c => c.ReservePayments).Returns(GetMockDbSetWithIdentity(paymentsDb).Object);
+        _contextMock.Setup(c => c.CustomerAccountTransactions).Returns(GetMockDbSetWithIdentity(accountTransactions).Object);
+        _contextMock.Setup(c => c.Users).Returns(GetQueryableMockDbSet(users).Object);
+
+        _contextMock.Setup(c => c.Customers.Update(It.IsAny<Customer>())).Callback<Customer>(c =>
+        {
+            customer.CurrentBalance = c.CurrentBalance;
+        });
+
+        SetupSaveChangesWithOutboxAsync(_contextMock);
+
+        _unitOfWorkMock
+            .Setup(uow => uow.ExecuteInTransactionAsync<bool>(
+                It.IsAny<Func<Task<Result<bool>>>>(),
+                It.IsAny<IsolationLevel>()))
+            .Returns<Func<Task<Result<bool>>>, IsolationLevel>((func, _) => func());
+
+        var passengerItems = new List<PassengerReserveCreateRequestDto>
+        {
+            new PassengerReserveCreateRequestDto(
+                ReserveId: 1, // Ida
+                ReserveTypeId: (int)ReserveTypeIdEnum.Ida,
+                CustomerId: 1,
+                IsPayment: true,
+                PickupLocationId: 1,
+                DropoffLocationId: 1,
+                HasTraveled: false,
+                Price: 100
+            ),
+            new PassengerReserveCreateRequestDto(
+                ReserveId: 2, // Vuelta
+                ReserveTypeId: (int)ReserveTypeIdEnum.IdaVuelta,
+                CustomerId: 1,
+                IsPayment: true,
+                PickupLocationId: 1,
+                DropoffLocationId: 1,
+                HasTraveled: false,
+                Price: 200 // Price must match service ReservePrice for IdaVuelta
+            )
+        };
+
+        var paymentItems = new List<CreatePaymentRequestDto>
+        {
+            new CreatePaymentRequestDto(300, (int)PaymentMethodEnum.Cash) // Total: ida (100) + vuelta (200)
+        };
+
+        var request = new PassengerReserveCreateRequestWrapperDto(paymentItems, passengerItems);
+
+        // Act
+        var result = await _reserveBusiness.CreatePassengerReserves(request);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+
+        // Debe haber 3 pagos: 1 padre (en HOY) + 2 hijos (ida y vuelta)
+        paymentsDb.Should().HaveCount(3, "Debe crear 1 pago padre en HOY + 2 hijos (ida y vuelta)");
+
+        var parentPayment = paymentsDb.First(p => p.ParentReservePaymentId == null);
+        var childPayments = paymentsDb.Where(p => p.ParentReservePaymentId != null).ToList();
+
+        // El pago padre debe estar en la reserva de HOY (más próxima)
+        parentPayment.ReserveId.Should().Be(99, "El pago padre debe estar en la reserva de HOY (más próxima)");
+        parentPayment.Amount.Should().Be(300, "El padre debe tener el monto total");
+        parentPayment.Status.Should().Be(StatusPaymentEnum.PrePayment, "Debe ser PrePayment porque pagamos anticipado para otra reserva");
+
+        // Los hijos deben estar en ida y vuelta con amount=0
+        childPayments.Should().HaveCount(2);
+        childPayments.Should().Contain(p => p.ReserveId == 1, "Debe haber un hijo en ida");
+        childPayments.Should().Contain(p => p.ReserveId == 2, "Debe haber un hijo en vuelta");
+        childPayments.Should().OnlyContain(p => p.Amount == 0, "Los hijos deben tener amount=0");
+        childPayments.Should().OnlyContain(p => p.ParentReservePaymentId == parentPayment.ReservePaymentId);
+        childPayments.Should().OnlyContain(p => p.Status == StatusPaymentEnum.PrePayment);
+
+        // Ambos pasajeros deben estar confirmados
+        passengers.Should().HaveCount(2);
+        passengers.Should().OnlyContain(p => p.Status == PassengerStatusEnum.Confirmed);
+    }
+
+    [Fact]
+    public async Task CreatePassengerReserves_MultipleReservesSameDay_ShouldAssignPaymentToEarliest()
+    {
+        // Arrange - 3 reservas el mismo día a diferentes horas: 15:00, 10:00, 20:00
+        var today = DateTime.UtcNow.Date;
+
+        var reserve1 = new Reserve // Segunda cronológicamente
+        {
+            ReserveId = 1,
+            ReserveDate = today,
+            DepartureHour = TimeSpan.FromHours(15), // 3:00 PM
+            Status = ReserveStatusEnum.Confirmed,
+            Passengers = new List<Passenger>(),
+            VehicleId = 1,
+            ServiceId = 1,
+            Driver = new Driver { FirstName = "Driver", LastName = "1" }
+        };
+
+        var reserve2 = new Reserve // Primera cronológicamente (EARLIEST)
+        {
+            ReserveId = 2,
+            ReserveDate = today,
+            DepartureHour = TimeSpan.FromHours(10), // 10:00 AM ← Esta debe recibir el pago padre
+            Status = ReserveStatusEnum.Confirmed,
+            Passengers = new List<Passenger>(),
+            VehicleId = 1,
+            ServiceId = 1,
+            Driver = new Driver { FirstName = "Driver", LastName = "2" }
+        };
+
+        var reserve3 = new Reserve // Tercera cronológicamente
+        {
+            ReserveId = 3,
+            ReserveDate = today,
+            DepartureHour = TimeSpan.FromHours(20), // 8:00 PM
+            Status = ReserveStatusEnum.Confirmed,
+            Passengers = new List<Passenger>(),
+            VehicleId = 1,
+            ServiceId = 1,
+            Driver = new Driver { FirstName = "Driver", LastName = "3" }
+        };
+
+        var vehicle = new Vehicle { VehicleId = 1, AvailableQuantity = 10 };
+        var service = new Service
+        {
+            ServiceId = 1,
+            ReservePrices = new List<ReservePrice>
+            {
+                new ReservePrice { ReserveTypeId = ReserveTypeIdEnum.Ida, Price = 100 }
+            },
+            Origin = new City { Name = "Origin" },
+            Destination = new City { Name = "Dest" }
+        };
+
+        var customer = new Customer
+        {
+            CustomerId = 1,
+            FirstName = "Test",
+            LastName = "MultiReserve",
+            DocumentNumber = "33333333",
+            Email = "multi@test.com",
+            CurrentBalance = 0
+        };
+
+        var direction = new Direction { DirectionId = 1, Name = "Location" };
+        var paymentsDb = new List<ReservePayment>();
+        var accountTransactions = new List<CustomerAccountTransaction>();
+        var passengers = new List<Passenger>();
+        var users = new List<User>();
+
+        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(new List<Reserve> { reserve1, reserve2, reserve3 }).Object);
+        _contextMock.Setup(c => c.Vehicles.FindAsync(It.IsAny<int>())).ReturnsAsync(vehicle);
+        _contextMock.Setup(c => c.Services).Returns(GetQueryableMockDbSet(new List<Service> { service }).Object);
+        _contextMock.Setup(c => c.Customers).Returns(GetQueryableMockDbSet(new List<Customer> { customer }).Object);
+        _contextMock.Setup(c => c.Customers.FindAsync(1)).ReturnsAsync(customer);
+        _contextMock.Setup(c => c.Directions.FindAsync(It.IsAny<int>())).ReturnsAsync(direction);
+        _contextMock.Setup(c => c.Passengers).Returns(GetMockDbSetWithIdentity(passengers).Object);
+        _contextMock.Setup(c => c.ReservePayments).Returns(GetMockDbSetWithIdentity(paymentsDb).Object);
+        _contextMock.Setup(c => c.CustomerAccountTransactions).Returns(GetMockDbSetWithIdentity(accountTransactions).Object);
+        _contextMock.Setup(c => c.Users).Returns(GetQueryableMockDbSet(users).Object);
+
+        _contextMock.Setup(c => c.Customers.Update(It.IsAny<Customer>())).Callback<Customer>(c =>
+        {
+            customer.CurrentBalance = c.CurrentBalance;
+        });
+
+        SetupSaveChangesWithOutboxAsync(_contextMock);
+
+        _unitOfWorkMock
+            .Setup(uow => uow.ExecuteInTransactionAsync<bool>(
+                It.IsAny<Func<Task<Result<bool>>>>(),
+                It.IsAny<IsolationLevel>()))
+            .Returns<Func<Task<Result<bool>>>, IsolationLevel>((func, _) => func());
+
+        var passengerItems = new List<PassengerReserveCreateRequestDto>
+        {
+            new PassengerReserveCreateRequestDto(
+                ReserveId: 1,
+                ReserveTypeId: (int)ReserveTypeIdEnum.Ida,
+                CustomerId: 1,
+                IsPayment: true,
+                PickupLocationId: 1,
+                DropoffLocationId: 1,
+                HasTraveled: false,
+                Price: 100
+            ),
+            new PassengerReserveCreateRequestDto(
+                ReserveId: 2,
+                ReserveTypeId: (int)ReserveTypeIdEnum.Ida,
+                CustomerId: 1,
+                IsPayment: true,
+                PickupLocationId: 1,
+                DropoffLocationId: 1,
+                HasTraveled: false,
+                Price: 100
+            ),
+            new PassengerReserveCreateRequestDto(
+                ReserveId: 3,
+                ReserveTypeId: (int)ReserveTypeIdEnum.Ida,
+                CustomerId: 1,
+                IsPayment: true,
+                PickupLocationId: 1,
+                DropoffLocationId: 1,
+                HasTraveled: false,
+                Price: 100
+            )
+        };
+
+        var paymentItems = new List<CreatePaymentRequestDto>
+        {
+            new CreatePaymentRequestDto(300, (int)PaymentMethodEnum.Cash) // Total 3 reservas
+        };
+
+        var request = new PassengerReserveCreateRequestWrapperDto(paymentItems, passengerItems);
+
+        // Act
+        var result = await _reserveBusiness.CreatePassengerReserves(request);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+
+        // Debe haber 3 pagos: 1 padre + 2 hijos (con amount=0)
+        paymentsDb.Should().HaveCount(3, "Debe crear 1 pago padre + 2 hijos para las otras reservas");
+
+        var parentPayment = paymentsDb.First(p => p.ParentReservePaymentId == null);
+        var childPayments = paymentsDb.Where(p => p.ParentReservePaymentId != null).ToList();
+
+        // El pago padre debe estar en reserve2 (10:00 AM - earliest del día)
+        parentPayment.ReserveId.Should().Be(2, "El pago padre debe estar en la reserva de las 10:00 AM (earliest del día)");
+        parentPayment.Amount.Should().Be(300, "El padre debe tener el monto total");
+
+        // Los hijos deben estar en reserve1 y reserve3 con amount=0
+        childPayments.Should().HaveCount(2);
+        childPayments.Should().OnlyContain(p => p.Amount == 0, "Los hijos deben tener amount=0");
+        childPayments.Should().Contain(p => p.ReserveId == 1, "Debe haber un hijo en reserve1");
+        childPayments.Should().Contain(p => p.ReserveId == 3, "Debe haber un hijo en reserve3");
+        childPayments.Should().OnlyContain(p => p.ParentReservePaymentId == parentPayment.ReservePaymentId);
+
+        // Todos los pasajeros deben estar confirmados
+        passengers.Should().HaveCount(3);
+        passengers.Should().OnlyContain(p => p.Status == PassengerStatusEnum.Confirmed);
+
+        // Verificar status basado en la hora earliest
+        var earliestDateTime = reserve2.ReserveDate.Add(reserve2.DepartureHour);
+        var expectedStatus = earliestDateTime <= DateTime.UtcNow
+            ? StatusPaymentEnum.Paid
+            : StatusPaymentEnum.PrePayment;
+
+        parentPayment.Status.Should().Be(expectedStatus);
+        childPayments.Should().OnlyContain(p => p.Status == expectedStatus, "Todos los hijos deben tener el mismo status que el padre");
     }
 
     #endregion
