@@ -1025,29 +1025,96 @@ public class ReserveBusiness : IReserveBusiness
             .Where(rp => rp.ReserveId == reserveId)
             .ToListAsync();
 
+        // Obtener IDs de pagos padres que están en otras reservas (para link children)
+        var parentPaymentIds = reservePayments
+            .Where(p => p.ParentReservePaymentId.HasValue)
+            .Select(p => p.ParentReservePaymentId!.Value)
+            .Distinct()
+            .ToList();
+
+        // Obtener los pagos padres que están en otras reservas
+        var parentPaymentsFromOtherReserves = parentPaymentIds.Any()
+            ? await _context.ReservePayments
+                .AsNoTracking()
+                .Where(rp => parentPaymentIds.Contains(rp.ReservePaymentId))
+                .ToListAsync()
+            : new List<ReservePayment>();
+
+        // También obtener los hijos de desglose de esos padres (pueden estar en la reserva padre)
+        var parentIdsFromOther = parentPaymentsFromOtherReserves.Select(p => p.ReservePaymentId).ToList();
+        var breakdownChildrenFromOtherReserves = parentIdsFromOther.Any()
+            ? await _context.ReservePayments
+                .AsNoTracking()
+                .Where(rp => rp.ParentReservePaymentId.HasValue
+                    && parentIdsFromOther.Contains(rp.ParentReservePaymentId.Value)
+                    && rp.Amount > 0)
+                .ToListAsync()
+            : new List<ReservePayment>();
+
         // Agrupar pagos por CustomerId
-        var paymentsByCustomer = reservePayments
-            .Where(p => p.CustomerId.HasValue)
-            .GroupBy(p => p.CustomerId!.Value)
-            .ToDictionary(
-                g => g.Key,
-                g =>
-                {
-                    var parentPayments = g.Where(p => p.ParentReservePaymentId == null).ToList();
-                    var breakdownChildren = g.Where(p => p.ParentReservePaymentId != null && p.Amount > 0).ToList();
+        var paymentsByCustomer = new Dictionary<int, (string Methods, decimal Amount)>();
 
-                    // Si hay hijos de desglose, usar esos para los métodos; si no, usar padres
-                    var paymentsForMethods = breakdownChildren.Any() ? breakdownChildren : parentPayments;
+        // Procesar pagos directos en esta reserva (padres locales)
+        var localParentPayments = reservePayments
+            .Where(p => p.ParentReservePaymentId == null && p.CustomerId.HasValue)
+            .GroupBy(p => p.CustomerId!.Value);
 
-                    var methods = paymentsForMethods
-                        .Select(p => GetPaymentMethodName(p.Method))
-                        .Distinct()
-                        .ToList();
+        foreach (var group in localParentPayments)
+        {
+            var parentPayments = group.ToList();
+            var breakdownChildren = reservePayments
+                .Where(p => p.ParentReservePaymentId != null
+                    && p.Amount > 0
+                    && parentPayments.Any(pp => pp.ReservePaymentId == p.ParentReservePaymentId))
+                .ToList();
 
-                    var totalAmount = parentPayments.Sum(p => p.Amount);
+            var paymentsForMethods = breakdownChildren.Any() ? breakdownChildren : parentPayments;
+            var methods = paymentsForMethods
+                .Select(p => GetPaymentMethodName(p.Method))
+                .Distinct()
+                .ToList();
 
-                    return (Methods: string.Join(", ", methods), Amount: totalAmount);
-                });
+            var totalAmount = parentPayments.Sum(p => p.Amount);
+
+            paymentsByCustomer[group.Key] = (string.Join(", ", methods), totalAmount);
+        }
+
+        // Procesar link children (pagos que están en otra reserva - caja actual)
+        var linkChildren = reservePayments
+            .Where(p => p.ParentReservePaymentId.HasValue && p.Amount == 0 && p.CustomerId.HasValue)
+            .ToList();
+
+        foreach (var linkChild in linkChildren)
+        {
+            var customerId = linkChild.CustomerId!.Value;
+
+            // Si ya procesamos este customer con pagos directos, saltar
+            if (paymentsByCustomer.ContainsKey(customerId))
+                continue;
+
+            // Buscar el pago padre en otra reserva
+            var parentPayment = parentPaymentsFromOtherReserves
+                .FirstOrDefault(p => p.ReservePaymentId == linkChild.ParentReservePaymentId);
+
+            if (parentPayment == null)
+                continue;
+
+            // Buscar hijos de desglose del padre
+            var breakdownChildren = breakdownChildrenFromOtherReserves
+                .Where(p => p.ParentReservePaymentId == parentPayment.ReservePaymentId)
+                .ToList();
+
+            var paymentsForMethods = breakdownChildren.Any()
+                ? breakdownChildren
+                : new List<ReservePayment> { parentPayment };
+
+            var methods = paymentsForMethods
+                .Select(p => GetPaymentMethodName(p.Method))
+                .Distinct()
+                .ToList();
+
+            paymentsByCustomer[customerId] = (string.Join(", ", methods), parentPayment.Amount);
+        }
 
         var sortMappings = new Dictionary<string, Expression<Func<Passenger, object>>>
         {
