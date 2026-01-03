@@ -866,7 +866,9 @@ public class ReserveBusiness : IReserveBusiness
                              p.PickupLocationId ?? 0,
                              p.PickupAddress,
                              p.Customer != null ? p.Customer.CurrentBalance : 0,
-                             rp.Service.Vehicle.AvailableQuantity - rp.Passengers.Count))
+                             rp.Service.Vehicle.AvailableQuantity - rp.Passengers.Count,
+                             null,
+                             0))
                          .ToList(),
                        rp.Service.ReservePrices.Select(p => new ReservePriceReport((int)p.ReserveTypeId, p.Price)).ToList()
                    ),
@@ -1017,6 +1019,36 @@ public class ReserveBusiness : IReserveBusiness
             query = query.Where(p => p.Email != null && p.Email.ToLower().Contains(emailFilter));
         }
 
+        // Obtener pagos de la reserva para enriquecer la respuesta
+        var reservePayments = await _context.ReservePayments
+            .AsNoTracking()
+            .Where(rp => rp.ReserveId == reserveId)
+            .ToListAsync();
+
+        // Agrupar pagos por CustomerId
+        var paymentsByCustomer = reservePayments
+            .Where(p => p.CustomerId.HasValue)
+            .GroupBy(p => p.CustomerId!.Value)
+            .ToDictionary(
+                g => g.Key,
+                g =>
+                {
+                    var parentPayments = g.Where(p => p.ParentReservePaymentId == null).ToList();
+                    var breakdownChildren = g.Where(p => p.ParentReservePaymentId != null && p.Amount > 0).ToList();
+
+                    // Si hay hijos de desglose, usar esos para los métodos; si no, usar padres
+                    var paymentsForMethods = breakdownChildren.Any() ? breakdownChildren : parentPayments;
+
+                    var methods = paymentsForMethods
+                        .Select(p => GetPaymentMethodName(p.Method))
+                        .Distinct()
+                        .ToList();
+
+                    var totalAmount = parentPayments.Sum(p => p.Amount);
+
+                    return (Methods: string.Join(", ", methods), Amount: totalAmount);
+                });
+
         var sortMappings = new Dictionary<string, Expression<Func<Passenger, object>>>
         {
             ["passengerfullname"] = p => p.FirstName + " " + p.LastName,
@@ -1024,9 +1056,26 @@ public class ReserveBusiness : IReserveBusiness
             ["email"] = p => p.Email
         };
 
-        var pagedResult = await query.ToPagedReportAsync<PassengerReserveReportResponseDto, Passenger, PassengerReserveReportFilterRequestDto>(
-            requestDto,
-            selector: p => new PassengerReserveReportResponseDto(
+        // Obtener pasajeros paginados
+        var passengers = await query.ToListAsync();
+
+        // Aplicar ordenamiento
+        if (!string.IsNullOrWhiteSpace(requestDto.SortBy) && sortMappings.ContainsKey(requestDto.SortBy.ToLower()))
+        {
+            var sortKey = sortMappings[requestDto.SortBy.ToLower()].Compile();
+            passengers = requestDto.SortDescending
+                ? passengers.OrderByDescending(sortKey).ToList()
+                : passengers.OrderBy(sortKey).ToList();
+        }
+
+        // Mapear a DTOs con información de pagos
+        var allItems = passengers.Select(p =>
+        {
+            var paymentInfo = p.CustomerId.HasValue && paymentsByCustomer.ContainsKey(p.CustomerId.Value)
+                ? paymentsByCustomer[p.CustomerId.Value]
+                : (Methods: (string?)null, Amount: 0m);
+
+            return new PassengerReserveReportResponseDto(
                 p.PassengerId,
                 p.CustomerId,
                 $"{p.FirstName} {p.LastName}",
@@ -1038,10 +1087,16 @@ public class ReserveBusiness : IReserveBusiness
                 p.DropoffAddress,
                 p.PickupLocationId ?? 0,
                 p.PickupAddress,
-                p.Customer != null ? p.Customer.CurrentBalance : 0,
-                p.Reserve.Service.Vehicle.AvailableQuantity - p.Reserve.Passengers.Count),
-            sortMappings: sortMappings
-        );
+                p.Customer?.CurrentBalance ?? 0,
+                p.Reserve.Service.Vehicle.AvailableQuantity - p.Reserve.Passengers.Count,
+                paymentInfo.Methods,
+                paymentInfo.Amount);
+        }).ToList();
+
+        var pagedResult = PagedReportResponseDto<PassengerReserveReportResponseDto>.Create(
+            allItems,
+            requestDto.PageNumber,
+            requestDto.PageSize);
 
         return Result.Success(pagedResult);
     }
