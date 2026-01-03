@@ -13,4 +13,6 @@ public record PassengerReserveReportResponseDto(
     int PickupLocationId,
     string? PickupLocationName,
     decimal? CurrentBalance,
-    int AvailableQuantity);
+    int AvailableQuantity,
+    string? PaymentMethods,
+    decimal PaidAmount);

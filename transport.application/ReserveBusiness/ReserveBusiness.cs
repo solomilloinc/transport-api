@@ -866,7 +866,9 @@ public class ReserveBusiness : IReserveBusiness
                              p.PickupLocationId ?? 0,
                              p.PickupAddress,
                              p.Customer != null ? p.Customer.CurrentBalance : 0,
-                             rp.Service.Vehicle.AvailableQuantity - rp.Passengers.Count))
+                             rp.Service.Vehicle.AvailableQuantity - rp.Passengers.Count,
+                             null,
+                             0))
                          .ToList(),
                        rp.Service.ReservePrices.Select(p => new ReservePriceReport((int)p.ReserveTypeId, p.Price)).ToList()
                    ),
@@ -1017,6 +1019,36 @@ public class ReserveBusiness : IReserveBusiness
             query = query.Where(p => p.Email != null && p.Email.ToLower().Contains(emailFilter));
         }
 
+        // Obtener pagos de la reserva para enriquecer la respuesta
+        var reservePayments = await _context.ReservePayments
+            .AsNoTracking()
+            .Where(rp => rp.ReserveId == reserveId)
+            .ToListAsync();
+
+        // Agrupar pagos por CustomerId
+        var paymentsByCustomer = reservePayments
+            .Where(p => p.CustomerId.HasValue)
+            .GroupBy(p => p.CustomerId!.Value)
+            .ToDictionary(
+                g => g.Key,
+                g =>
+                {
+                    var parentPayments = g.Where(p => p.ParentReservePaymentId == null).ToList();
+                    var breakdownChildren = g.Where(p => p.ParentReservePaymentId != null && p.Amount > 0).ToList();
+
+                    // Si hay hijos de desglose, usar esos para los métodos; si no, usar padres
+                    var paymentsForMethods = breakdownChildren.Any() ? breakdownChildren : parentPayments;
+
+                    var methods = paymentsForMethods
+                        .Select(p => GetPaymentMethodName(p.Method))
+                        .Distinct()
+                        .ToList();
+
+                    var totalAmount = parentPayments.Sum(p => p.Amount);
+
+                    return (Methods: string.Join(", ", methods), Amount: totalAmount);
+                });
+
         var sortMappings = new Dictionary<string, Expression<Func<Passenger, object>>>
         {
             ["passengerfullname"] = p => p.FirstName + " " + p.LastName,
@@ -1024,9 +1056,26 @@ public class ReserveBusiness : IReserveBusiness
             ["email"] = p => p.Email
         };
 
-        var pagedResult = await query.ToPagedReportAsync<PassengerReserveReportResponseDto, Passenger, PassengerReserveReportFilterRequestDto>(
-            requestDto,
-            selector: p => new PassengerReserveReportResponseDto(
+        // Obtener pasajeros paginados
+        var passengers = await query.ToListAsync();
+
+        // Aplicar ordenamiento
+        if (!string.IsNullOrWhiteSpace(requestDto.SortBy) && sortMappings.ContainsKey(requestDto.SortBy.ToLower()))
+        {
+            var sortKey = sortMappings[requestDto.SortBy.ToLower()].Compile();
+            passengers = requestDto.SortDescending
+                ? passengers.OrderByDescending(sortKey).ToList()
+                : passengers.OrderBy(sortKey).ToList();
+        }
+
+        // Mapear a DTOs con información de pagos
+        var allItems = passengers.Select(p =>
+        {
+            var paymentInfo = p.CustomerId.HasValue && paymentsByCustomer.ContainsKey(p.CustomerId.Value)
+                ? paymentsByCustomer[p.CustomerId.Value]
+                : (Methods: (string?)null, Amount: 0m);
+
+            return new PassengerReserveReportResponseDto(
                 p.PassengerId,
                 p.CustomerId,
                 $"{p.FirstName} {p.LastName}",
@@ -1038,10 +1087,16 @@ public class ReserveBusiness : IReserveBusiness
                 p.DropoffAddress,
                 p.PickupLocationId ?? 0,
                 p.PickupAddress,
-                p.Customer != null ? p.Customer.CurrentBalance : 0,
-                p.Reserve.Service.Vehicle.AvailableQuantity - p.Reserve.Passengers.Count),
-            sortMappings: sortMappings
-        );
+                p.Customer?.CurrentBalance ?? 0,
+                p.Reserve.Service.Vehicle.AvailableQuantity - p.Reserve.Passengers.Count,
+                paymentInfo.Methods,
+                paymentInfo.Amount);
+        }).ToList();
+
+        var pagedResult = PagedReportResponseDto<PassengerReserveReportResponseDto>.Create(
+            allItems,
+            requestDto.PageNumber,
+            requestDto.PageSize);
 
         return Result.Success(pagedResult);
     }
@@ -1223,30 +1278,97 @@ public class ReserveBusiness : IReserveBusiness
                 return Result.Failure<bool>(
                     ReserveError.InvalidPaymentAmount(expectedAmount, providedAmount));
 
-            // Determinar quien paga usando el primer pasajero
-            var firstPayment = payments.First();
-
-            Customer payer = null;
-            payer = await _context.Customers
-                   .FindAsync(customerId);
-
+            Customer payer = await _context.Customers.FindAsync(customerId);
             if (payer == null)
-            {
                 return Result.Failure<bool>(CustomerError.NotFound);
+
+            // BUSCAR la reserva MÁS PRÓXIMA a salir (caja actual)
+            var closestReserveInDb = await _context.Reserves
+                .OrderBy(r => r.ReserveDate)
+                .ThenBy(r => r.DepartureHour)
+                .ThenBy(r => r.ReserveId)
+                .FirstOrDefaultAsync();
+
+            // Determinar dónde va el pago y el estado
+            int parentReserveId;
+            StatusPaymentEnum paymentStatus;
+            bool needsLinkChild;
+
+            // ¿La reserva indicada es la más próxima a salir?
+            bool reserveIsClosest = closestReserveInDb == null || closestReserveInDb.ReserveId == reserveId;
+
+            if (reserveIsClosest)
+            {
+                // La reserva indicada ES la más próxima → Pago va a ella, estado = Paid
+                parentReserveId = reserveId;
+                paymentStatus = StatusPaymentEnum.Paid;
+                needsLinkChild = false;
+            }
+            else
+            {
+                // Hay otra reserva más próxima → Pago va a esa (caja actual), estado = PrePayment
+                parentReserveId = closestReserveInDb.ReserveId;
+                paymentStatus = StatusPaymentEnum.PrePayment;
+                needsLinkChild = true;
             }
 
-            foreach (var payment in payments)
+            var primaryMethod = (PaymentMethodEnum)payments.First().PaymentMethod;
+
+            // Crear pago PADRE en la reserva más próxima (caja actual)
+            var parentPayment = new ReservePayment
             {
-                var newPayment = new ReservePayment
+                ReserveId = parentReserveId,
+                CustomerId = payer.CustomerId,
+                PayerDocumentNumber = payer.DocumentNumber,
+                PayerName = $"{payer.FirstName} {payer.LastName}",
+                PayerEmail = payer.Email,
+                Amount = providedAmount,
+                Method = primaryMethod,
+                Status = paymentStatus,
+                StatusDetail = paymentStatus == StatusPaymentEnum.PrePayment
+                    ? "paid_in_advance"
+                    : "paid_on_departure"
+            };
+            _context.ReservePayments.Add(parentPayment);
+            await _context.SaveChangesWithOutboxAsync(); // necesitamos el Id del padre
+
+            // Si hay split de medios (>=2), crear hijos de desglose SOLO en la reserva padre
+            if (payments.Count > 1)
+            {
+                foreach (var payment in payments)
+                {
+                    var breakdownChild = new ReservePayment
+                    {
+                        ReserveId = parentReserveId,
+                        CustomerId = payer.CustomerId,
+                        PayerDocumentNumber = payer.DocumentNumber,
+                        PayerName = $"{payer.FirstName} {payer.LastName}",
+                        PayerEmail = payer.Email,
+                        Amount = payment.TransactionAmount,
+                        Method = (PaymentMethodEnum)payment.PaymentMethod,
+                        Status = paymentStatus,
+                        ParentReservePaymentId = parentPayment.ReservePaymentId
+                    };
+                    _context.ReservePayments.Add(breakdownChild);
+                }
+            }
+
+            // Si el pago fue a otra reserva (caja actual), crear "link child" en la reserva original
+            if (needsLinkChild)
+            {
+                var linkChild = new ReservePayment
                 {
                     ReserveId = reserveId,
-                    CustomerId = payer?.CustomerId,
-                    Amount = payment.TransactionAmount,
-                    Method = (PaymentMethodEnum)payment.PaymentMethod,
-                    Status = StatusPaymentEnum.Paid,
+                    CustomerId = payer.CustomerId,
+                    PayerDocumentNumber = payer.DocumentNumber,
+                    PayerName = $"{payer.FirstName} {payer.LastName}",
+                    PayerEmail = payer.Email,
+                    Amount = 0m,
+                    Method = primaryMethod,
+                    Status = paymentStatus,
+                    ParentReservePaymentId = parentPayment.ReservePaymentId
                 };
-
-                _context.ReservePayments.Add(newPayment);
+                _context.ReservePayments.Add(linkChild);
             }
 
             // Actualizar estado de los pasajeros a confirmado
@@ -1259,14 +1381,16 @@ public class ReserveBusiness : IReserveBusiness
                 }
             }
 
+            // Asiento de Payment (negativo) e impacto en saldo
             var transaction = new CustomerAccountTransaction
             {
                 CustomerId = payer.CustomerId,
                 Date = DateTime.UtcNow,
                 Type = TransactionType.Payment,
                 Amount = -providedAmount,
-                Description = $"Pago de reserva #{reserveId}",
-                RelatedReserveId = reserveId
+                Description = $"Pago aplicado a reserva #{reserveId}",
+                RelatedReserveId = parentReserveId,
+                ReservePaymentId = parentPayment.ReservePaymentId
             };
             _context.CustomerAccountTransactions.Add(transaction);
 
@@ -1477,5 +1601,68 @@ public class ReserveBusiness : IReserveBusiness
         }
 
         return Result.Success(true);
+    }
+
+    public async Task<Result<PagedReportResponseDto<ReservePaymentSummaryResponseDto>>> GetReservePaymentSummary(
+        int reserveId,
+        PagedReportRequestDto<ReservePaymentSummaryFilterRequestDto> requestDto)
+    {
+        var reserve = await _context.Reserves
+            .AsNoTracking()
+            .FirstOrDefaultAsync(r => r.ReserveId == reserveId);
+
+        if (reserve is null)
+            return Result.Failure<PagedReportResponseDto<ReservePaymentSummaryResponseDto>>(ReserveError.NotFound);
+
+        // Obtener pagos de la reserva (solo padres o pagos sin hijos para evitar duplicados)
+        // Si hay hijos de desglose (breakdown), usamos esos para el resumen por método
+        // Si no hay hijos, usamos el pago padre directamente
+        var payments = await _context.ReservePayments
+            .AsNoTracking()
+            .Where(p => p.ReserveId == reserveId)
+            .ToListAsync();
+
+        // Separar pagos padres de hijos
+        var parentPayments = payments.Where(p => p.ParentReservePaymentId == null).ToList();
+        var childBreakdownPayments = payments.Where(p => p.ParentReservePaymentId != null && p.Amount > 0).ToList();
+
+        // Si hay hijos de desglose (Amount > 0), usamos esos para el detalle por método
+        // Si no hay, usamos los padres
+        var paymentsForSummary = childBreakdownPayments.Any() ? childBreakdownPayments : parentPayments;
+
+        var paymentsByMethod = paymentsForSummary
+            .GroupBy(p => p.Method)
+            .Select(g => new PaymentMethodSummaryDto(
+                (int)g.Key,
+                GetPaymentMethodName(g.Key),
+                g.Sum(p => p.Amount)))
+            .OrderBy(p => p.PaymentMethodId)
+            .ToList();
+
+        // Total es la suma de los pagos padres (no los hijos para evitar duplicar)
+        var totalAmount = parentPayments.Sum(p => p.Amount);
+
+        var summaryItem = new ReservePaymentSummaryResponseDto(
+            reserveId,
+            paymentsByMethod,
+            totalAmount);
+
+        var result = PagedReportResponseDto<ReservePaymentSummaryResponseDto>.Create(
+            new List<ReservePaymentSummaryResponseDto> { summaryItem },
+            requestDto.PageNumber,
+            requestDto.PageSize);
+
+        return Result.Success(result);
+    }
+
+    private static string GetPaymentMethodName(PaymentMethodEnum method)
+    {
+        return method switch
+        {
+            PaymentMethodEnum.Cash => "Efectivo",
+            PaymentMethodEnum.Online => "Online",
+            PaymentMethodEnum.CreditCard => "Tarjeta de Crédito",
+            _ => method.ToString()
+        };
     }
 }

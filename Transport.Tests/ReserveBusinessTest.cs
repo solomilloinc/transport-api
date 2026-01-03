@@ -648,11 +648,12 @@ public class ReserveBusinessTests : TestBase
     [Fact]
     public async Task CreatePaymentsAsync_ShouldSucceed_WhenValidPaymentsProvided()
     {
+        // Arrange
         var paymentsDb = new List<ReservePayment>();
         var passengers = new List<Passenger> { new Passenger { PassengerId = 1, ReserveId = 1, CustomerId = 1, Price = 100, Status = PassengerStatusEnum.PendingPayment } };
-        var reserve = new Reserve { ReserveId = 1, ServiceId = 1, Passengers = passengers };
+        var reserve = new Reserve { ReserveId = 1, ServiceId = 1, Passengers = passengers, ReserveDate = DateTime.Today, DepartureHour = TimeSpan.FromHours(9) };
         var reserves = new List<Reserve> { reserve };
-        var customer = new Customer { CustomerId = 1, DocumentNumber = "12345678" };
+        var customer = new Customer { CustomerId = 1, DocumentNumber = "12345678", FirstName = "Test", LastName = "User", Email = "test@test.com" };
         var service = new Service { ServiceId = 1, ReservePrices = new List<ReservePrice> { new ReservePrice { ReserveTypeId = ReserveTypeIdEnum.Ida, Price = 100 } } };
 
         var customers = new List<Customer> { customer };
@@ -675,17 +676,30 @@ public class ReserveBusinessTests : TestBase
                It.IsAny<IsolationLevel>()))
            .Returns<Func<Task<Result<bool>>>, IsolationLevel>((func, _) => func());
 
+        // Act
         var result = await _reserveBusiness.CreatePaymentsAsync(1, 1, new List<CreatePaymentRequestDto>
-    {
-        new CreatePaymentRequestDto(50, 1),
-        new CreatePaymentRequestDto(50, 2)
-    });
+        {
+            new CreatePaymentRequestDto(50, 1),
+            new CreatePaymentRequestDto(50, 2)
+        });
 
+        // Assert
         result.IsSuccess.Should().BeTrue();
-        paymentsDb.Should().HaveCount(2);
-        paymentsDb[0].Amount.Should().Be(50);
-        paymentsDb[1].Amount.Should().Be(50);
-        paymentsDb.All(p => p.ReserveId == 1 && p.CustomerId == 1).Should().BeTrue();
+        // Con la nueva lógica de "caja actual":
+        // - 1 pago padre con monto total (100)
+        // - 2 hijos de desglose (50 cada uno) cuando hay split de medios
+        paymentsDb.Should().HaveCount(3);
+
+        var parentPayment = paymentsDb.First(p => p.ParentReservePaymentId == null);
+        parentPayment.Amount.Should().Be(100);
+        parentPayment.ReserveId.Should().Be(1);
+        parentPayment.CustomerId.Should().Be(1);
+        parentPayment.Status.Should().Be(StatusPaymentEnum.Paid);
+
+        var childPayments = paymentsDb.Where(p => p.ParentReservePaymentId != null).ToList();
+        childPayments.Should().HaveCount(2);
+        childPayments.Select(p => p.Amount).Should().BeEquivalentTo(new[] { 50m, 50m });
+        childPayments.All(p => p.ReserveId == 1 && p.CustomerId == 1).Should().BeTrue();
     }
 
     [Fact]
@@ -1711,6 +1725,246 @@ public class ReserveBusinessTests : TestBase
 
         parentPayment.Status.Should().Be(expectedStatus);
         childPayments.Should().OnlyContain(p => p.Status == expectedStatus, "Todos los hijos deben tener el mismo status que el padre");
+    }
+
+    #endregion
+
+    #region GetReservePaymentSummary Tests
+
+    [Fact]
+    public async Task GetReservePaymentSummary_ShouldFail_WhenReserveNotFound()
+    {
+        // Arrange
+        _contextMock.Setup(c => c.Reserves)
+            .Returns(GetQueryableMockDbSet(new List<Reserve>()).Object);
+
+        var request = new PagedReportRequestDto<ReservePaymentSummaryFilterRequestDto>();
+
+        // Act
+        var result = await _reserveBusiness.GetReservePaymentSummary(999, request);
+
+        // Assert
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Be(ReserveError.NotFound);
+    }
+
+    [Fact]
+    public async Task GetReservePaymentSummary_ShouldReturnEmptySummary_WhenNoPayments()
+    {
+        // Arrange
+        var reserve = new Reserve { ReserveId = 1 };
+        var reserves = new List<Reserve> { reserve };
+        var payments = new List<ReservePayment>();
+
+        _contextMock.Setup(c => c.Reserves)
+            .Returns(GetQueryableMockDbSet(reserves).Object);
+        _contextMock.Setup(c => c.ReservePayments)
+            .Returns(GetQueryableMockDbSet(payments).Object);
+
+        var request = new PagedReportRequestDto<ReservePaymentSummaryFilterRequestDto>();
+
+        // Act
+        var result = await _reserveBusiness.GetReservePaymentSummary(1, request);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Items.Should().HaveCount(1);
+        result.Value.Items[0].ReserveId.Should().Be(1);
+        result.Value.Items[0].PaymentsByMethod.Should().BeEmpty();
+        result.Value.Items[0].TotalAmount.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task GetReservePaymentSummary_ShouldReturnCorrectSummary_WithSinglePaymentMethod()
+    {
+        // Arrange
+        var reserve = new Reserve { ReserveId = 1 };
+        var reserves = new List<Reserve> { reserve };
+        var payments = new List<ReservePayment>
+        {
+            new ReservePayment
+            {
+                ReservePaymentId = 1,
+                ReserveId = 1,
+                Amount = 5000,
+                Method = PaymentMethodEnum.Cash,
+                ParentReservePaymentId = null
+            }
+        };
+
+        _contextMock.Setup(c => c.Reserves)
+            .Returns(GetQueryableMockDbSet(reserves).Object);
+        _contextMock.Setup(c => c.ReservePayments)
+            .Returns(GetQueryableMockDbSet(payments).Object);
+
+        var request = new PagedReportRequestDto<ReservePaymentSummaryFilterRequestDto>();
+
+        // Act
+        var result = await _reserveBusiness.GetReservePaymentSummary(1, request);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Items.Should().HaveCount(1);
+
+        var summary = result.Value.Items[0];
+        summary.ReserveId.Should().Be(1);
+        summary.TotalAmount.Should().Be(5000);
+        summary.PaymentsByMethod.Should().HaveCount(1);
+        summary.PaymentsByMethod[0].PaymentMethodId.Should().Be((int)PaymentMethodEnum.Cash);
+        summary.PaymentsByMethod[0].PaymentMethodName.Should().Be("Efectivo");
+        summary.PaymentsByMethod[0].Amount.Should().Be(5000);
+    }
+
+    [Fact]
+    public async Task GetReservePaymentSummary_ShouldReturnCorrectSummary_WithMultiplePaymentMethods()
+    {
+        // Arrange
+        var reserve = new Reserve { ReserveId = 1 };
+        var reserves = new List<Reserve> { reserve };
+
+        // Simular pago padre con monto total y hijos de desglose por método
+        var payments = new List<ReservePayment>
+        {
+            // Pago padre (monto total consolidado)
+            new ReservePayment
+            {
+                ReservePaymentId = 1,
+                ReserveId = 1,
+                Amount = 8000,
+                Method = PaymentMethodEnum.Cash,
+                ParentReservePaymentId = null
+            },
+            // Hijo desglose - Efectivo
+            new ReservePayment
+            {
+                ReservePaymentId = 2,
+                ReserveId = 1,
+                Amount = 5000,
+                Method = PaymentMethodEnum.Cash,
+                ParentReservePaymentId = 1
+            },
+            // Hijo desglose - Tarjeta
+            new ReservePayment
+            {
+                ReservePaymentId = 3,
+                ReserveId = 1,
+                Amount = 3000,
+                Method = PaymentMethodEnum.CreditCard,
+                ParentReservePaymentId = 1
+            }
+        };
+
+        _contextMock.Setup(c => c.Reserves)
+            .Returns(GetQueryableMockDbSet(reserves).Object);
+        _contextMock.Setup(c => c.ReservePayments)
+            .Returns(GetQueryableMockDbSet(payments).Object);
+
+        var request = new PagedReportRequestDto<ReservePaymentSummaryFilterRequestDto>();
+
+        // Act
+        var result = await _reserveBusiness.GetReservePaymentSummary(1, request);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Items.Should().HaveCount(1);
+
+        var summary = result.Value.Items[0];
+        summary.ReserveId.Should().Be(1);
+        summary.TotalAmount.Should().Be(8000, "Total debe ser la suma de pagos padres");
+        summary.PaymentsByMethod.Should().HaveCount(2, "Debe haber 2 métodos de pago diferentes");
+
+        var cashPayment = summary.PaymentsByMethod.First(p => p.PaymentMethodId == (int)PaymentMethodEnum.Cash);
+        cashPayment.Amount.Should().Be(5000);
+        cashPayment.PaymentMethodName.Should().Be("Efectivo");
+
+        var cardPayment = summary.PaymentsByMethod.First(p => p.PaymentMethodId == (int)PaymentMethodEnum.CreditCard);
+        cardPayment.Amount.Should().Be(3000);
+        cardPayment.PaymentMethodName.Should().Be("Tarjeta de Crédito");
+    }
+
+    [Fact]
+    public async Task GetReservePaymentSummary_ShouldIgnoreLinkChildren_WithZeroAmount()
+    {
+        // Arrange - Escenario de PrePayment con link children (amount = 0)
+        var reserve = new Reserve { ReserveId = 1 };
+        var reserves = new List<Reserve> { reserve };
+
+        var payments = new List<ReservePayment>
+        {
+            // Link child con amount = 0 (no debe contar en el resumen de esta reserva)
+            new ReservePayment
+            {
+                ReservePaymentId = 10,
+                ReserveId = 1,
+                Amount = 0,
+                Method = PaymentMethodEnum.Cash,
+                ParentReservePaymentId = 99 // El padre está en otra reserva
+            }
+        };
+
+        _contextMock.Setup(c => c.Reserves)
+            .Returns(GetQueryableMockDbSet(reserves).Object);
+        _contextMock.Setup(c => c.ReservePayments)
+            .Returns(GetQueryableMockDbSet(payments).Object);
+
+        var request = new PagedReportRequestDto<ReservePaymentSummaryFilterRequestDto>();
+
+        // Act
+        var result = await _reserveBusiness.GetReservePaymentSummary(1, request);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        var summary = result.Value.Items[0];
+
+        // No debe haber métodos de pago porque el link child tiene amount = 0
+        summary.PaymentsByMethod.Should().BeEmpty();
+        summary.TotalAmount.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task GetReservePaymentSummary_ShouldAggregateMultiplePayments_SameMethod()
+    {
+        // Arrange - Múltiples pagos del mismo método
+        var reserve = new Reserve { ReserveId = 1 };
+        var reserves = new List<Reserve> { reserve };
+
+        var payments = new List<ReservePayment>
+        {
+            new ReservePayment
+            {
+                ReservePaymentId = 1,
+                ReserveId = 1,
+                Amount = 2000,
+                Method = PaymentMethodEnum.Cash,
+                ParentReservePaymentId = null
+            },
+            new ReservePayment
+            {
+                ReservePaymentId = 2,
+                ReserveId = 1,
+                Amount = 3000,
+                Method = PaymentMethodEnum.Cash,
+                ParentReservePaymentId = null
+            }
+        };
+
+        _contextMock.Setup(c => c.Reserves)
+            .Returns(GetQueryableMockDbSet(reserves).Object);
+        _contextMock.Setup(c => c.ReservePayments)
+            .Returns(GetQueryableMockDbSet(payments).Object);
+
+        var request = new PagedReportRequestDto<ReservePaymentSummaryFilterRequestDto>();
+
+        // Act
+        var result = await _reserveBusiness.GetReservePaymentSummary(1, request);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        var summary = result.Value.Items[0];
+
+        summary.TotalAmount.Should().Be(5000);
+        summary.PaymentsByMethod.Should().HaveCount(1);
+        summary.PaymentsByMethod[0].Amount.Should().Be(5000, "Debe sumar todos los pagos en efectivo");
     }
 
     #endregion
