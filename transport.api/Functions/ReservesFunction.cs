@@ -252,4 +252,24 @@ public class ReservesFunction : FunctionBase
         return await MatchResultAsync(req, result);
     }
 
+    [Function("GetReservePaymentSummary")]
+    [Authorize("Admin")]
+    [OpenApiOperation(
+        operationId: "reserve-payment-summary",
+        tags: new[] { "ReservePayments" },
+        Summary = "Get Reserve Payment Summary",
+        Description = "Returns a summary of payments for a reserve, grouped by payment method.",
+        Visibility = OpenApiVisibilityType.Important)]
+    [OpenApiParameter(name: "reserveId", In = ParameterLocation.Path, Required = true, Type = typeof(int), Summary = "The ID of the reserve")]
+    [OpenApiRequestBody("application/json", typeof(PagedReportRequestDto<ReservePaymentSummaryFilterRequestDto>), Required = true)]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(PagedReportResponseDto<ReservePaymentSummaryResponseDto>), Summary = "Reserve Payment Summary")]
+    public async Task<HttpResponseData> GetReservePaymentSummary(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "reserve-payment-summary/{reserveId:int}")] HttpRequestData req,
+        int reserveId)
+    {
+        var filter = await req.ReadFromJsonAsync<PagedReportRequestDto<ReservePaymentSummaryFilterRequestDto>>();
+        var result = await _reserveBusiness.GetReservePaymentSummary(reserveId, filter);
+        return await MatchResultAsync(req, result);
+    }
+
 }
