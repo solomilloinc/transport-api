@@ -10,5 +10,6 @@ public record ReserveReportResponseDto(int ReserveId,
     string DepartureHour,
     int VehicleId, 
     int DriverId,
+    DateTime ReserveDate,
     List<PassengerReserveReportResponseDto> Passengers,
     List<ReservePriceReport> Prices);
