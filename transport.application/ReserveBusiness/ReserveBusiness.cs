@@ -868,7 +868,9 @@ public class ReserveBusiness : IReserveBusiness
                              p.Customer != null ? p.Customer.CurrentBalance : 0,
                              rp.Service.Vehicle.AvailableQuantity - rp.Passengers.Count,
                              null,
-                             0))
+                             0,
+                             false,
+                             false))
                          .ToList(),
                        rp.Service.ReservePrices.Select(p => new ReservePriceReport((int)p.ReserveTypeId, p.Price)).ToList()
                    ),
@@ -1157,7 +1159,9 @@ public class ReserveBusiness : IReserveBusiness
                 p.Customer?.CurrentBalance ?? 0,
                 p.Reserve.Service.Vehicle.AvailableQuantity - p.Reserve.Passengers.Count,
                 paymentInfo.Methods,
-                paymentInfo.Amount);
+                paymentInfo.Amount,
+                paymentInfo.Amount > 0,
+                p.HasTraveled);
         }).ToList();
 
         var pagedResult = PagedReportResponseDto<PassengerReserveReportResponseDto>.Create(
