@@ -852,6 +852,7 @@ public class ReserveBusiness : IReserveBusiness
                        rp.DepartureHour.ToString(@"hh\:mm"),
                        rp.VehicleId,
                        rp.DriverId.GetValueOrDefault(),
+                       rp.ReserveDate,
                        rp.Passengers
                          .Select(p => new PassengerReserveReportResponseDto(
                              p.PassengerId,
