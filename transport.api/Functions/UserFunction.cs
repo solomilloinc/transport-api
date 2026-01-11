@@ -10,6 +10,7 @@ using Transport.SharedKernel.Contracts.User;
 using Transport_Api.Functions.Base;
 using transport_api.Extensions;
 using Transport.Domain.Users.Abstraction;
+using Transport.Business.Authentication;
 
 namespace Transport_Api.Functions;
 
@@ -17,12 +18,14 @@ public class UserFunction : FunctionBase
 {
     private readonly IUserBusiness _userBusiness;
     private readonly IValidator<LoginDto> _validator;
+    private readonly IUserContext _userContext;
 
-    public UserFunction(IUserBusiness loginBusiness, IValidator<LoginDto> validator, IServiceProvider serviceProvider) :
+    public UserFunction(IUserBusiness loginBusiness, IValidator<LoginDto> validator, IUserContext userContext, IServiceProvider serviceProvider) :
         base(serviceProvider)
     {
         _userBusiness = loginBusiness;
         _validator = validator;
+        _userContext = userContext;
     }
 
     [Function("login")]
@@ -49,7 +52,7 @@ public class UserFunction : FunctionBase
         var encodedToken = WebUtility.UrlEncode(result.Value.RefreshToken);
 
         response.Headers.Add("Set-Cookie",
-            $"refreshToken={encodedToken}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=604800");
+            $"refreshToken={encodedToken}; HttpOnly; Secure; SameSite=None; Path=/; Max-Age=604800");
 
         return response;
     }
@@ -74,7 +77,27 @@ public class UserFunction : FunctionBase
         await response.WriteStringAsync("Logged out");
 
         response.Headers.Add("Set-Cookie",
-            $"refreshToken=; HttpOnly; Secure; SameSite=Strict; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT");
+            $"refreshToken=; HttpOnly; Secure; SameSite=None; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT");
+
+        return response;
+    }
+
+    [Function("revoke-all-sessions")]
+    [Authorize(["Admin", "User"])]
+    [OpenApiOperation(operationId: "RevokeAllSessions", tags: new[] { "Auth" }, Summary = "Cerrar todas las sesiones", Description = "Revoca todos los refresh tokens del usuario actual.")]
+    [OpenApiResponseWithoutBody(statusCode: HttpStatusCode.OK, Summary = "Sesiones revocadas", Description = "Todas las sesiones fueron cerradas correctamente.")]
+    [OpenApiResponseWithoutBody(statusCode: HttpStatusCode.Unauthorized, Summary = "No autorizado", Description = "El usuario no está autenticado.")]
+    public async Task<HttpResponseData> RevokeAllSessions(
+    [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "revoke-all-sessions")] HttpRequestData req)
+    {
+        var ipAddress = req.GetClientIp();
+        await _userBusiness.RevokeAllSessionsAsync(_userContext.UserId, ipAddress);
+
+        var response = req.CreateResponse(HttpStatusCode.OK);
+        await response.WriteStringAsync("All sessions revoked");
+
+        response.Headers.Add("Set-Cookie",
+            $"refreshToken=; HttpOnly; Secure; SameSite=None; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT");
 
         return response;
     }

@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using FluentValidation;
+using Transport.Domain.CashBoxes.Abstraction;
 using Transport.Domain.Drivers.Abstraction;
 using Transport.Domain.Users.Abstraction;
 using Transport.Domain.Vehicles.Abstraction;
@@ -27,6 +28,7 @@ public static class DependencyInjection
         services.AddScoped<ICustomerBusiness, CustomerBusiness.CustomerBusiness>();
         services.AddScoped<IReserveBusiness, ReserveBusiness.ReserveBusiness>();
         services.AddScoped<IDirectionBusiness, DirectionBusiness.DirectionBusiness>();
+        services.AddScoped<ICashBoxBusiness, CashBoxBusiness.CashBoxBusiness>();
         services.AddScoped<ISendReservationEmailTask, SendReservationEmailTask>();
 
         return services;

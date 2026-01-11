@@ -805,24 +805,25 @@ public class ServiceBusinessTests : TestBase
         var reservePrice = new ReservePrice
         {
             ReservePriceId = 10,
+            ReserveTypeId = ReserveTypeIdEnum.Ida,
             Price = 3000,
             Status = EntityStatusEnum.Active
         };
 
-        _contextMock.Setup(x => x.ReservePrices.FindAsync(reservePrice.ReservePriceId))
-            .ReturnsAsync(reservePrice);
-
         var service = new Service
         {
-            ServiceId = 1
+            ServiceId = 1,
+            ReservePrices = new List<ReservePrice> { reservePrice }
         };
 
         _contextMock.Setup(x => x.Services)
             .Returns(GetQueryableMockDbSet(new List<Service> { service }).Object);
 
+        _contextMock.Setup(x => x.ReservePrices.Update(It.IsAny<ReservePrice>()));
+
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
-        var dto = new ServicePriceUpdateDto(10, 4500m);
+        var dto = new ServicePriceUpdateDto((int)ReserveTypeIdEnum.Ida, 4500m);
 
         // Act
         var result = await _serviceBusiness.UpdatePrice(service.ServiceId, dto);

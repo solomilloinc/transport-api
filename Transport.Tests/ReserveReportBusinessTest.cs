@@ -1,6 +1,8 @@
 ﻿using Moq;
 using Transport.Business.Data;
 using Transport.Business.ReserveBusiness;
+using Transport.Domain.CashBoxes;
+using Transport.Domain.CashBoxes.Abstraction;
 using Transport.Domain.Customers;
 using Transport.Domain.Reserves;
 using Transport.Domain.Services;
@@ -23,6 +25,7 @@ public class ReserveReportBusinessTest : TestBase
     private readonly Mock<IUserContext> _userContextMock;
     private readonly Mock<IMercadoPagoPaymentGateway> _mercadoPagoPaymentGatewayMock;
     private readonly Mock<ICustomerBusiness> _customerBusinessMock;
+    private readonly Mock<ICashBoxBusiness> _cashBoxBusinessMock;
     private readonly ReserveBusiness _reserveBusiness;
 
     public ReserveReportBusinessTest()
@@ -32,7 +35,13 @@ public class ReserveReportBusinessTest : TestBase
         _userContextMock = new Mock<IUserContext>();
         _mercadoPagoPaymentGatewayMock = new Mock<IMercadoPagoPaymentGateway>();
         _customerBusinessMock = new Mock<ICustomerBusiness>();
-        _reserveBusiness = new ReserveBusiness(_contextMock.Object, _unitOfWorkMock.Object, _userContextMock.Object, _mercadoPagoPaymentGatewayMock.Object, _customerBusinessMock.Object, new FakeReserveOption());
+        _cashBoxBusinessMock = new Mock<ICashBoxBusiness>();
+
+        var openCashBox = new CashBox { CashBoxId = 1, Status = CashBoxStatusEnum.Open };
+        _cashBoxBusinessMock.Setup(x => x.GetOpenCashBoxEntity())
+            .ReturnsAsync(Result.Success(openCashBox));
+
+        _reserveBusiness = new ReserveBusiness(_contextMock.Object, _unitOfWorkMock.Object, _userContextMock.Object, _mercadoPagoPaymentGatewayMock.Object, _customerBusinessMock.Object, new FakeReserveOption(), _cashBoxBusinessMock.Object);
     }
 
     [Fact]

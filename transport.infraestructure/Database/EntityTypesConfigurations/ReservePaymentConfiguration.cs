@@ -1,7 +1,8 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using Transport.Domain.Reserves;
+using Transport.Domain.CashBoxes;
 using Transport.Domain.Customers;
+using Transport.Domain.Reserves;
 
 namespace Transport.Infraestructure.Database.EntityTypesConfigurations;
 
@@ -70,11 +71,18 @@ internal class ReservePaymentConfiguration : IEntityTypeConfiguration<ReservePay
                .HasForeignKey(p => p.ParentReservePaymentId)
                .OnDelete(DeleteBehavior.Restrict);
 
+        // Relacion con CashBox
+        builder.HasOne(p => p.CashBox)
+               .WithMany(c => c.Payments)
+               .HasForeignKey(p => p.CashBoxId)
+               .OnDelete(DeleteBehavior.Restrict);
+
         // Índices útiles
         builder.HasIndex(p => p.ReserveId);
         builder.HasIndex(p => p.CustomerId);
         builder.HasIndex(p => p.Status);
         builder.HasIndex(p => p.ParentReservePaymentId);
         builder.HasIndex(p => p.PaymentExternalId);
+        builder.HasIndex(p => p.CashBoxId);
     }
 }

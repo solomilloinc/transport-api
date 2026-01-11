@@ -56,14 +56,27 @@ public class UserBusiness : IUserBusiness
 
     public async Task<Result<RefreshTokenResponseDto>> RenewTokenAsync(string refreshToken, string ipAddress)
     {
-        var storedRefreshToken = await tokenProvider.GetRefreshTokenAsync(refreshToken);
+        // Buscar el token sin filtrar por estado para detectar reutilización
+        var storedRefreshToken = await tokenProvider.GetRefreshTokenByHashAsync(refreshToken);
 
         if (storedRefreshToken == null)
             return Result.Failure<RefreshTokenResponseDto>(RefreshTokenError.RefreshNotFound);
 
+        // Detectar reutilización de token (posible robo)
+        if (storedRefreshToken.RevokedAt != null)
+        {
+            // Token ya fue usado/revocado - revocar toda la familia por seguridad
+            await tokenProvider.RevokeAllUserTokensAsync(storedRefreshToken.UserId, ipAddress);
+            return Result.Failure<RefreshTokenResponseDto>(RefreshTokenError.TokenReused);
+        }
+
+        // Verificar expiración
+        if (storedRefreshToken.IsExpired)
+            return Result.Failure<RefreshTokenResponseDto>(RefreshTokenError.TokenExpired);
+
         var user = await dbContext.Users.FindAsync(storedRefreshToken.UserId);
         var claims = ClaimBuilder.Create()
-            .SetEmail(user.Email)
+            .SetEmail(user!.Email)
             .SetRole(((RoleEnum)user.RoleId).ToString())
             .SetId(user.UserId.ToString())
             .Build();
@@ -86,6 +99,11 @@ public class UserBusiness : IUserBusiness
     public async Task LogoutAsync(string refreshToken, string ipAddress)
     {
         await tokenProvider.RevokeRefreshTokenAsync(refreshToken, ipAddress);
+    }
+
+    public async Task RevokeAllSessionsAsync(int userId, string ipAddress)
+    {
+        await tokenProvider.RevokeAllUserTokensAsync(userId, ipAddress);
     }
 
 }
