@@ -116,8 +116,8 @@ public class UserBusinessTests : TestBase
             ExpiresAt = DateTime.UtcNow.AddDays(7)
         };
 
-        _tokenProviderMock.Setup(tp => tp.GetRefreshTokenAsync(refreshToken)).ReturnsAsync(storedToken);
-        _contextMock.Setup(c => c.Users.FindAsync(It.IsAny<object[]>())).ReturnsAsync(user);
+        _tokenProviderMock.Setup(tp => tp.GetRefreshTokenByHashAsync(refreshToken)).ReturnsAsync(storedToken);
+        _contextMock.Setup(c => c.Users.FindAsync(userId)).ReturnsAsync(user);
         _jwtServiceMock.Setup(j => j.BuildToken(It.IsAny<IEnumerable<Claim>>())).Returns("new-access");
         _tokenProviderMock.Setup(tp => tp.GenerateRefreshToken()).Returns("new-refresh");
         _tokenProviderMock.Setup(tp => tp.SaveRefreshTokenAsync("new-refresh", userId, ip)).Returns(Task.CompletedTask);

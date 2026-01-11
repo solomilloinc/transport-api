@@ -8,7 +8,7 @@ public class ServicePriceUpdateRequestValidator : AbstractValidator<ServicePrice
 {
     public ServicePriceUpdateRequestValidator()
     {
-        RuleFor(x => x.ReservePriceId)
+        RuleFor(x => x.ReserveTypeId)
        .GreaterThan(0)
        .WithMessage("El ID del precio de reserva debe ser mayor a 0");
 

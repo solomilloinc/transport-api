@@ -15,6 +15,11 @@ public class Passenger : Entity, IAuditable
     public int PassengerId { get; set; }
     public int ReserveId { get; set; }
 
+    /// <summary>
+    /// ID de la reserva relacionada (ej: la vuelta cuando este pasajero es de ida)
+    /// </summary>
+    public int? ReserveRelatedId { get; set; }
+
     public string FirstName { get; set; }
     public string LastName { get; set; }
     public string DocumentNumber { get; set; }
@@ -35,6 +40,7 @@ public class Passenger : Entity, IAuditable
 
     // Navegación
     public Reserve Reserve { get; set; }
+    public Reserve? ReserveRelated { get; set; }
     public Customer? Customer { get; set; }
     public Direction? PickupLocation { get; set; }
     public Direction? DropoffLocation { get; set; }

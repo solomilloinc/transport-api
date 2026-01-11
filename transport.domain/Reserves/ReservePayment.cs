@@ -1,4 +1,5 @@
-﻿using Transport.Domain.Customers;
+﻿using Transport.Domain.CashBoxes;
+using Transport.Domain.Customers;
 using Transport.SharedKernel;
 
 namespace Transport.Domain.Reserves;
@@ -24,6 +25,9 @@ public class ReservePayment : Entity, IAuditable
     public int? ParentReservePaymentId { get; set; }
     public ReservePayment? ParentReservePayment { get; set; }
     public ICollection<ReservePayment> ChildPayments { get; set; } = new List<ReservePayment>();
+
+    public int? CashBoxId { get; set; }
+    public CashBox? CashBox { get; set; }
 
     public string CreatedBy { get; set; } = null!;
     public string? UpdatedBy { get; set; }

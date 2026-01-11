@@ -352,19 +352,15 @@ public class ServiceBusiness : IServiceBusiness
 
     public async Task<Result<bool>> UpdatePrice(int serviceId, ServicePriceUpdateDto requestDto)
     {
-        ReservePrice reservePrice = await _context.ReservePrices.FindAsync(requestDto.ReservePriceId);
-
-        if (reservePrice is null)
-        {
-            return Result.Failure<bool>(ReservePriceError.ReservePriceNotFound);
-        }
-
         var service = await _context.Services.Include(p => p.ReservePrices).SingleOrDefaultAsync(p => p.ServiceId == serviceId);
 
         if (service is null)
         {
             return Result.Failure<bool>(ServiceError.ServiceNotFound);
         }
+
+        ReservePrice reservePrice = service.ReservePrices
+            .FirstOrDefault(p => p.ReserveTypeId == (ReserveTypeIdEnum)requestDto.ReserveTypeId);
 
         reservePrice.Price = requestDto.Price;
 

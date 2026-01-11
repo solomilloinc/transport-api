@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Transport.Domain;
+using Transport.Domain.CashBoxes;
 using Transport.Domain.Drivers;
 using Transport.Domain.Customers;
 using Transport.Domain.Reserves;
@@ -33,6 +34,7 @@ public interface IApplicationDbContext
     DbSet<ReservePayment> ReservePayments { get; }
     DbSet<ReserveSlotLock> ReserveSlotLocks { get; }
     DbSet<CustomerAccountTransaction> CustomerAccountTransactions { get; }
+    DbSet<CashBox> CashBoxes { get; }
     DbSet<OutboxMessage> OutboxMessages { get; }
     EntityEntry<TEntity> Entry<TEntity>(TEntity entity) where TEntity : class;
     Task<int> SaveChangesWithOutboxAsync(CancellationToken cancellationToken = default);

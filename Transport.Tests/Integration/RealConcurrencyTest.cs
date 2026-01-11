@@ -7,6 +7,8 @@ using Transport.Business.ReserveBusiness;
 using Transport.Business.Services.Payment;
 using Transport.Business.Authentication;
 using Transport.Business.Data;
+using Transport.Domain.CashBoxes;
+using Transport.Domain.CashBoxes.Abstraction;
 using Transport.Domain.Customers.Abstraction;
 using Transport.Domain.Reserves;
 using Transport.Domain.Services;
@@ -32,6 +34,7 @@ public class RealConcurrencyTest : IDisposable
     private readonly ReserveBusiness _reserveBusiness;
     private readonly Mock<IMercadoPagoPaymentGateway> _paymentGatewayMock;
     private readonly Mock<ICustomerBusiness> _customerBusinessMock;
+    private readonly Mock<ICashBoxBusiness> _cashBoxBusinessMock;
     private readonly IUnitOfWork _unitOfWork;
 
     private Reserve _testReserve = null!;
@@ -69,6 +72,11 @@ public class RealConcurrencyTest : IDisposable
         // Setup mocks
         _paymentGatewayMock = new Mock<IMercadoPagoPaymentGateway>();
         _customerBusinessMock = new Mock<ICustomerBusiness>();
+        _cashBoxBusinessMock = new Mock<ICashBoxBusiness>();
+
+        var openCashBox = new CashBox { CashBoxId = 1, Status = CashBoxStatusEnum.Open };
+        _cashBoxBusinessMock.Setup(x => x.GetOpenCashBoxEntity())
+            .ReturnsAsync(Result.Success(openCashBox));
 
         var userContext = serviceProvider.GetRequiredService<IUserContext>();
         var reserveOptions = new TestReserveOption();
@@ -79,7 +87,8 @@ public class RealConcurrencyTest : IDisposable
             userContext,
             _paymentGatewayMock.Object,
             _customerBusinessMock.Object,
-            reserveOptions);
+            reserveOptions,
+            _cashBoxBusinessMock.Object);
 
         // Seed data mínimo necesario
         SeedMinimalTestData();
@@ -217,6 +226,12 @@ public class RealConcurrencyTest : IDisposable
         // Setup mocks para esta instancia
         var paymentGatewayMock = new Mock<IMercadoPagoPaymentGateway>();
         var customerBusinessMock = new Mock<ICustomerBusiness>();
+        var cashBoxBusinessMock = new Mock<ICashBoxBusiness>();
+
+        var openCashBox = new CashBox { CashBoxId = 1, Status = CashBoxStatusEnum.Open };
+        cashBoxBusinessMock.Setup(x => x.GetOpenCashBoxEntity())
+            .ReturnsAsync(Result.Success(openCashBox));
+
         var reserveOptions = new TestReserveOption();
 
         var reserveBusiness = new ReserveBusiness(
@@ -225,7 +240,8 @@ public class RealConcurrencyTest : IDisposable
             userContext,
             paymentGatewayMock.Object,
             customerBusinessMock.Object,
-            reserveOptions);
+            reserveOptions,
+            cashBoxBusinessMock.Object);
 
         return (serviceProvider, reserveBusiness);
     }

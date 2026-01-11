@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Transport.SharedKernel;
 using Transport.Domain;
+using Transport.Domain.CashBoxes;
 using Transport.Domain.Drivers;
 using Transport.Business.Data;
 using Transport.Domain.Customers;
@@ -40,6 +41,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<ReservePayment> ReservePayments { get; set; }
     public DbSet<ReserveSlotLock> ReserveSlotLocks { get; set; }
     public DbSet<CustomerAccountTransaction> CustomerAccountTransactions { get; set; }
+    public DbSet<CashBox> CashBoxes { get; set; }
 
     private readonly IUserContext _userContext;
 

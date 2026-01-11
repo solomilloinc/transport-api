@@ -23,6 +23,8 @@ using Transport.Domain.Users;
 using Microsoft.AspNetCore.Builder.Extensions;
 using MercadoPago.Client.Payment;
 using Transport.Business.Services.Payment;
+using Transport.Domain.CashBoxes;
+using Transport.Domain.CashBoxes.Abstraction;
 using Transport.Domain.Customers.Abstraction;
 using Transport.Domain.Passengers;
 using Transport.SharedKernel.Contracts.Passenger;
@@ -37,6 +39,7 @@ public class ReserveBusinessTests : TestBase
     private readonly Mock<IUserContext> _userContextMock;
     private readonly Mock<IMercadoPagoPaymentGateway> _paymentGatewayMock;
     private readonly Mock<ICustomerBusiness> _customerBusinessMock;
+    private readonly Mock<ICashBoxBusiness> _cashBoxBusinessMock;
     private readonly ReserveBusiness _reserveBusiness;
 
     public ReserveBusinessTests()
@@ -46,12 +49,20 @@ public class ReserveBusinessTests : TestBase
         _userContextMock = new Mock<IUserContext>();
         _paymentGatewayMock = new Mock<IMercadoPagoPaymentGateway>();
         _customerBusinessMock = new Mock<ICustomerBusiness>();
+        _cashBoxBusinessMock = new Mock<ICashBoxBusiness>();
+
+        // Setup default open CashBox
+        var openCashBox = new CashBox { CashBoxId = 1, Status = CashBoxStatusEnum.Open };
+        _cashBoxBusinessMock.Setup(x => x.GetOpenCashBoxEntity())
+            .ReturnsAsync(Result.Success(openCashBox));
+
         _reserveBusiness = new ReserveBusiness(_contextMock.Object,
             _unitOfWorkMock.Object,
             _userContextMock.Object,
             _paymentGatewayMock.Object,
             _customerBusinessMock.Object,
-            new FakeReserveOption());
+            new FakeReserveOption(),
+            _cashBoxBusinessMock.Object);
     }
 
     [Fact]
@@ -218,7 +229,8 @@ public class ReserveBusinessTests : TestBase
             )
         ).ToList();
 
-        var totalAmount = 100m * reserveCount;
+        // IdaVuelta: si hay 2 reservas, el precio ya incluye ida y vuelta (no se duplica)
+        var totalAmount = reserveCount == 2 ? 100m : 100m * reserveCount;
         var payments = new List<CreatePaymentRequestDto>();
 
         if (paymentCount == 1)
@@ -242,38 +254,26 @@ public class ReserveBusinessTests : TestBase
         // Assert
         Assert.True(result.IsSuccess);
 
-        if (paymentCount == 1)
-        {
-            int accountPaymentShouldBe = 0;
-
-            if (reserveCount == 2)
-            {
-                accountPaymentShouldBe += 1;
-            }
-
-            Assert.Equal(paymentCount + accountPaymentShouldBe, reservePaymentsList.Count);
-        }
-        else
-        {
-            int accountPaymentShouldBe = 1;
-
-            if (reserveCount == 2)
-            {
-                accountPaymentShouldBe += 1;
-            }
-
-            Assert.Equal(paymentCount + accountPaymentShouldBe, reservePaymentsList.Count);
-        }
+        // Lógica de pagos:
+        // - paymentCount == 1: solo 1 pago (parent)
+        // - paymentCount > 1: 1 parent + N breakdown children = (paymentCount + 1) pagos
+        // - reserveCount ya no afecta el conteo de pagos (no hay link children)
+        var expectedPaymentCount = paymentCount == 1 ? 1 : paymentCount + 1;
+        Assert.Equal(expectedPaymentCount, reservePaymentsList.Count);
 
         var parent = reservePaymentsList.First();
         Assert.Equal(payments.Sum(p => p.TransactionAmount), parent.Amount);
         Assert.Null(parent.ParentReservePaymentId);
+        Assert.NotNull(parent.CashBoxId); // El pago admin debe tener CashBoxId
 
-        if (reserveCount == 2)
+        // Verificar breakdown children si hay más de un método de pago
+        if (paymentCount > 1)
         {
-            foreach (var child in reservePaymentsList.TakeLast(0))
+            var breakdownChildren = reservePaymentsList.Where(p => p.ParentReservePaymentId != null).ToList();
+            Assert.Equal(paymentCount, breakdownChildren.Count);
+            foreach (var child in breakdownChildren)
             {
-                Assert.Equal(0, child.Amount);
+                Assert.True(child.Amount > 0);
                 Assert.Equal(parent.ReservePaymentId, child.ParentReservePaymentId);
             }
         }
@@ -396,8 +396,11 @@ public class ReserveBusinessTests : TestBase
             _userContextMock.Object,
             paymentGatewayMock.Object,
             _customerBusinessMock.Object,
-            new FakeReserveOption());
+            new FakeReserveOption(),
+            _cashBoxBusinessMock.Object);
 
+        // 1 pasajero con ida/vuelta = 2 items (1 para ida con tipo Ida, 1 para vuelta con tipo IdaVuelta)
+        // La validación requiere exactamente Ida + IdaVuelta para 2 reservas
         var passengerList = new List<PassengerReserveExternalCreateRequestDto>
         {
         new(
@@ -413,7 +416,7 @@ public class ReserveBusinessTests : TestBase
             LastName: "Argento",
             Email: "pepe@example.com",
             Phone1: "32145678",
-            DocumentNumber: "1111-2222"
+            DocumentNumber: "32145678"
         ),
         new(
             ReserveId: 2,
@@ -424,16 +427,17 @@ public class ReserveBusinessTests : TestBase
             DropoffLocationId: 2,
             HasTraveled: false,
             Price: 100m,
-            FirstName: "Lionel",
-            LastName: "Messi",
-            Email: "liomessi@example.com",
-            Phone1: "32145679",
-            DocumentNumber: "1111-2222"
+            FirstName: "Pepe",
+            LastName: "Argento",
+            Email: "pepe@example.com",
+            Phone1: "32145678",
+            DocumentNumber: "32145678"
         )
         };
 
+        // 1 pasajero IdaVuelta = precio 100 (no 200)
         var paymentDto = new CreatePaymentExternalRequestDto(
-            TransactionAmount: 200m,
+            TransactionAmount: 100m,
             Token: "token",
             Description: "Reserva de ida y vuelta",
             Installments: 1,
@@ -462,20 +466,16 @@ public class ReserveBusinessTests : TestBase
 
         // Assert - Verificaciones para pago directo
         Assert.True(result.IsSuccess);
-        Assert.Equal(2, reservePaymentsList.Count);
+        Assert.Single(reservePaymentsList); // Solo pago padre, sin link children
         Assert.Equal(2, reserve1.Passengers.Count + reserve2.Passengers.Count);
 
         var parentPayment = reservePaymentsList[0];
-        var childPayment = reservePaymentsList[1];
 
-        // Verificar pagos
-        Assert.Equal(200m, parentPayment.Amount);
+        // Verificar pago padre (1 pasajero IdaVuelta = precio 100, no 200)
+        Assert.Equal(100m, parentPayment.Amount);
         Assert.Null(parentPayment.ParentReservePaymentId);
-        Assert.Equal(0m, childPayment.Amount);
-        Assert.Equal(parentPayment.ReservePaymentId, childPayment.ParentReservePaymentId);
         Assert.Equal(987654321, parentPayment.PaymentExternalId);
         Assert.Equal(StatusPaymentEnum.Paid, parentPayment.Status);
-        Assert.Equal(StatusPaymentEnum.Paid, childPayment.Status);
 
         // Verificar estados de las reservas
         Assert.All(reserve1.Passengers, cr =>
@@ -508,19 +508,15 @@ public class ReserveBusinessTests : TestBase
 
         // Assert - Verificaciones para wallet
         Assert.True(walletResult.IsSuccess);
-        Assert.Equal(2, reservePaymentsList.Count);
+        Assert.Single(reservePaymentsList); // Solo pago padre, sin link children
 
         var walletParentPayment = reservePaymentsList[0];
-        var walletChildPayment = reservePaymentsList[1];
 
-        // Verificar pagos
-        Assert.Equal(200m, walletParentPayment.Amount);
+        // Verificar pago padre (1 pasajero con precio 100)
+        Assert.Equal(100m, walletParentPayment.Amount);
         Assert.Null(walletParentPayment.ParentReservePaymentId);
-        Assert.Equal(0m, walletChildPayment.Amount);
-        Assert.Equal(walletParentPayment.ReservePaymentId, walletChildPayment.ParentReservePaymentId);
-        Assert.Null(walletParentPayment.PaymentExternalId); // Aún no tiene ID externo
+        Assert.Null(walletParentPayment.PaymentExternalId); // Aun no tiene ID externo
         Assert.Equal(StatusPaymentEnum.Pending, walletParentPayment.Status);
-        Assert.Equal(StatusPaymentEnum.Pending, walletChildPayment.Status);
 
         // Verificar estados de las reservas
         Assert.All(reserve1.Passengers, cr =>
@@ -546,7 +542,6 @@ public class ReserveBusinessTests : TestBase
         // Verificar actualización después de notificación
         Assert.Equal(987654321, walletParentPayment.PaymentExternalId);
         Assert.Equal(StatusPaymentEnum.Paid, walletParentPayment.Status);
-        Assert.Equal(StatusPaymentEnum.Paid, walletChildPayment.Status);
     }
 
 
@@ -685,9 +680,9 @@ public class ReserveBusinessTests : TestBase
 
         // Assert
         result.IsSuccess.Should().BeTrue();
-        // Con la nueva lógica de "caja actual":
+        // Con CashBox:
         // - 1 pago padre con monto total (100)
-        // - 2 hijos de desglose (50 cada uno) cuando hay split de medios
+        // - 2 hijos de desglose (50 cada uno) cuando hay split de metodos
         paymentsDb.Should().HaveCount(3);
 
         var parentPayment = paymentsDb.First(p => p.ParentReservePaymentId == null);
@@ -695,11 +690,13 @@ public class ReserveBusinessTests : TestBase
         parentPayment.ReserveId.Should().Be(1);
         parentPayment.CustomerId.Should().Be(1);
         parentPayment.Status.Should().Be(StatusPaymentEnum.Paid);
+        parentPayment.CashBoxId.Should().Be(1); // Debe estar en la caja abierta
 
         var childPayments = paymentsDb.Where(p => p.ParentReservePaymentId != null).ToList();
         childPayments.Should().HaveCount(2);
         childPayments.Select(p => p.Amount).Should().BeEquivalentTo(new[] { 50m, 50m });
         childPayments.All(p => p.ReserveId == 1 && p.CustomerId == 1).Should().BeTrue();
+        childPayments.Should().OnlyContain(p => p.Amount > 0); // Breakdown children tienen Amount > 0
     }
 
     [Fact]
@@ -1369,23 +1366,16 @@ public class ReserveBusinessTests : TestBase
         // Assert
         result.IsSuccess.Should().BeTrue();
 
-        // Debe haber 2 pagos: padre en HOY (99) + hijo en mañana (1)
-        paymentsDb.Should().HaveCount(2, "Pago padre en reserva de HOY + hijo en reserva de mañana");
+        // Con CashBox: solo 1 pago padre en la reserva seleccionada
+        paymentsDb.Should().HaveCount(1, "Solo pago padre en la reserva seleccionada");
 
-        var parentPayment = paymentsDb.First(p => p.ParentReservePaymentId == null);
-        var childPayment = paymentsDb.First(p => p.ParentReservePaymentId != null);
-
-        // El pago padre debe estar en la reserva de HOY (la más próxima)
-        parentPayment.ReserveId.Should().Be(99, "El pago va a la reserva más próxima (HOY)");
-        parentPayment.Status.Should().Be(StatusPaymentEnum.PrePayment,
-            "Debe ser PrePayment porque estamos pagando anticipadamente para otra reserva");
-        parentPayment.StatusDetail.Should().Be("paid_in_advance");
+        var parentPayment = paymentsDb.First();
+        // Con CashBox: el pago va directamente a la reserva seleccionada
+        parentPayment.ReserveId.Should().Be(1, "El pago va a la reserva seleccionada");
+        parentPayment.Status.Should().Be(StatusPaymentEnum.Paid);
+        parentPayment.StatusDetail.Should().Be("paid_on_departure");
         parentPayment.Amount.Should().Be(100);
-
-        // El hijo debe estar en la reserva seleccionada (mañana)
-        childPayment.ReserveId.Should().Be(1, "La reserva seleccionada es hija");
-        childPayment.Amount.Should().Be(0, "Los hijos tienen amount 0");
-        childPayment.ParentReservePaymentId.Should().Be(parentPayment.ReservePaymentId);
+        parentPayment.CashBoxId.Should().Be(1, "El pago debe estar en la caja abierta");
     }
 
     [Fact]
@@ -1448,7 +1438,7 @@ public class ReserveBusinessTests : TestBase
             ReservePrices = new List<ReservePrice>
             {
                 new ReservePrice { ReserveTypeId = ReserveTypeIdEnum.Ida, Price = 100 },
-                new ReservePrice { ReserveTypeId = ReserveTypeIdEnum.IdaVuelta, Price = 200 }
+                new ReservePrice { ReserveTypeId = ReserveTypeIdEnum.IdaVuelta, Price = 100 } // Precio IdaVuelta = 100
             },
             Origin = new City { Name = "Origin" },
             Destination = new City { Name = "Dest" }
@@ -1470,7 +1460,7 @@ public class ReserveBusinessTests : TestBase
         var passengers = new List<Passenger>();
         var users = new List<User>();
 
-        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(new List<Reserve> { todayReserve, reserveIda, reserveVuelta }).Object);
+        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(new List<Reserve> { reserveIda, reserveVuelta }).Object);
         _contextMock.Setup(c => c.Vehicles.FindAsync(It.IsAny<int>())).ReturnsAsync(vehicle);
         _contextMock.Setup(c => c.Services).Returns(GetQueryableMockDbSet(new List<Service> { service }).Object);
         _contextMock.Setup(c => c.Customers).Returns(GetQueryableMockDbSet(new List<Customer> { customer }).Object);
@@ -1494,11 +1484,12 @@ public class ReserveBusinessTests : TestBase
                 It.IsAny<IsolationLevel>()))
             .Returns<Func<Task<Result<bool>>>, IsolationLevel>((func, _) => func());
 
+        // IdaVuelta: ambos items con el mismo tipo y precio (el precio ya incluye ida y vuelta)
         var passengerItems = new List<PassengerReserveCreateRequestDto>
         {
             new PassengerReserveCreateRequestDto(
                 ReserveId: 1, // Ida
-                ReserveTypeId: (int)ReserveTypeIdEnum.Ida,
+                ReserveTypeId: (int)ReserveTypeIdEnum.IdaVuelta,
                 CustomerId: 1,
                 IsPayment: true,
                 PickupLocationId: 1,
@@ -1514,13 +1505,13 @@ public class ReserveBusinessTests : TestBase
                 PickupLocationId: 1,
                 DropoffLocationId: 1,
                 HasTraveled: false,
-                Price: 200 // Price must match service ReservePrice for IdaVuelta
+                Price: 100
             )
         };
 
         var paymentItems = new List<CreatePaymentRequestDto>
         {
-            new CreatePaymentRequestDto(300, (int)PaymentMethodEnum.Cash) // Total: ida (100) + vuelta (200)
+            new CreatePaymentRequestDto(100, (int)PaymentMethodEnum.Cash) // IdaVuelta: precio del primer item
         };
 
         var request = new PassengerReserveCreateRequestWrapperDto(paymentItems, passengerItems);
@@ -1531,24 +1522,16 @@ public class ReserveBusinessTests : TestBase
         // Assert
         result.IsSuccess.Should().BeTrue();
 
-        // Debe haber 3 pagos: 1 padre (en HOY) + 2 hijos (ida y vuelta)
-        paymentsDb.Should().HaveCount(3, "Debe crear 1 pago padre en HOY + 2 hijos (ida y vuelta)");
+        // Con CashBox: solo 1 pago padre en la reserva principal (ida)
+        paymentsDb.Should().HaveCount(1, "Solo el pago padre");
 
-        var parentPayment = paymentsDb.First(p => p.ParentReservePaymentId == null);
-        var childPayments = paymentsDb.Where(p => p.ParentReservePaymentId != null).ToList();
+        var parentPayment = paymentsDb.First();
 
-        // El pago padre debe estar en la reserva de HOY (más próxima)
-        parentPayment.ReserveId.Should().Be(99, "El pago padre debe estar en la reserva de HOY (más próxima)");
-        parentPayment.Amount.Should().Be(300, "El padre debe tener el monto total");
-        parentPayment.Status.Should().Be(StatusPaymentEnum.PrePayment, "Debe ser PrePayment porque pagamos anticipado para otra reserva");
-
-        // Los hijos deben estar en ida y vuelta con amount=0
-        childPayments.Should().HaveCount(2);
-        childPayments.Should().Contain(p => p.ReserveId == 1, "Debe haber un hijo en ida");
-        childPayments.Should().Contain(p => p.ReserveId == 2, "Debe haber un hijo en vuelta");
-        childPayments.Should().OnlyContain(p => p.Amount == 0, "Los hijos deben tener amount=0");
-        childPayments.Should().OnlyContain(p => p.ParentReservePaymentId == parentPayment.ReservePaymentId);
-        childPayments.Should().OnlyContain(p => p.Status == StatusPaymentEnum.PrePayment);
+        // El pago va a la reserva principal seleccionada (no a "la mas proxima")
+        parentPayment.ReserveId.Should().Be(1, "El pago va a la reserva de ida");
+        parentPayment.Amount.Should().Be(100, "IdaVuelta: el precio del primer item ya incluye ida y vuelta");
+        parentPayment.Status.Should().Be(StatusPaymentEnum.Paid);
+        parentPayment.CashBoxId.Should().Be(1, "El pago debe estar en la caja abierta");
 
         // Ambos pasajeros deben estar confirmados
         passengers.Should().HaveCount(2);
@@ -1649,6 +1632,7 @@ public class ReserveBusinessTests : TestBase
                 It.IsAny<IsolationLevel>()))
             .Returns<Func<Task<Result<bool>>>, IsolationLevel>((func, _) => func());
 
+        // Múltiples reservas Ida del mismo día - el pago usa First().Price
         var passengerItems = new List<PassengerReserveCreateRequestDto>
         {
             new PassengerReserveCreateRequestDto(
@@ -1685,7 +1669,7 @@ public class ReserveBusinessTests : TestBase
 
         var paymentItems = new List<CreatePaymentRequestDto>
         {
-            new CreatePaymentRequestDto(300, (int)PaymentMethodEnum.Cash) // Total 3 reservas
+            new CreatePaymentRequestDto(100, (int)PaymentMethodEnum.Cash) // Usa First().Price
         };
 
         var request = new PassengerReserveCreateRequestWrapperDto(paymentItems, passengerItems);
@@ -1696,35 +1680,20 @@ public class ReserveBusinessTests : TestBase
         // Assert
         result.IsSuccess.Should().BeTrue();
 
-        // Debe haber 3 pagos: 1 padre + 2 hijos (con amount=0)
-        paymentsDb.Should().HaveCount(3, "Debe crear 1 pago padre + 2 hijos para las otras reservas");
+        // Con CashBox: solo 1 pago padre
+        paymentsDb.Should().HaveCount(1, "Solo el pago padre");
 
-        var parentPayment = paymentsDb.First(p => p.ParentReservePaymentId == null);
-        var childPayments = paymentsDb.Where(p => p.ParentReservePaymentId != null).ToList();
+        var parentPayment = paymentsDb.First();
 
-        // El pago padre debe estar en reserve2 (10:00 AM - earliest del día)
-        parentPayment.ReserveId.Should().Be(2, "El pago padre debe estar en la reserva de las 10:00 AM (earliest del día)");
-        parentPayment.Amount.Should().Be(300, "El padre debe tener el monto total");
-
-        // Los hijos deben estar en reserve1 y reserve3 con amount=0
-        childPayments.Should().HaveCount(2);
-        childPayments.Should().OnlyContain(p => p.Amount == 0, "Los hijos deben tener amount=0");
-        childPayments.Should().Contain(p => p.ReserveId == 1, "Debe haber un hijo en reserve1");
-        childPayments.Should().Contain(p => p.ReserveId == 3, "Debe haber un hijo en reserve3");
-        childPayments.Should().OnlyContain(p => p.ParentReservePaymentId == parentPayment.ReservePaymentId);
+        // Con CashBox: el pago va a la reserva principal (mainReserveId) con CashBoxId
+        parentPayment.ReserveId.Should().Be(1, "El pago va a la reserva principal");
+        parentPayment.Amount.Should().Be(100, "Usa First().Price");
+        parentPayment.Status.Should().Be(StatusPaymentEnum.Paid);
+        parentPayment.CashBoxId.Should().Be(1, "El pago debe estar en la caja abierta");
 
         // Todos los pasajeros deben estar confirmados
         passengers.Should().HaveCount(3);
         passengers.Should().OnlyContain(p => p.Status == PassengerStatusEnum.Confirmed);
-
-        // Verificar status basado en la hora earliest
-        var earliestDateTime = reserve2.ReserveDate.Add(reserve2.DepartureHour);
-        var expectedStatus = earliestDateTime <= DateTime.UtcNow
-            ? StatusPaymentEnum.Paid
-            : StatusPaymentEnum.PrePayment;
-
-        parentPayment.Status.Should().Be(expectedStatus);
-        childPayments.Should().OnlyContain(p => p.Status == expectedStatus, "Todos los hijos deben tener el mismo status que el padre");
     }
 
     #endregion
@@ -1834,7 +1803,7 @@ public class ReserveBusinessTests : TestBase
                 Method = PaymentMethodEnum.Cash,
                 ParentReservePaymentId = null
             },
-            // Hijo desglose - Efectivo
+            // Hijo desglose - Efectivo (Breakdown: Amount > 0)
             new ReservePayment
             {
                 ReservePaymentId = 2,
@@ -1843,7 +1812,7 @@ public class ReserveBusinessTests : TestBase
                 Method = PaymentMethodEnum.Cash,
                 ParentReservePaymentId = 1
             },
-            // Hijo desglose - Tarjeta
+            // Hijo desglose - Tarjeta (Breakdown: Amount > 0)
             new ReservePayment
             {
                 ReservePaymentId = 3,
@@ -1880,45 +1849,6 @@ public class ReserveBusinessTests : TestBase
         var cardPayment = summary.PaymentsByMethod.First(p => p.PaymentMethodId == (int)PaymentMethodEnum.CreditCard);
         cardPayment.Amount.Should().Be(3000);
         cardPayment.PaymentMethodName.Should().Be("Tarjeta de Crédito");
-    }
-
-    [Fact]
-    public async Task GetReservePaymentSummary_ShouldIgnoreLinkChildren_WithZeroAmount()
-    {
-        // Arrange - Escenario de PrePayment con link children (amount = 0)
-        var reserve = new Reserve { ReserveId = 1 };
-        var reserves = new List<Reserve> { reserve };
-
-        var payments = new List<ReservePayment>
-        {
-            // Link child con amount = 0 (no debe contar en el resumen de esta reserva)
-            new ReservePayment
-            {
-                ReservePaymentId = 10,
-                ReserveId = 1,
-                Amount = 0,
-                Method = PaymentMethodEnum.Cash,
-                ParentReservePaymentId = 99 // El padre está en otra reserva
-            }
-        };
-
-        _contextMock.Setup(c => c.Reserves)
-            .Returns(GetQueryableMockDbSet(reserves).Object);
-        _contextMock.Setup(c => c.ReservePayments)
-            .Returns(GetQueryableMockDbSet(payments).Object);
-
-        var request = new PagedReportRequestDto<ReservePaymentSummaryFilterRequestDto>();
-
-        // Act
-        var result = await _reserveBusiness.GetReservePaymentSummary(1, request);
-
-        // Assert
-        result.IsSuccess.Should().BeTrue();
-        var summary = result.Value.Items[0];
-
-        // No debe haber métodos de pago porque el link child tiene amount = 0
-        summary.PaymentsByMethod.Should().BeEmpty();
-        summary.TotalAmount.Should().Be(0);
     }
 
     [Fact]
@@ -1967,6 +1897,143 @@ public class ReserveBusinessTests : TestBase
         summary.PaymentsByMethod[0].Amount.Should().Be(5000, "Debe sumar todos los pagos en efectivo");
     }
 
-    #endregion
+    [Fact]
+    public async Task GetReservePassengerReport_ShouldIncludeRelatedReservePayments()
+    {
+        // Arrange
+        var reserveId = 1;
+        var relatedReserveId = 2;
+        var customerId = 10;
 
+        var vehicle = new Vehicle { AvailableQuantity = 10 };
+        var service = new Service { Vehicle = vehicle };
+        var reserve1 = new Reserve { ReserveId = reserveId, Service = service };
+
+        var passengers = new List<Passenger>
+        {
+            new Passenger 
+            { 
+                PassengerId = 1, 
+                ReserveId = reserveId, 
+                ReserveRelatedId = relatedReserveId,
+                CustomerId = customerId,
+                FirstName = "Juan",
+                LastName = "Perez",
+                DocumentNumber = "123",
+                Reserve = reserve1
+            }
+        };
+
+        var payments = new List<ReservePayment>
+        {
+            // Pago en la reserva actual (Ida) - Efectivo 1000
+            new ReservePayment 
+            { 
+                ReservePaymentId = 1, 
+                ReserveId = reserveId, 
+                CustomerId = customerId, 
+                Amount = 1000, 
+                Method = PaymentMethodEnum.Cash 
+            },
+            // Pago en la reserva relacionada (Vuelta) - Online 2000
+            new ReservePayment 
+            { 
+                ReservePaymentId = 2, 
+                ReserveId = relatedReserveId, 
+                CustomerId = customerId, 
+                Amount = 2000, 
+                Method = PaymentMethodEnum.Online 
+            }
+        };
+
+        _contextMock.Setup(c => c.Passengers).Returns(GetQueryableMockDbSet(passengers).Object);
+        _contextMock.Setup(c => c.ReservePayments).Returns(GetQueryableMockDbSet(payments).Object);
+        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(new List<Reserve> { reserve1 }).Object);
+
+        var request = new PagedReportRequestDto<PassengerReserveReportFilterRequestDto>
+        {
+            Filters = new PassengerReserveReportFilterRequestDto(null, null, null)
+        };
+
+        // Act
+        var result = await _reserveBusiness.GetReservePassengerReport(reserveId, request);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Items.Should().HaveCount(1);
+        
+        var passengerReport = result.Value.Items[0];
+        passengerReport.PaidAmount.Should().Be(3000, "Debe sumar pagos de ambas reservas (1000 + 2000)");
+        passengerReport.PaymentMethods.Should().Contain("Efectivo");
+        passengerReport.PaymentMethods.Should().Contain("Online");
+    }
+
+    [Fact]
+    public async Task GetReservePassengerReport_ShouldIncludeServicePrice_WhenNoPaymentsExist()
+    {
+        // Arrange
+        var reserveId = 1;
+        var passengerIdUnpaidIda = 1;
+        var passengerIdUnpaidIdaVuelta = 2;
+
+        var prices = new List<ReservePrice>
+        {
+            new ReservePrice { ReserveTypeId = ReserveTypeIdEnum.Ida, Price = 1500 },
+            new ReservePrice { ReserveTypeId = ReserveTypeIdEnum.IdaVuelta, Price = 2500 }
+        };
+        var vehicle = new Vehicle { AvailableQuantity = 10 };
+        var service = new Service { Vehicle = vehicle, ReservePrices = prices };
+        var reserve1 = new Reserve { ReserveId = reserveId, Service = service };
+
+        var passengers = new List<Passenger>
+        {
+            // Pasajero 1: Solo Ida, sin pago
+            new Passenger 
+            { 
+                PassengerId = passengerIdUnpaidIda, 
+                ReserveId = reserveId, 
+                FirstName = "Unpaid", 
+                LastName = "Ida",
+                DocumentNumber = "001",
+                Reserve = reserve1
+            },
+            // Pasajero 2: Ida y Vuelta, sin pago
+            new Passenger 
+            { 
+                PassengerId = passengerIdUnpaidIdaVuelta, 
+                ReserveId = reserveId, 
+                ReserveRelatedId = 3, // Indica que es Ida y Vuelta
+                FirstName = "Unpaid", 
+                LastName = "IdaVuelta",
+                DocumentNumber = "002",
+                Reserve = reserve1
+            }
+        };
+
+        _contextMock.Setup(c => c.Passengers).Returns(GetQueryableMockDbSet(passengers).Object);
+        _contextMock.Setup(c => c.ReservePayments).Returns(GetQueryableMockDbSet(new List<ReservePayment>()).Object);
+        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(new List<Reserve> { reserve1 }).Object);
+
+        var request = new PagedReportRequestDto<PassengerReserveReportFilterRequestDto>
+        {
+            Filters = new PassengerReserveReportFilterRequestDto(null, null, null)
+        };
+
+        // Act
+        var result = await _reserveBusiness.GetReservePassengerReport(reserveId, request);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Items.Should().HaveCount(2);
+        
+        var reportIda = result.Value.Items.First(i => i.PassengerId == passengerIdUnpaidIda);
+        reportIda.PaidAmount.Should().Be(1500, "Debe mostrar el precio de Ida del servicio");
+        reportIda.IsPayment.Should().BeFalse();
+
+        var reportIdaVuelta = result.Value.Items.First(i => i.PassengerId == passengerIdUnpaidIdaVuelta);
+        reportIdaVuelta.PaidAmount.Should().Be(2500, "Debe mostrar el precio de IdaVuelta del servicio");
+        reportIdaVuelta.IsPayment.Should().BeFalse();
+    }
+
+    #endregion
 }

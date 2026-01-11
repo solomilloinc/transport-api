@@ -58,12 +58,20 @@ internal sealed class TokenProvider(IConfiguration configuration, IApplicationDb
         await dbContext.SaveChangesWithOutboxAsync();
     }
 
-    public async Task<RefreshToken> GetRefreshTokenAsync(string token)
+    public async Task<RefreshToken?> GetRefreshTokenAsync(string token)
     {
         var hashedToken = TokenHasher.HashToken(token);
 
         return await dbContext.RefreshTokens
             .SingleOrDefaultAsync(rt => rt.Token == hashedToken && rt.RevokedAt == null && rt.ExpiresAt > DateTime.UtcNow);
+    }
+
+    public async Task<RefreshToken?> GetRefreshTokenByHashAsync(string token)
+    {
+        var hashedToken = TokenHasher.HashToken(token);
+
+        return await dbContext.RefreshTokens
+            .SingleOrDefaultAsync(rt => rt.Token == hashedToken);
     }
 
     public async Task RevokeRefreshTokenAsync(string token, string ipAddress, string? replacedByToken = null)
@@ -72,13 +80,38 @@ internal sealed class TokenProvider(IConfiguration configuration, IApplicationDb
 
         if (refreshToken == null) return;
 
-
         refreshToken.RevokedAt = DateTime.UtcNow;
         refreshToken.RevokedByIp = ipAddress;
         refreshToken.ReplacedByToken = replacedByToken;
 
         dbContext.RefreshTokens.Update(refreshToken);
         await dbContext.SaveChangesWithOutboxAsync();
+    }
+
+    public async Task RevokeAllUserTokensAsync(int userId, string ipAddress)
+    {
+        var activeTokens = await dbContext.RefreshTokens
+            .Where(rt => rt.UserId == userId && rt.RevokedAt == null)
+            .ToListAsync();
+
+        foreach (var token in activeTokens)
+        {
+            token.RevokedAt = DateTime.UtcNow;
+            token.RevokedByIp = ipAddress;
+        }
+
+        await dbContext.SaveChangesWithOutboxAsync();
+    }
+
+    public async Task<int> CleanupExpiredTokensAsync(int daysOld = 30)
+    {
+        var cutoff = DateTime.UtcNow.AddDays(-daysOld);
+
+        var deletedCount = await dbContext.RefreshTokens
+            .Where(rt => rt.ExpiresAt < cutoff)
+            .ExecuteDeleteAsync();
+
+        return deletedCount;
     }
 
     public string GenerateRefreshToken()

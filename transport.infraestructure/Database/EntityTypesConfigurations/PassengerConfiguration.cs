@@ -58,6 +58,12 @@ public class PassengerConfiguration : IEntityTypeConfiguration<Passenger>
                .HasForeignKey(p => p.ReserveId)
                .OnDelete(DeleteBehavior.NoAction);
 
+        // Reserva relacionada (ej: la vuelta cuando este pasajero es de ida)
+        builder.HasOne(p => p.ReserveRelated)
+               .WithMany()
+               .HasForeignKey(p => p.ReserveRelatedId)
+               .OnDelete(DeleteBehavior.NoAction);
+
         builder.HasOne(p => p.Customer)
                .WithMany(c => c.Passengers)
                .HasForeignKey(p => p.CustomerId)
@@ -84,6 +90,7 @@ public class PassengerConfiguration : IEntityTypeConfiguration<Passenger>
 
         // Índices
         builder.HasIndex(p => p.ReserveId);
+        builder.HasIndex(p => p.ReserveRelatedId);
         builder.HasIndex(p => p.CustomerId);
         builder.HasIndex(p => p.Status);
 

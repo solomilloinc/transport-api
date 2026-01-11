@@ -50,7 +50,7 @@ public class TokenFunction : FunctionBase
         var encodedToken = WebUtility.UrlEncode(result.Value.RefreshToken);
 
         response.Headers.Add("Set-Cookie",
-            $"refreshToken={encodedToken}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=604800");
+            $"refreshToken={encodedToken}; HttpOnly; Secure; SameSite=None; Path=/; Max-Age=604800");
 
         return response;
     }  
