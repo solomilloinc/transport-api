@@ -1,22 +1,21 @@
 using Azure.Messaging.ServiceBus;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging;
-using System;
-using System.Threading.Tasks;
+using transport_api.Functions.Subscriptions.Base;
 using Transport.Business.Tasks;
 using Transport.Domain.Reserves;
 
 namespace transport_api.Functions.Subscriptions;
 
-public class CustomerReserveCreatedSubscriptionFunction
+public class CustomerReserveCreatedSubscriptionFunction : ServiceBusSubscriptionBase<CustomerReserveCreatedEvent>
 {
-    private readonly ILogger<CustomerReserveCreatedSubscriptionFunction> _logger;
     private readonly ISendReservationEmailTask _sendReservationEmailTask;
 
-    public CustomerReserveCreatedSubscriptionFunction(ILogger<CustomerReserveCreatedSubscriptionFunction> logger,
+    public CustomerReserveCreatedSubscriptionFunction(
+        ILogger<CustomerReserveCreatedSubscriptionFunction> logger,
         ISendReservationEmailTask sendReservationEmailTask)
+        : base(logger)
     {
-        _logger = logger;
         _sendReservationEmailTask = sendReservationEmailTask;
     }
 
@@ -26,31 +25,16 @@ public class CustomerReserveCreatedSubscriptionFunction
         ServiceBusReceivedMessage message,
         ServiceBusMessageActions messageActions)
     {
-        _logger.LogInformation("Message ID: {id}", message.MessageId);
-        _logger.LogInformation("Message Body: {body}", message.Body);
-        _logger.LogInformation("Message Content-Type: {contentType}", message.ContentType);
+        await ProcessMessageAsync(message, messageActions);
+    }
 
+    protected override async Task HandleAsync(CustomerReserveCreatedEvent @event)
+    {
+        await _sendReservationEmailTask.ExecuteAsync(@event);
+    }
 
-        try
-        {
-            var json = message.Body.ToString();
-            var @event = System.Text.Json.JsonSerializer.Deserialize<CustomerReserveCreatedEvent>(json);
-
-            if (@event is null)
-            {
-                _logger.LogError("Message could not be deserialized.");
-                // Reemplaza la línea problemática por la siguiente:
-                await messageActions.DeadLetterMessageAsync(message, null, "InvalidPayload", "Failed to deserialize payload");
-                return;
-            }
-
-            await _sendReservationEmailTask.ExecuteAsync(@event);
-            await messageActions.CompleteMessageAsync(message);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error processing message.");
-            await messageActions.DeadLetterMessageAsync(message, null, "ProcessingError", ex.Message);
-        }
+    protected override string GetEventIdentifier(CustomerReserveCreatedEvent @event)
+    {
+        return $"Reserve:{@event.ReserveId}";
     }
 }

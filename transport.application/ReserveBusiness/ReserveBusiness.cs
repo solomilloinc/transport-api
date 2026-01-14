@@ -418,6 +418,23 @@ public class ReserveBusiness : IReserveBusiness
             if (resultPayment.IsFailure)
                 return Result.Failure<CreateReserveExternalResult>(resultPayment.Error);
 
+            // Lanzar evento para enviar email de confirmacion
+            var mainReserve = reserves.OrderBy(r => r.ReserveId).First();
+            var firstPassenger = dto.Items.First();
+            var reserveCreatedEvent = new CustomerReserveCreatedEvent(
+                ReserveId: mainReserve.ReserveId,
+                CustomerId: firstPassenger.CustomerId,
+                CustomerEmail: firstPassenger.Email,
+                CustomerFullName: $"{firstPassenger.FirstName} {firstPassenger.LastName}",
+                ServiceName: mainReserve.ServiceName,
+                OriginName: mainReserve.OriginName,
+                DestinationName: mainReserve.DestinationName,
+                ReserveDate: mainReserve.ReserveDate,
+                DepartureHour: mainReserve.DepartureHour,
+                TotalPrice: totalExpectedAmount
+            );
+            mainReserve.Raise(reserveCreatedEvent);
+
             await _context.SaveChangesWithOutboxAsync();
             return Result.Success(new CreateReserveExternalResult(PaymentStatus.Approved, null));
         }
