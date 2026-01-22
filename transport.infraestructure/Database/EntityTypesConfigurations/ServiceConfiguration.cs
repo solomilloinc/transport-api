@@ -25,5 +25,10 @@ public class ServiceConfiguration : IEntityTypeConfiguration<Service>
             .WithMany(c => c.DestinationServices)
             .HasForeignKey(s => s.DestinationId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne(s => s.Trip)
+            .WithMany()
+            .HasForeignKey(s => s.TripId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

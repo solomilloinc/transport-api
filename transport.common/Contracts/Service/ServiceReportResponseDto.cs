@@ -12,5 +12,4 @@ public record ServiceReportResponseDto(
     DayOfWeek EndDay,
     ServiceVehicleResponseDto Vehicle,
     string Status,
-    List<ReservePriceReport> ReservePrices,
     List<ServiceScheduleReportResponseDto> Schedulers);

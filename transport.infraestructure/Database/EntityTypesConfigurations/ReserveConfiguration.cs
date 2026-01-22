@@ -37,6 +37,7 @@ public class ReserveConfiguration : IEntityTypeConfiguration<Reserve>
                .IsRequired();
 
         builder.Property(r => r.DepartureHour).IsRequired();
+        builder.Property(r => r.EstimatedDuration).IsRequired();
         builder.Property(r => r.IsHoliday).IsRequired();
 
         // Optimistic Concurrency Control
@@ -47,7 +48,7 @@ public class ReserveConfiguration : IEntityTypeConfiguration<Reserve>
         builder.HasOne(r => r.Service)
                .WithMany(s => s.Reserves)
                .HasForeignKey(r => r.ServiceId)
-               .IsRequired()
+               .IsRequired(false)
                .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasOne(r => r.Vehicle)
@@ -63,6 +64,24 @@ public class ReserveConfiguration : IEntityTypeConfiguration<Reserve>
         builder.HasOne(r => r.ServiceSchedule)
                .WithMany()
                .HasForeignKey(r => r.ServiceScheduleId)
+               .IsRequired(false)
+               .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne(r => r.Trip)
+               .WithMany()
+               .HasForeignKey(r => r.TripId)
+               .IsRequired()
+               .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne(r => r.Origin)
+               .WithMany(c => c.OriginReserves)
+               .HasForeignKey(r => r.OriginId)
+               .IsRequired()
+               .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne(r => r.Destination)
+               .WithMany(c => c.DestinationReserves)
+               .HasForeignKey(r => r.DestinationId)
                .IsRequired()
                .OnDelete(DeleteBehavior.Restrict);
 
@@ -75,5 +94,7 @@ public class ReserveConfiguration : IEntityTypeConfiguration<Reserve>
         // Índices
         builder.HasIndex(r => new { r.ServiceId, r.ReserveDate });
         builder.HasIndex(r => new { r.Status, r.ReserveDate });
+        builder.HasIndex(r => new { r.OriginId, r.DestinationId, r.ReserveDate });
+        builder.HasIndex(r => new { r.TripId, r.ReserveDate });
     }
 }

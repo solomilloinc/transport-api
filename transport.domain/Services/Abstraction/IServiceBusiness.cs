@@ -11,9 +11,6 @@ public interface IServiceBusiness
     Task<Result<bool>> Delete(int serviceId);
     Task<Result<bool>> Update(int serviceId, ServiceCreateRequestDto dto);
     Task<Result<bool>> GenerateFutureReservesAsync();
-    Task<Result<bool>> UpdatePricesByPercentageAsync(PriceMassiveUpdateRequestDto requestDto);
-    Task<Result<bool>> UpdatePrice(int serviceId, ServicePriceUpdateDto requestDto);
-    Task<Result<bool>> AddPrice(int serviceId, ServicePriceAddDto requestDto);
     Task<Result<int>> CreateSchedule(int serviceId, ServiceScheduleCreateDto request);
     Task<Result<bool>> UpdateScheduleStatus(int scheduleId, EntityStatusEnum status);
     Task<Result<bool>> DeleteSchedule(int scheduleId);

@@ -10,6 +10,7 @@ using Transport.Business.Data;
 using Transport.Business.Services.Payment;
 using Transport.Domain.CashBoxes;
 using Transport.Domain.CashBoxes.Abstraction;
+using Transport.Domain.Cities;
 using Transport.Domain.Customers;
 using Transport.Domain.Customers.Abstraction;
 using Transport.Domain.Directions;
@@ -18,6 +19,7 @@ using Transport.Domain.Passengers;
 using Transport.Domain.Reserves;
 using Transport.Domain.Reserves.Abstraction;
 using Transport.Domain.Services;
+using Transport.Domain.Trips;
 using Transport.Domain.Users;
 using Transport.Domain.Vehicles;
 using Transport.SharedKernel;
@@ -26,6 +28,7 @@ using Transport.SharedKernel.Contracts.Passenger;
 using Transport.SharedKernel.Contracts.Payment;
 using Transport.SharedKernel.Contracts.Reserve;
 using Transport.SharedKernel.Contracts.Service;
+using Transport.SharedKernel.Contracts.Trip;
 using Transport.SharedKernel.Configuration;
 
 namespace Transport.Business.ReserveBusiness;
@@ -55,6 +58,61 @@ public class ReserveBusiness : IReserveBusiness
         _customerBusiness = customerBusiness;
         _reserveOptions = reserveOptions;
         _cashBoxBusiness = cashBoxBusiness;
+    }
+
+    public async Task<Result<int>> CreateReserve(ReserveCreateDto dto)
+    {
+        // Validate Vehicle
+        var vehicle = await _context.Vehicles.FindAsync(dto.VehicleId);
+        if (vehicle is null)
+            return Result.Failure<int>(VehicleError.VehicleNotFound);
+
+        if (vehicle.Status != EntityStatusEnum.Active)
+            return Result.Failure<int>(VehicleError.VehicleNotAvailable);
+
+        // Validate Trip
+        var trip = await _context.Trips
+            .Include(t => t.OriginCity)
+            .Include(t => t.DestinationCity)
+            .FirstOrDefaultAsync(t => t.TripId == dto.TripId);
+
+        if (trip is null)
+            return Result.Failure<int>(TripError.TripNotFound);
+        
+        if (trip.Status != EntityStatusEnum.Active)
+             return Result.Failure<int>(TripError.TripNotActive);
+
+        // Validate Driver if provided
+        if (dto.DriverId.HasValue)
+        {
+            var driver = await _context.Drivers.FindAsync(dto.DriverId.Value);
+            if (driver is null)
+                return Result.Failure<int>(DriverError.DriverNotFound);
+        }
+
+        var reserve = new Reserve
+        {
+            ReserveDate = dto.ReserveDate,
+            VehicleId = dto.VehicleId,
+            DriverId = dto.DriverId,
+            TripId = trip.TripId,
+            OriginId = trip.OriginCityId,
+            DestinationId = trip.DestinationCityId,
+            OriginName = trip.OriginCity.Name,
+            DestinationName = trip.DestinationCity.Name,
+            ServiceName = $"{trip.OriginCity.Name} - {trip.DestinationCity.Name}",
+            DepartureHour = dto.DepartureHour,
+            EstimatedDuration = dto.EstimatedDuration,
+            IsHoliday = dto.IsHoliday,
+            Status = ReserveStatusEnum.Confirmed,
+            ServiceId = null,
+            ServiceScheduleId = null
+        };
+
+        _context.Reserves.Add(reserve);
+        await _context.SaveChangesWithOutboxAsync();
+
+        return Result.Success(reserve.ReserveId);
     }
 
     public async Task<Result<bool>> CreatePassengerReserves(PassengerReserveCreateRequestWrapperDto passengerReserves)
@@ -104,18 +162,21 @@ public class ReserveBusiness : IReserveBusiness
 
                 reserveMap[reserve.ReserveId] = reserve;
 
-                if (!servicesCache.TryGetValue(reserve.ServiceId, out var service))
+                // Only lookup service if the reserve has one
+                if (reserve.ServiceId.HasValue)
                 {
-                    service = await _context.Services
-                        .Include(s => s.ReservePrices)
-                        .Include(s => s.Origin)
-                        .Include(s => s.Destination)
-                        .SingleOrDefaultAsync(s => s.ServiceId == reserve.ServiceId);
+                    if (!servicesCache.TryGetValue(reserve.ServiceId.Value, out var service))
+                    {
+                        service = await _context.Services
+                            .Include(s => s.Origin)
+                            .Include(s => s.Destination)
+                            .SingleOrDefaultAsync(s => s.ServiceId == reserve.ServiceId.Value);
 
-                    if (service is null)
-                        return Result.Failure<bool>(ServiceError.ServiceNotFound);
+                        if (service is null)
+                            return Result.Failure<bool>(ServiceError.ServiceNotFound);
 
-                    servicesCache[reserve.ServiceId] = service;
+                        servicesCache[reserve.ServiceId.Value] = service;
+                    }
                 }
 
                 var vehicle = await _context.Vehicles.FindAsync(reserve.VehicleId);
@@ -126,9 +187,10 @@ public class ReserveBusiness : IReserveBusiness
                     return Result.Failure<bool>(ReserveError.VehicleQuantityNotAvailable(
                         existingPassengerCount, passengerReserves.Items.Count, vehicle?.AvailableQuantity ?? 0));
 
-                var reservePrice = service.ReservePrices
-                    .SingleOrDefault(p => p.ReserveTypeId == (ReserveTypeIdEnum)dto.ReserveTypeId);
-                if (reservePrice is null || dto.Price != reservePrice.Price)
+                var reservePrice = await GetPassengerPriceAsync(
+                    reserve.OriginId, reserve.DestinationId, (ReserveTypeIdEnum)dto.ReserveTypeId, dto.DropoffLocationId);
+                
+                if (reservePrice is null || dto.Price != reservePrice.Value)
                     return Result.Failure<bool>(ReserveError.PriceNotAvailable);
 
                 var pickupResult = await GetDirectionAsync(dto.PickupLocationId, "Pickup");
@@ -150,7 +212,7 @@ public class ReserveBusiness : IReserveBusiness
                     PickupAddress = pickupResult.Value?.Name,
                     DropoffAddress = dropoffResult.Value?.Name,
                     HasTraveled = dto.HasTraveled,
-                    Price = reservePrice.Price,
+                    Price = reservePrice.Value,
                     Status = PassengerStatusEnum.Confirmed,
                     CustomerId = payer.CustomerId,
                     DocumentNumber = payer.DocumentNumber,
@@ -321,7 +383,6 @@ public class ReserveBusiness : IReserveBusiness
                 return Result.Failure<CreateReserveExternalResult>(ReserveError.NotAvailable);
 
             var service = await _context.Services
-                .Include(s => s.ReservePrices)
                 .Include(s => s.Origin)
                 .Include(s => s.Destination)
                 .SingleOrDefaultAsync(s => s.ServiceId == reserve.ServiceId);
@@ -335,8 +396,8 @@ public class ReserveBusiness : IReserveBusiness
                 return Result.Failure<CreateReserveExternalResult>(
                     ReserveError.VehicleQuantityNotAvailable(existingPassengerCount, dto.Items.Count, vehicle.AvailableQuantity));
 
-            var reservePrice = service.ReservePrices
-                .SingleOrDefault(p => p.ReserveTypeId == (ReserveTypeIdEnum)passengerDto.ReserveTypeId);
+            var reservePrice = await GetPassengerPriceAsync(
+                reserve.OriginId, reserve.DestinationId, (ReserveTypeIdEnum)passengerDto.ReserveTypeId, passengerDto.DropoffLocationId);
 
             if (reservePrice is null)
                 return Result.Failure<CreateReserveExternalResult>(ReserveError.PriceNotAvailable);
@@ -375,7 +436,7 @@ public class ReserveBusiness : IReserveBusiness
                 PickupAddress = pickupResult.Value?.Name,
                 DropoffAddress = dropoffResult.Value?.Name,
                 HasTraveled = false,
-                Price = reservePrice.Price,
+                Price = reservePrice.Value,
                 Status = dto.Payment is null ? PassengerStatusEnum.PendingPayment : PassengerStatusEnum.Confirmed,
                 CustomerId = existingCustomer?.CustomerId,
             };
@@ -589,22 +650,32 @@ public class ReserveBusiness : IReserveBusiness
         {
             var rid = reserveIds[0];
             var reserve = reserveMap[rid];
-            var service = servicesCache[reserve.ServiceId];
+            var originName = reserve.ServiceId.HasValue && servicesCache.TryGetValue(reserve.ServiceId.Value, out var svc)
+                ? svc.Origin.Name : reserve.OriginName;
+            var destName = reserve.ServiceId.HasValue && servicesCache.TryGetValue(reserve.ServiceId.Value, out svc)
+                ? svc.Destination.Name : reserve.DestinationName;
             var type = passengerReserves.Items.First(i => i.ReserveId == rid).ReserveTypeId == (int)ReserveTypeIdEnum.IdaVuelta
                 ? "Ida y vuelta"
                 : "Ida";
-            return $"Reserva: {type} #{rid} - {service.Origin.Name} - {service.Destination.Name} {reserve.ReserveDate:HH:mm}";
+            return $"Reserva: {type} #{rid} - {originName} - {destName} {reserve.ReserveDate:HH:mm}";
         }
 
         var rid1 = reserveIds[0];
         var rid2 = reserveIds[1];
         var reserve1 = reserveMap[rid1];
         var reserve2 = reserveMap[rid2];
-        var service1 = servicesCache[reserve1.ServiceId];
-        var service2 = servicesCache[reserve2.ServiceId];
 
-        var desc1 = $"Ida #{rid1} - {service1.Origin.Name} - {service1.Destination.Name} {reserve1.ReserveDate:HH:mm}";
-        var desc2 = $"Vuelta #{rid2} - {service2.Destination.Name} - {service2.Origin.Name} {reserve2.ReserveDate:HH:mm}";
+        var origin1 = reserve1.ServiceId.HasValue && servicesCache.TryGetValue(reserve1.ServiceId.Value, out var svc1)
+            ? svc1.Origin.Name : reserve1.OriginName;
+        var dest1 = reserve1.ServiceId.HasValue && servicesCache.TryGetValue(reserve1.ServiceId.Value, out svc1)
+            ? svc1.Destination.Name : reserve1.DestinationName;
+        var origin2 = reserve2.ServiceId.HasValue && servicesCache.TryGetValue(reserve2.ServiceId.Value, out var svc2)
+            ? svc2.Origin.Name : reserve2.OriginName;
+        var dest2 = reserve2.ServiceId.HasValue && servicesCache.TryGetValue(reserve2.ServiceId.Value, out svc2)
+            ? svc2.Destination.Name : reserve2.DestinationName;
+
+        var desc1 = $"Ida #{rid1} - {origin1} - {dest1} {reserve1.ReserveDate:HH:mm}";
+        var desc2 = $"Vuelta #{rid2} - {dest2} - {origin2} {reserve2.ReserveDate:HH:mm}";
 
         return $"Reserva(s): {desc1}; {desc2}";
     }
@@ -779,65 +850,76 @@ public class ReserveBusiness : IReserveBusiness
     public async Task<Result<PagedReportResponseDto<ReserveReportResponseDto>>> GetReserveReport(
         DateTime reserveDate, PagedReportRequestDto<ReserveReportFilterRequestDto> requestDto)
     {
-        var query = _context.Reserves
-            .Include(r => r.Passengers)
-            .ThenInclude(p => p.Customer)
-            .Include(r => r.Service)
-                .ThenInclude(s => s.Vehicle)
-            .Include(r => r.Service)
-                .ThenInclude(s => s.ReservePrices)
-            .Where(rp => rp.Status == ReserveStatusEnum.Confirmed);
-
         var date = reserveDate.Date;
-        query = query.Where(rp => rp.ReserveDate.Date == date);
 
-        var sortMappings = new Dictionary<string, Expression<Func<Reserve, object>>>
+        // 1. Query base para contar y paginar
+        var baseQuery = _context.Reserves
+            .Include(r => r.Passengers)
+            .Include(r => r.Vehicle)
+            .Where(r => r.Status == ReserveStatusEnum.Confirmed)
+            .Where(r => r.ReserveDate.Date == date);
+
+        // 2. Contar total
+        var totalCount = await baseQuery.CountAsync();
+
+        // 3. Aplicar ordenamiento
+        var sortBy = requestDto.SortBy?.ToLower() ?? "reservedate";
+        var sortDesc = requestDto.SortDescending;
+
+        IOrderedQueryable<Reserve> orderedQuery = sortBy switch
         {
-            ["reservedate"] = rp => rp.ReserveDate,
-            ["serviceorigin"] = rp => rp.Service.Origin.Name,
-            ["servicedest"] = rp => rp.Service.Destination.Name,
+            "serviceorigin" => sortDesc ? baseQuery.OrderByDescending(r => r.OriginName) : baseQuery.OrderBy(r => r.OriginName),
+            "servicedest" => sortDesc ? baseQuery.OrderByDescending(r => r.DestinationName) : baseQuery.OrderBy(r => r.DestinationName),
+            _ => sortDesc ? baseQuery.OrderByDescending(r => r.ReserveDate) : baseQuery.OrderBy(r => r.ReserveDate)
         };
 
+        // 4. Aplicar paginación y obtener reservas
+        var pageNumber = requestDto.PageNumber > 0 ? requestDto.PageNumber : 1;
+        var pageSize = requestDto.PageSize > 0 ? requestDto.PageSize : 10;
 
-        var pagedResult = await query.ToPagedReportAsync<ReserveReportResponseDto, Reserve, ReserveReportFilterRequestDto>(
-                   requestDto,
-                   selector: rp => new ReserveReportResponseDto(
-                       rp.ReserveId,
-                       rp.OriginName,
-                       rp.DestinationName,
-                       rp.Service.Vehicle.AvailableQuantity,
-                       rp.Passengers.Count,
-                       rp.DepartureHour.ToString(@"hh\:mm"),
-                       rp.VehicleId,
-                       rp.DriverId.GetValueOrDefault(),
-                       rp.ReserveDate,
-                       rp.Passengers
-                         .Select(p => new PassengerReserveReportResponseDto(
-                             p.PassengerId,
-                             p.CustomerId,
-                             $"{p.FirstName} {p.LastName}",
-                             p.DocumentNumber,
-                             p.Email,
-                             p.Phone,
-                             p.ReserveId,
-                             p.DropoffLocationId ?? 0,
-                             p.DropoffAddress,
-                             p.PickupLocationId ?? 0,
-                             p.PickupAddress,
-                             p.Customer != null ? p.Customer.CurrentBalance : 0,
-                             rp.Service.Vehicle.AvailableQuantity - rp.Passengers.Count,
-                             null,
-                             0,
-                             false,
-                             false))
-                         .ToList(),
-                       rp.Service.ReservePrices.Select(p => new ReservePriceReport((int)p.ReserveTypeId, p.Price)).ToList()
-                   ),
-                   sortMappings: sortMappings
-               );
+        var reserves = await orderedQuery
+            .Skip((pageNumber - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+
+        // 5. Precios eliminados para optimización (se deben pedir por GetTripById bajo demanda)
+        var tripIds = reserves.Select(r => r.TripId).Distinct().ToList();
+
+        var tripDescriptions = await _context.Trips
+            .Where(t => tripIds.Contains(t.TripId))
+            .ToDictionaryAsync(t => t.TripId, t => t.Description);
+
+        // 7. Proyectar a DTOs
+        var items = reserves.Select(r =>
+        {
+            var tripName = tripDescriptions.GetValueOrDefault(r.TripId) ?? "Unknown Trip";
+
+            return new ReserveReportResponseDto(
+                r.ReserveId,
+                r.TripId,
+                tripName,
+                r.OriginName,
+                r.DestinationName,
+                r.Vehicle.AvailableQuantity,
+                r.Passengers.Count,
+                r.DepartureHour.ToString(@"hh\:mm"),
+                r.VehicleId,
+                r.DriverId.GetValueOrDefault(),
+                r.ReserveDate
+            );
+        }).ToList();
+
+        var pagedResult = new PagedReportResponseDto<ReserveReportResponseDto>
+        {
+            Items = items,
+            TotalRecords = totalCount,
+            PageNumber = pageNumber,
+            PageSize = pageSize
+        };
 
         return Result.Success(pagedResult);
     }
+
 
     public async Task<Result<ReserveGroupedPagedReportResponseDto>> GetReserveReport(
         PagedReportRequestDto<ReserveReportFilterRequestDto> requestDto)
@@ -849,13 +931,31 @@ public class ReserveBusiness : IReserveBusiness
         var originId = requestDto.Filters.OriginId;
         var destinationId = requestDto.Filters.DestinationId;
 
+        // Pre-fetch prices for ida and vuelta routes via Trip
+        var idaTrip = await _context.Trips
+            .Where(t => t.OriginCityId == originId && t.DestinationCityId == destinationId
+                     && t.Status == EntityStatusEnum.Active)
+            .Include(t => t.Prices.Where(p => p.Status == EntityStatusEnum.Active))
+            .FirstOrDefaultAsync();
+
+        var vueltaTrip = await _context.Trips
+            .Where(t => t.OriginCityId == destinationId && t.DestinationCityId == originId
+                     && t.Status == EntityStatusEnum.Active)
+            .Include(t => t.Prices.Where(p => p.Status == EntityStatusEnum.Active))
+            .FirstOrDefaultAsync();
+
+        var idaPrice = idaTrip?.Prices
+            .Where(p => p.ReserveTypeId == ReserveTypeIdEnum.Ida && p.CityId == destinationId && p.DirectionId == null)
+            .Select(p => p.Price)
+            .FirstOrDefault() ?? 0;
+
+        var vueltaPrice = vueltaTrip?.Prices
+            .Where(p => p.ReserveTypeId == ReserveTypeIdEnum.Ida && p.CityId == originId && p.DirectionId == null)
+            .Select(p => p.Price)
+            .FirstOrDefault() ?? 0;
+
         var query = _context.Reserves
-            .Include(r => r.Service)
-                .ThenInclude(s => s.Origin)
-            .Include(r => r.Service)
-                .ThenInclude(s => s.Destination)
-            .Include(r => r.Service.ReservePrices)
-            .Include(r => r.Service.Vehicle)
+            .Include(r => r.Vehicle)
             .Include(r => r.Passengers)
             .Where(rp => rp.Status == ReserveStatusEnum.Confirmed &&
                         (rp.ReserveDate.Date == idaDate ||
@@ -865,13 +965,13 @@ public class ReserveBusiness : IReserveBusiness
 
         var idaItems = items
             .Where(rp => rp.ReserveDate.Date == idaDate)
-            .Where(rp => rp.Service.Origin.CityId == originId && rp.Service.Destination.CityId == destinationId)
+            .Where(rp => rp.OriginId == originId && rp.DestinationId == destinationId)
             .Where(rp =>
             {
                 int totalReserved = rp.Passengers
                     .Count(p => p.Status == PassengerStatusEnum.Confirmed
                              || p.Status == PassengerStatusEnum.PendingPayment);
-                var available = rp.Service.Vehicle.AvailableQuantity - totalReserved;
+                var available = rp.Vehicle.AvailableQuantity - totalReserved;
                 return available >= passengersRequested;
             })
             .Select(rp =>
@@ -879,18 +979,18 @@ public class ReserveBusiness : IReserveBusiness
                 int totalReserved = rp.Passengers
                     .Count(p => p.Status == PassengerStatusEnum.Confirmed
                              || p.Status == PassengerStatusEnum.PendingPayment);
-                var arrivalTime = rp.DepartureHour.Add(rp.Service.EstimatedDuration);
+                var arrivalTime = rp.DepartureHour.Add(rp.EstimatedDuration);
                 return new ReserveExternalReportResponseDto(
                     rp.ReserveId,
-                    rp.Service.Origin.Name,
-                    rp.Service.Destination.Name,
+                    rp.OriginName,
+                    rp.DestinationName,
                     rp.DepartureHour.ToString(@"hh\:mm"),
                     rp.ReserveDate,
-                    rp.Service.EstimatedDuration.ToString(@"hh\:mm"),
+                    rp.EstimatedDuration.ToString(@"hh\:mm"),
                     arrivalTime.ToString(@"hh\:mm"),
-                    rp.Service.ReservePrices.FirstOrDefault(p => p.ReserveTypeId == ReserveTypeIdEnum.Ida)?.Price ?? 0,
-                    rp.Service.Vehicle.AvailableQuantity - totalReserved,
-                    rp.Service.Vehicle.InternalNumber
+                    idaPrice,
+                    rp.Vehicle.AvailableQuantity - totalReserved,
+                    rp.Vehicle.InternalNumber
                 );
             })
             .ToList();
@@ -898,13 +998,13 @@ public class ReserveBusiness : IReserveBusiness
         var vueltaItems = vueltaDate.HasValue
             ? items
                 .Where(rp => rp.ReserveDate.Date == vueltaDate.Value)
-                .Where(rp => rp.Service.Origin.CityId == destinationId && rp.Service.Destination.CityId == originId)
+                .Where(rp => rp.OriginId == destinationId && rp.DestinationId == originId)
                 .Where(rp =>
                 {
                     int totalReserved = rp.Passengers
                         .Count(p => p.Status == PassengerStatusEnum.Confirmed
                                  || p.Status == PassengerStatusEnum.PendingPayment);
-                    var available = rp.Service.Vehicle.AvailableQuantity - totalReserved;
+                    var available = rp.Vehicle.AvailableQuantity - totalReserved;
                     return available >= passengersRequested;
                 })
                 .Select(rp =>
@@ -912,18 +1012,18 @@ public class ReserveBusiness : IReserveBusiness
                     int totalReserved = rp.Passengers
                         .Count(p => p.Status == PassengerStatusEnum.Confirmed
                                  || p.Status == PassengerStatusEnum.PendingPayment);
-                    var arrivalTime = rp.DepartureHour.Add(rp.Service.EstimatedDuration);
+                    var arrivalTime = rp.DepartureHour.Add(rp.EstimatedDuration);
                     return new ReserveExternalReportResponseDto(
                         rp.ReserveId,
-                        rp.Service.Origin.Name,
-                        rp.Service.Destination.Name,
+                        rp.OriginName,
+                        rp.DestinationName,
                         rp.DepartureHour.ToString(@"hh\:mm"),
                         rp.ReserveDate,
-                        rp.Service.EstimatedDuration.ToString(@"hh\:mm"),
+                        rp.EstimatedDuration.ToString(@"hh\:mm"),
                         arrivalTime.ToString(@"hh\:mm"),
-                        rp.Service.ReservePrices.FirstOrDefault(p => p.ReserveTypeId == ReserveTypeIdEnum.Ida)?.Price ?? 0,
-                        rp.Service.Vehicle.AvailableQuantity - totalReserved,
-                        rp.Service.Vehicle.InternalNumber
+                        vueltaPrice,
+                        rp.Vehicle.AvailableQuantity - totalReserved,
+                        rp.Vehicle.InternalNumber
                     );
                 })
                 .ToList()
@@ -957,9 +1057,7 @@ public class ReserveBusiness : IReserveBusiness
         var query = _context.Passengers
             .Include(p => p.Customer)
             .Include(p => p.Reserve)
-                .ThenInclude(r => r.Service)
-                    .ThenInclude(s => s.Vehicle)
-            .Include(p => p.Reserve.Service.ReservePrices)
+                .ThenInclude(r => r.Vehicle)
             .Where(p => p.ReserveId == reserveId);
 
         if (!string.IsNullOrWhiteSpace(requestDto.Filters.PassengerFullName))
@@ -983,6 +1081,10 @@ public class ReserveBusiness : IReserveBusiness
 
         // Obtener pasajeros
         var passengers = await query.ToListAsync();
+
+        // Obtener el count total de pasajeros de la reserva (sin filtros aplicados)
+        var totalPassengersInReserve = await _context.Passengers
+            .CountAsync(p => p.ReserveId == reserveId);
 
         // Obtener IDs de reservas relacionadas de estos pasajeros (ida/vuelta)
         var relatedReserveIds = passengers
@@ -1049,6 +1151,25 @@ public class ReserveBusiness : IReserveBusiness
                 : passengers.OrderBy(sortKey).ToList();
         }
 
+        // Pre-fetch prices for this reserve's route via Trip
+        var firstPassenger = passengers.FirstOrDefault();
+        var routePrices = new Dictionary<ReserveTypeIdEnum, decimal>();
+        if (firstPassenger != null)
+        {
+            var trip = await _context.Trips
+                .Where(t => t.TripId == firstPassenger.Reserve.TripId)
+                .Include(t => t.Prices.Where(p => p.Status == EntityStatusEnum.Active))
+                .FirstOrDefaultAsync();
+
+            if (trip != null)
+            {
+                foreach (var price in trip.Prices.Where(p => p.DirectionId == null))
+                {
+                    routePrices[price.ReserveTypeId] = price.Price;
+                }
+            }
+        }
+
         // Mapear a DTOs con información de pagos
         var allItems = passengers.Select(p =>
         {
@@ -1059,13 +1180,11 @@ public class ReserveBusiness : IReserveBusiness
             var paidAmount = paymentInfo.Amount;
             var isPayment = paymentInfo.Amount > 0;
 
-            // Si no tiene pago, obtenemos el precio del servicio
+            // Si no tiene pago, obtenemos el precio de la ruta
             if (!isPayment)
             {
                 var typeId = p.ReserveRelatedId.HasValue ? ReserveTypeIdEnum.IdaVuelta : ReserveTypeIdEnum.Ida;
-                paidAmount = p.Reserve.Service.ReservePrices
-                    .FirstOrDefault(pr => pr.ReserveTypeId == typeId)?
-                    .Price ?? 0;
+                paidAmount = routePrices.TryGetValue(typeId, out var price) ? price : 0;
             }
 
             return new PassengerReserveReportResponseDto(
@@ -1081,7 +1200,7 @@ public class ReserveBusiness : IReserveBusiness
                 p.PickupLocationId ?? 0,
                 p.PickupAddress,
                 p.Customer?.CurrentBalance ?? 0,
-                p.Reserve.Service.Vehicle.AvailableQuantity - p.Reserve.Passengers.Count,
+                p.Reserve.Vehicle.AvailableQuantity - totalPassengersInReserve,
                 paymentInfo.Methods,
                 paidAmount,
                 isPayment,
@@ -1173,51 +1292,6 @@ public class ReserveBusiness : IReserveBusiness
         return Result.Success(true);
     }
 
-    public async Task<Result<PagedReportResponseDto<ReservePriceReportResponseDto>>> GetReservePriceReport(
-        PagedReportRequestDto<ReservePriceReportFilterRequestDto> requestDto)
-    {
-        var query = _context.ReservePrices
-            .AsNoTracking()
-            .Include(rp => rp.Service)
-            .Where(rp => rp.Status == EntityStatusEnum.Active)
-            .AsQueryable();
-
-        if (requestDto.Filters?.ReserveTypeId is not null)
-            query = query.Where(rp => (int)rp.ReserveTypeId == requestDto.Filters.ReserveTypeId);
-
-        if (requestDto.Filters?.ServiceId is not null)
-            query = query.Where(rp => rp.ServiceId == requestDto.Filters.ServiceId);
-
-        if (requestDto.Filters?.PriceFrom is not null)
-            query = query.Where(rp => rp.Price >= requestDto.Filters.PriceFrom);
-
-        if (requestDto.Filters?.PriceTo is not null)
-            query = query.Where(rp => rp.Price <= requestDto.Filters.PriceTo);
-
-        var sortMappings = new Dictionary<string, Expression<Func<ReservePrice, object>>>
-        {
-            ["reservepriceid"] = rp => rp.ReservePriceId,
-            ["serviceid"] = rp => rp.ServiceId,
-            ["servicename"] = rp => rp.Service.Name,
-            ["price"] = rp => rp.Price,
-            ["reservetypeid"] = rp => rp.ReserveTypeId
-        };
-
-        var pagedResult = await query.ToPagedReportAsync<ReservePriceReportResponseDto, ReservePrice, ReservePriceReportFilterRequestDto>(
-            requestDto,
-            selector: rp => new ReservePriceReportResponseDto(
-                rp.ReservePriceId,
-                rp.ServiceId,
-                rp.Service.Name,
-                rp.Price,
-                (int)rp.ReserveTypeId
-            ),
-            sortMappings: sortMappings
-        );
-
-        return Result.Success(pagedResult);
-    }
-
     public async Task<Result<bool>> CreatePaymentsAsync(
       int customerId,
       int reserveId,
@@ -1228,7 +1302,6 @@ public class ReserveBusiness : IReserveBusiness
             var reserve = await _context.Reserves
                 .Include(r => r.Passengers)
                 .Include(r => r.Service)
-                    .ThenInclude(s => s.ReservePrices)
                 .FirstOrDefaultAsync(r => r.ReserveId == reserveId);
 
             if (reserve is null)
@@ -1440,7 +1513,7 @@ public class ReserveBusiness : IReserveBusiness
 
         var reserves = await _context.Reserves
             .Include(r => r.Passengers)
-            .Include(r => r.Service.Vehicle)
+            .Include(r => r.Vehicle)
             .Where(r => reserveIds.Contains(r.ReserveId))
             .ToListAsync();
 
@@ -1460,7 +1533,7 @@ public class ReserveBusiness : IReserveBusiness
 
             var totalActiveLocks = activeLocks.Sum(l => l.SlotsLocked);
 
-            var available = reserve.Service.Vehicle.AvailableQuantity - confirmedPassengers - totalActiveLocks;
+            var available = reserve.Vehicle.AvailableQuantity - confirmedPassengers - totalActiveLocks;
             minAvailable = Math.Min(minAvailable, available);
 
             reserve.UpdatedDate = DateTime.UtcNow;
@@ -1618,5 +1691,60 @@ public class ReserveBusiness : IReserveBusiness
             PaymentMethodEnum.Transfer => "Transferencia",
             _ => method.ToString()
         };
+    }
+
+    private async Task<decimal?> GetPassengerPriceAsync(
+        int originId, 
+        int destinationId, 
+        ReserveTypeIdEnum reserveTypeId, 
+        int? dropoffLocationId)
+    {
+        // 1. Find the trip for this origin/destination
+        var trip = await _context.Trips
+            .Where(t => t.OriginCityId == originId
+                     && t.DestinationCityId == destinationId
+                     && t.Status == EntityStatusEnum.Active)
+            .Include(t => t.Prices.Where(p => p.Status == EntityStatusEnum.Active))
+            .FirstOrDefaultAsync();
+
+        if (trip is null)
+            return null;
+
+        // 2. Filter prices for the specific reserve type (OneWay/RoundTrip)
+        var relevantPrices = trip.Prices
+            .Where(p => p.ReserveTypeId == reserveTypeId)
+            .ToList();
+
+        if (!relevantPrices.Any())
+            return null;
+
+        // 3. Determine the Dropoff City ID if a specific location is provided
+        int? dropoffCityId = null;
+        if (dropoffLocationId.HasValue)
+        {
+            var dropoffDirection = await _context.Directions.FindAsync(dropoffLocationId.Value);
+            dropoffCityId = dropoffDirection?.CityId;
+            
+            // PRIORITY 1: Specific Price for this Direction (Stop)
+            var directionPrice = relevantPrices.FirstOrDefault(p => p.DirectionId == dropoffLocationId.Value);
+            if (directionPrice != null)
+                return directionPrice.Price;
+        }
+
+        // PRIORITY 2: Price for the Dropoff City (intermediate city)
+        if (dropoffCityId.HasValue)
+        {
+            var cityPrice = relevantPrices.FirstOrDefault(p => p.CityId == dropoffCityId.Value && p.DirectionId == null);
+            if (cityPrice != null)
+                return cityPrice.Price;
+        }
+
+        // PRIORITY 3: Base Price (Destination City)
+        // This is the fallback if no intermediate price is found
+        var basePrice = relevantPrices
+            .Where(p => p.CityId == destinationId && p.DirectionId == null)
+            .FirstOrDefault();
+
+        return basePrice?.Price;
     }
 }

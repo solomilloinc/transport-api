@@ -15,6 +15,7 @@ using Transport.Domain.Services;
 using Transport.Domain.Cities;
 using Transport.Domain.Directions;
 using Transport.Domain.Passengers;
+using Transport.Domain.Trips;
 using Transport.Domain.Vehicles;
 using Transport.Infraestructure.Database;
 using Transport.SharedKernel.Contracts.Reserve;
@@ -136,9 +137,21 @@ public class RealConcurrencyTest : IDisposable
         _context.Vehicles.Add(vehicle);
         _context.SaveChanges();
 
+        var trip = new Trip
+        {
+            Description = $"Test Trip {timestamp}",
+            OriginCityId = city.CityId,
+            DestinationCityId = city.CityId,
+            Status = Transport.SharedKernel.EntityStatusEnum.Active,
+            CreatedBy = "Test"
+        };
+        _context.Trips.Add(trip);
+        _context.SaveChanges();
+
         var service = new Service
         {
             Name = $"Test Service {timestamp}",
+            TripId = trip.TripId,
             OriginId = city.CityId,
             DestinationId = city.CityId,
             VehicleId = vehicle.VehicleId,
@@ -166,8 +179,12 @@ public class RealConcurrencyTest : IDisposable
             VehicleId = vehicle.VehicleId,
             ServiceId = service.ServiceId,
             ServiceScheduleId = serviceSchedule.ServiceScheduleId,
+            TripId = trip.TripId,
+            OriginId = city.CityId,
+            DestinationId = city.CityId,
             ReserveDate = DateTime.Today.AddDays(1),
             DepartureHour = TimeSpan.FromHours(9),
+            EstimatedDuration = TimeSpan.FromHours(2),
             ServiceName = $"Test Service {timestamp}",
             OriginName = $"Test City {timestamp}",
             DestinationName = $"Test City {timestamp}",

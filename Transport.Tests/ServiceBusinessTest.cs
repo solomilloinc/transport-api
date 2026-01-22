@@ -12,6 +12,7 @@ using Transport.Domain.Vehicles;
 using Transport.SharedKernel;
 using Transport.SharedKernel.Configuration;
 using Transport.SharedKernel.Contracts.Service;
+using Transport.Domain.Trips;
 using Xunit;
 
 namespace Transport.Tests.ServiceBusinessTests;
@@ -36,23 +37,54 @@ public class ServiceBusinessTests : TestBase
     }
 
     [Fact]
+    public async Task Create_ShouldFail_WhenTripNotFound()
+    {
+        _contextMock.Setup(x => x.Trips.FindAsync(It.IsAny<int>()))
+            .ReturnsAsync((Trip)null);
+
+        var schedules = new List<ServiceScheduleCreateDto>
+        {
+            new(0, false, TimeSpan.FromHours(8))
+        };
+
+        var requestDto = new ServiceCreateRequestDto(
+            Name: "Test",
+            TripId: 999,
+            OriginId: 1,
+            DestinationId: 2,
+            EstimatedDuration: TimeSpan.FromHours(1),
+            VehicleId: 1,
+            Schedules: schedules
+        );
+
+        var result = await _serviceBusiness.Create(requestDto);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Be(TripError.TripNotFound);
+    }
+
+    [Fact]
     public async Task Create_ShouldFail_WhenVehicleNotFound()
     {
+        _contextMock.Setup(x => x.Trips.FindAsync(It.IsAny<int>()))
+            .ReturnsAsync(new Trip { TripId = 1, Status = EntityStatusEnum.Active });
+
         _contextMock.Setup(x => x.Vehicles.FindAsync(It.IsAny<int>()))
             .ReturnsAsync((Vehicle)null);
 
         var schedules = new List<ServiceScheduleCreateDto>
-    {
-        new(0, false, TimeSpan.FromHours(8))
-    };
+        {
+            new(0, false, TimeSpan.FromHours(8))
+        };
 
         var requestDto = new ServiceCreateRequestDto(
             Name: "Test",
+            TripId: 1,
             OriginId: 1,
             DestinationId: 2,
             EstimatedDuration: TimeSpan.FromHours(1),
             VehicleId: 999,
-            schedules
+            Schedules: schedules
         );
 
         var result = await _serviceBusiness.Create(requestDto);
@@ -64,21 +96,25 @@ public class ServiceBusinessTests : TestBase
     [Fact]
     public async Task Create_ShouldFail_WhenVehicleNotAvailable()
     {
+        _contextMock.Setup(x => x.Trips.FindAsync(It.IsAny<int>()))
+            .ReturnsAsync(new Trip { TripId = 1, Status = EntityStatusEnum.Active });
+
         _contextMock.Setup(x => x.Vehicles.FindAsync(It.IsAny<int>()))
             .ReturnsAsync(new Vehicle { VehicleId = 1, Status = EntityStatusEnum.Inactive });
 
         var schedules = new List<ServiceScheduleCreateDto>
-    {
-        new(0, false, TimeSpan.FromHours(8))
-    };
+        {
+            new(0, false, TimeSpan.FromHours(8))
+        };
 
         var request = new ServiceCreateRequestDto(
             Name: "Test",
+            TripId: 1,
             OriginId: 1,
             DestinationId: 2,
             EstimatedDuration: TimeSpan.FromHours(1),
             VehicleId: 1,
-            schedules
+            Schedules: schedules
         );
 
         var result = await _serviceBusiness.Create(request);
@@ -90,6 +126,9 @@ public class ServiceBusinessTests : TestBase
     [Fact]
     public async Task Create_ShouldFail_WhenOriginCityNotFound()
     {
+        _contextMock.Setup(x => x.Trips.FindAsync(It.IsAny<int>()))
+            .ReturnsAsync(new Trip { TripId = 1, Status = EntityStatusEnum.Active });
+
         _contextMock.Setup(x => x.Vehicles.FindAsync(It.IsAny<int>()))
             .ReturnsAsync(new Vehicle { VehicleId = 1, Status = EntityStatusEnum.Active });
 
@@ -97,17 +136,18 @@ public class ServiceBusinessTests : TestBase
             .ReturnsAsync((City)null);
 
         var schedules = new List<ServiceScheduleCreateDto>
-    {
-        new(0, false, TimeSpan.FromHours(8))
-    };
+        {
+            new(0, false, TimeSpan.FromHours(8))
+        };
 
         var request = new ServiceCreateRequestDto(
             Name: "Test",
+            TripId: 1,
             OriginId: 1,
             DestinationId: 2,
             EstimatedDuration: TimeSpan.FromHours(1),
             VehicleId: 1,
-            schedules
+            Schedules: schedules
         );
 
         var result = await _serviceBusiness.Create(request);
@@ -119,6 +159,9 @@ public class ServiceBusinessTests : TestBase
     [Fact]
     public async Task Create_ShouldFail_WhenDestinationCityNotFound()
     {
+        _contextMock.Setup(x => x.Trips.FindAsync(It.IsAny<int>()))
+            .ReturnsAsync(new Trip { TripId = 1, Status = EntityStatusEnum.Active });
+
         _contextMock.Setup(x => x.Vehicles.FindAsync(It.IsAny<int>()))
             .ReturnsAsync(new Vehicle { VehicleId = 1, Status = EntityStatusEnum.Active });
 
@@ -127,17 +170,18 @@ public class ServiceBusinessTests : TestBase
             .ReturnsAsync((City)null);
 
         var schedules = new List<ServiceScheduleCreateDto>
-    {
-        new(0, false, TimeSpan.FromHours(8))
-    };
+        {
+            new(0, false, TimeSpan.FromHours(8))
+        };
 
         var request = new ServiceCreateRequestDto(
             Name: "Test",
+            TripId: 1,
             OriginId: 1,
             DestinationId: 2,
             EstimatedDuration: TimeSpan.FromHours(1),
             VehicleId: 1,
-            schedules
+            Schedules: schedules
         );
 
         var result = await _serviceBusiness.Create(request);
@@ -149,6 +193,9 @@ public class ServiceBusinessTests : TestBase
     [Fact]
     public async Task Create_ShouldSucceed_WhenDataIsValid()
     {
+        _contextMock.Setup(x => x.Trips.FindAsync(It.IsAny<int>()))
+            .ReturnsAsync(new Trip { TripId = 1, Status = EntityStatusEnum.Active });
+
         _contextMock.Setup(x => x.Vehicles.FindAsync(It.IsAny<int>()))
             .ReturnsAsync(new Vehicle { VehicleId = 1, Status = EntityStatusEnum.Active });
 
@@ -160,22 +207,23 @@ public class ServiceBusinessTests : TestBase
             .Callback<Service>(s => s.ServiceId = 99);
 
         _contextMock.Setup(x => x.ServiceSchedules)
-       .Returns(GetQueryableMockDbSet(new List<ServiceSchedule>()).Object);
+            .Returns(GetQueryableMockDbSet(new List<ServiceSchedule>()).Object);
 
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
         var schedules = new List<ServiceScheduleCreateDto>
-    {
-        new(0, false, TimeSpan.FromHours(8))
-    };
+        {
+            new(0, false, TimeSpan.FromHours(8))
+        };
 
         var request = new ServiceCreateRequestDto(
             Name: "TestService",
+            TripId: 1,
             OriginId: 1,
             DestinationId: 2,
             EstimatedDuration: TimeSpan.FromHours(3),
             VehicleId: 1,
-            schedules
+            Schedules: schedules
         );
 
         var result = await _serviceBusiness.Create(request);
@@ -260,8 +308,7 @@ public class ServiceBusinessTests : TestBase
     {
         var service = new Service
         {
-            ServiceId = 2,
-            ReservePrices = new List<ReservePrice>()
+            ServiceId = 2
         };
 
         _contextMock.Setup(x => x.Services)
@@ -270,17 +317,18 @@ public class ServiceBusinessTests : TestBase
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
         var schedules = new List<ServiceScheduleCreateDto>
-    {
-        new(0, false, TimeSpan.FromHours(8))
-    };
+        {
+            new(0, false, TimeSpan.FromHours(8))
+        };
 
         var result = await _serviceBusiness.Update(1, new ServiceCreateRequestDto(
             Name: "Updated",
+            TripId: 1,
             OriginId: 1,
             DestinationId: 2,
             EstimatedDuration: TimeSpan.FromHours(2),
             VehicleId: 1,
-            schedules
+            Schedules: schedules
         ));
 
         result.IsSuccess.Should().BeFalse();
@@ -292,30 +340,33 @@ public class ServiceBusinessTests : TestBase
     {
         var service = new Service
         {
-            ServiceId = 1,
-            ReservePrices = new List<ReservePrice>()
+            ServiceId = 1
         };
 
         _contextMock.Setup(x => x.Services)
             .Returns(GetQueryableMockDbSet(new List<Service> { service }).Object);
 
+        _contextMock.Setup(x => x.Trips.FindAsync(It.IsAny<int>()))
+            .ReturnsAsync(new Trip { TripId = 1, Status = EntityStatusEnum.Active });
+
         _contextMock.Setup(x => x.ServiceSchedules)
-       .Returns(GetQueryableMockDbSet(new List<ServiceSchedule>()).Object);
+            .Returns(GetQueryableMockDbSet(new List<ServiceSchedule>()).Object);
 
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
         var schedules = new List<ServiceScheduleCreateDto>
-    {
-        new(0, false, TimeSpan.FromHours(8))
-    };
+        {
+            new(0, false, TimeSpan.FromHours(8))
+        };
 
         var dto = new ServiceCreateRequestDto(
             Name: "Updated",
+            TripId: 1,
             OriginId: 1,
             DestinationId: 2,
             EstimatedDuration: TimeSpan.FromHours(2),
             VehicleId: 1,
-            schedules
+            Schedules: schedules
         );
 
         var result = await _serviceBusiness.Update(1, dto);
@@ -341,6 +392,8 @@ public class ServiceBusinessTests : TestBase
             VehicleType = new VehicleType { Name = "Bus", Quantity = 50 }
         };
 
+        var trip = new Trip { TripId = 1, OriginCityId = 1, DestinationCityId = 2, Status = EntityStatusEnum.Active };
+
         var service = new Service
         {
             ServiceId = 1,
@@ -348,30 +401,23 @@ public class ServiceBusinessTests : TestBase
             EstimatedDuration = TimeSpan.FromHours(2),
             Vehicle = vehicle,
             VehicleId = vehicle.VehicleId,
+            TripId = trip.TripId,
+            Trip = trip,
             OriginId = 1,
             Origin = new City() { CityId = 1, Name = "Origin City" },
             DestinationId = 2,
             Destination = new City() { CityId = 2, Name = "Destination City" },
             StartDay = today.DayOfWeek,
             EndDay = today.DayOfWeek,
-            ReservePrices = new List<ReservePrice>
-        {
-            new ReservePrice
-            {
-                ReservePriceId = 1,
-                Price = 100,
-                ReserveTypeId = ReserveTypeIdEnum.Ida
-            }
-        },
             Schedules = new List<ServiceSchedule>
-        {
-            new ServiceSchedule
             {
-                ServiceScheduleId = 1,
-                DepartureHour = TimeSpan.FromHours(8),
-                IsHoliday = false
+                new ServiceSchedule
+                {
+                    ServiceScheduleId = 1,
+                    DepartureHour = TimeSpan.FromHours(8),
+                    IsHoliday = false
+                }
             }
-        }
         };
 
         var services = new List<Service> { service };
@@ -383,6 +429,7 @@ public class ServiceBusinessTests : TestBase
         _contextMock.Setup(x => x.Vehicles).Returns(GetMockDbSetWithIdentity(vehicles).Object);
         _contextMock.Setup(x => x.Reserves).Returns(GetMockDbSetWithIdentity(reserves).Object);
         _contextMock.Setup(x => x.Holidays).Returns(GetMockDbSetWithIdentity(holidays).Object);
+        _contextMock.Setup(x => x.Trips).Returns(GetQueryableMockDbSet(new List<Trip> { trip }).Object);
 
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
@@ -417,27 +464,29 @@ public class ServiceBusinessTests : TestBase
             AvailableQuantity = 5
         };
 
+        var trip = new Trip { TripId = 1, OriginCityId = 1, DestinationCityId = 2, Status = EntityStatusEnum.Active };
+
         var service = new Service
         {
             ServiceId = 1,
             EstimatedDuration = TimeSpan.FromHours(2),
             VehicleId = vehicle.VehicleId,
             Vehicle = vehicle,
+            TripId = trip.TripId,
+            Trip = trip,
+            OriginId = 1,
+            DestinationId = 2,
             StartDay = DayOfWeek.Sunday,
             EndDay = DayOfWeek.Sunday,
             Schedules = new List<ServiceSchedule>
-        {
-            new ServiceSchedule
             {
-                ServiceScheduleId = 1,
-                DepartureHour = TimeSpan.FromHours(8),
-                IsHoliday = false
+                new ServiceSchedule
+                {
+                    ServiceScheduleId = 1,
+                    DepartureHour = TimeSpan.FromHours(8),
+                    IsHoliday = false
+                }
             }
-        },
-            ReservePrices = new List<ReservePrice>
-        {
-            new ReservePrice { Price = 100, ReserveTypeId = ReserveTypeIdEnum.Ida }
-        }
         };
 
         var services = new List<Service> { service };
@@ -447,6 +496,7 @@ public class ServiceBusinessTests : TestBase
         _contextMock.Setup(x => x.Vehicles).Returns(GetMockDbSetWithIdentity([vehicle]).Object);
         _contextMock.Setup(x => x.Reserves).Returns(GetMockDbSetWithIdentity(reserves).Object);
         _contextMock.Setup(x => x.Holidays).Returns(GetMockDbSetWithIdentity(new List<Holiday>()).Object);
+        _contextMock.Setup(x => x.Trips).Returns(GetQueryableMockDbSet(new List<Trip> { trip }).Object);
 
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
@@ -474,6 +524,7 @@ public class ServiceBusinessTests : TestBase
         reserveOptionMock.Setup(x => x.ReserveGenerationDays).Returns(2); // Lunes y martes
 
         var vehicle = new Vehicle { VehicleId = 1, Status = EntityStatusEnum.Active };
+        var trip = new Trip { TripId = 1, OriginCityId = 1, DestinationCityId = 2, Status = EntityStatusEnum.Active };
 
         var service = new Service
         {
@@ -481,6 +532,8 @@ public class ServiceBusinessTests : TestBase
             EstimatedDuration = TimeSpan.FromHours(2),
             VehicleId = vehicle.VehicleId,
             Vehicle = vehicle,
+            TripId = trip.TripId,
+            Trip = trip,
             OriginId = 1,
             Origin = new City() { CityId = 1, Name = "Origin City" },
             DestinationId = 2,
@@ -488,24 +541,20 @@ public class ServiceBusinessTests : TestBase
             StartDay = DayOfWeek.Monday,
             EndDay = DayOfWeek.Tuesday,
             Schedules = new List<ServiceSchedule>
-        {
-            new ServiceSchedule
             {
-                ServiceScheduleId = 1,
-                DepartureHour = TimeSpan.FromHours(8),
-                IsHoliday = false // NO opera en feriados
+                new ServiceSchedule
+                {
+                    ServiceScheduleId = 1,
+                    DepartureHour = TimeSpan.FromHours(8),
+                    IsHoliday = false // NO opera en feriados
+                }
             }
-        },
-            ReservePrices = new List<ReservePrice>
-        {
-            new ReservePrice { Price = 100, ReserveTypeId = ReserveTypeIdEnum.Ida }
-        }
         };
 
         var holidays = new List<Holiday>
-    {
-        new Holiday { HolidayDate = feriado, Description = "Feriado test" }
-    };
+        {
+            new Holiday { HolidayDate = feriado, Description = "Feriado test" }
+        };
 
         var reserves = new List<Reserve>();
 
@@ -513,6 +562,7 @@ public class ServiceBusinessTests : TestBase
         _contextMock.Setup(x => x.Vehicles).Returns(GetMockDbSetWithIdentity([vehicle]).Object);
         _contextMock.Setup(x => x.Reserves).Returns(GetMockDbSetWithIdentity(reserves).Object);
         _contextMock.Setup(x => x.Holidays).Returns(GetMockDbSetWithIdentity(holidays).Object);
+        _contextMock.Setup(x => x.Trips).Returns(GetQueryableMockDbSet(new List<Trip> { trip }).Object);
 
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
@@ -540,6 +590,7 @@ public class ServiceBusinessTests : TestBase
         reserveOptionMock.Setup(x => x.ReserveGenerationDays).Returns(2);
 
         var vehicle = new Vehicle { VehicleId = 1, Status = EntityStatusEnum.Active };
+        var trip = new Trip { TripId = 1, OriginCityId = 1, DestinationCityId = 2, Status = EntityStatusEnum.Active };
 
         var service = new Service
         {
@@ -547,6 +598,8 @@ public class ServiceBusinessTests : TestBase
             EstimatedDuration = TimeSpan.FromHours(2),
             VehicleId = vehicle.VehicleId,
             Vehicle = vehicle,
+            TripId = trip.TripId,
+            Trip = trip,
             OriginId = 1,
             Origin = new City() { CityId = 1, Name = "Origin City" },
             DestinationId = 2,
@@ -554,24 +607,20 @@ public class ServiceBusinessTests : TestBase
             StartDay = DayOfWeek.Monday,
             EndDay = DayOfWeek.Friday,
             Schedules = new List<ServiceSchedule>
-        {
-            new ServiceSchedule
             {
-                ServiceScheduleId = 1,
-                DepartureHour = TimeSpan.FromHours(8),
-                IsHoliday = true // Sí opera en feriados
+                new ServiceSchedule
+                {
+                    ServiceScheduleId = 1,
+                    DepartureHour = TimeSpan.FromHours(8),
+                    IsHoliday = true // Sí opera en feriados
+                }
             }
-        },
-            ReservePrices = new List<ReservePrice>
-        {
-            new ReservePrice { Price = 100, ReserveTypeId = ReserveTypeIdEnum.Ida }
-        }
         };
 
         var holidays = new List<Holiday>
-    {
-        new Holiday { HolidayDate = feriado, Description = "Feriado test" }
-    };
+        {
+            new Holiday { HolidayDate = feriado, Description = "Feriado test" }
+        };
 
         var reserves = new List<Reserve>();
 
@@ -579,6 +628,7 @@ public class ServiceBusinessTests : TestBase
         _contextMock.Setup(x => x.Vehicles).Returns(GetMockDbSetWithIdentity([vehicle]).Object);
         _contextMock.Setup(x => x.Reserves).Returns(GetMockDbSetWithIdentity(reserves).Object);
         _contextMock.Setup(x => x.Holidays).Returns(GetMockDbSetWithIdentity(holidays).Object);
+        _contextMock.Setup(x => x.Trips).Returns(GetQueryableMockDbSet(new List<Trip> { trip }).Object);
 
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
@@ -589,248 +639,6 @@ public class ServiceBusinessTests : TestBase
 
         // Assert
         Assert.Contains(reserves, r => r.ReserveDate.Date == feriado.Date);
-    }
-
-
-    [Fact]
-    public async Task GenerateFutureReserves_ShouldNotCreateReserves_WhenServiceHasNoPrices()
-    {
-        // Arrange
-        var today = _dateTimeProviderMock.Object.UtcNow;
-        var dayOfWeek = today.DayOfWeek;
-
-        var vehicle = new Vehicle
-        {
-            VehicleId = 1,
-            InternalNumber = "ABC123",
-            Status = EntityStatusEnum.Active,
-            AvailableQuantity = 10,
-            VehicleType = new VehicleType { Name = "Bus", Quantity = 50 }
-        };
-
-        var service = new Service
-        {
-            ServiceId = 1,
-            Name = "Servicio sin precios",
-            EstimatedDuration = TimeSpan.FromHours(2),
-            Vehicle = vehicle,
-            VehicleId = vehicle.VehicleId,
-            OriginId = 1,
-            DestinationId = 2,
-            StartDay = dayOfWeek,
-            EndDay = dayOfWeek,
-            ReservePrices = new List<ReservePrice>(), // Sin precios
-            Schedules = new List<ServiceSchedule>
-        {
-            new ServiceSchedule
-            {
-                ServiceScheduleId = 1,
-                DepartureHour = TimeSpan.FromHours(8),
-                IsHoliday = false
-            }
-        }
-        };
-
-        var services = new List<Service> { service };
-        var vehicles = new List<Vehicle> { vehicle };
-        var reserves = new List<Reserve>();
-        var holidays = new List<Holiday>();
-
-        _contextMock.Setup(x => x.Services).Returns(GetMockDbSetWithIdentity(services).Object);
-        _contextMock.Setup(x => x.Vehicles).Returns(GetMockDbSetWithIdentity(vehicles).Object);
-        _contextMock.Setup(x => x.Reserves).Returns(GetMockDbSetWithIdentity(reserves).Object);
-        _contextMock.Setup(x => x.Holidays).Returns(GetMockDbSetWithIdentity(holidays).Object);
-
-        SetupSaveChangesWithOutboxAsync(_contextMock);
-
-        // Act
-        await _serviceBusiness.GenerateFutureReservesAsync();
-
-        // Assert
-        Assert.Empty(reserves);
-    }
-
-    [Fact]
-    public async Task UpdatePricesByPercentageAsync_ShouldUpdatePrices_WhenValidRequestDto()
-    {
-        // Arrange
-        var reserveOptionMock = new Mock<IReserveOption>();
-
-        var requestDto = new PriceMassiveUpdateRequestDto(
-            new List<PricePercentageUpdateDto>
-            {
-            new PricePercentageUpdateDto((int)ReserveTypeIdEnum.Ida, 10),
-            new PricePercentageUpdateDto((int)ReserveTypeIdEnum.IdaVuelta, 20)
-            });
-
-        var service = new Service
-        {
-            ServiceId = 1,
-            Name = "Servicio A",
-            Origin = new City { CityId = 1, Name = "Ciudad A" },
-            Destination = new City { CityId = 2, Name = "Ciudad B" },
-            EstimatedDuration = TimeSpan.FromHours(2),
-            Vehicle = new Vehicle
-            {
-                VehicleId = 1,
-                InternalNumber = "ABC123",
-                Status = EntityStatusEnum.Active,
-                AvailableQuantity = 10,
-                VehicleType = new VehicleType { Name = "Bus", Quantity = 50 }
-            },
-            ReservePrices = new List<ReservePrice>
-        {
-            new ReservePrice { ReserveTypeId = ReserveTypeIdEnum.Ida, Status = EntityStatusEnum.Active, Price = 100m },
-            new ReservePrice { ReserveTypeId = ReserveTypeIdEnum.IdaVuelta, Status = EntityStatusEnum.Active, Price = 200m }
-        }
-        };
-
-        var services = new List<Service> { service };
-
-        _contextMock.Setup(x => x.Services).Returns(GetMockDbSetWithIdentity(services).Object);
-
-        SetupSaveChangesWithOutboxAsync(ContextMock);
-
-        // Act
-
-        var result = await _serviceBusiness.UpdatePricesByPercentageAsync(requestDto);
-
-        var requestServiceReportDto = new PagedReportRequestDto<ServiceReportFilterRequestDto>
-        {
-            PageNumber = 1,
-            PageSize = 10,
-            Filters = new ServiceReportFilterRequestDto("Servicio A", null, null, null, null, null),
-            SortBy = "name",
-            SortDescending = false
-        };
-
-        var serviceReportResult = await _serviceBusiness.GetServiceReport(requestServiceReportDto);
-
-        // Assert
-        Assert.True(serviceReportResult.IsSuccess);
-
-        // Verificar que los precios actualizados estén en el reporte
-        var reportService = serviceReportResult.Value.Items.FirstOrDefault();
-        Assert.NotNull(reportService);
-
-        var idaPriceReport = reportService.ReservePrices.FirstOrDefault(rp => rp.ReserveTypeId == (int)ReserveTypeIdEnum.Ida);
-        var idaVueltaPriceReport = reportService.ReservePrices.FirstOrDefault(rp => rp.ReserveTypeId == (int)ReserveTypeIdEnum.IdaVuelta);
-
-        Assert.NotNull(idaPriceReport);
-        Assert.Equal(110m, idaPriceReport.Price);  // 100 + 10%
-
-        Assert.NotNull(idaVueltaPriceReport);
-        Assert.Equal(240m, idaVueltaPriceReport.Price);  // 200 + 20%
-        Assert.True(result.IsSuccess);
-        Assert.Equal(110m, service.ReservePrices.First(p => p.ReserveTypeId == ReserveTypeIdEnum.Ida).Price);  // 100 + 10%
-        Assert.Equal(240m, service.ReservePrices.First(p => p.ReserveTypeId == ReserveTypeIdEnum.IdaVuelta).Price);  // 200 + 20%
-    }
-
-    [Fact]
-    public async Task AddPrice_ShouldFail_WhenServiceNotFound()
-    {
-        // Arrange
-        var services = new List<Service>(); // No hay servicios
-        _contextMock.Setup(x => x.Services).Returns(GetQueryableMockDbSet(services).Object);
-
-        var request = new ServicePriceAddDto((int)ReserveTypeIdEnum.Ida, 1000m);
-
-        var result = await _serviceBusiness.AddPrice(1, request);
-
-        // Assert
-        result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Be(ServiceError.ServiceNotFound);
-    }
-
-    [Fact]
-    public async Task AddPrice_ShouldFail_WhenReservePriceAlreadyExists()
-    {
-        // Arrange
-        var existingPrice = new ReservePrice
-        {
-            ReserveTypeId = ReserveTypeIdEnum.Ida
-        };
-
-        var service = new Service
-        {
-            ServiceId = 1,
-            ReservePrices = new List<ReservePrice> { existingPrice }
-        };
-
-        _contextMock.Setup(x => x.Services)
-            .Returns(GetQueryableMockDbSet(new List<Service> { service }).Object);
-
-        var request = new ServicePriceAddDto((int)ReserveTypeIdEnum.Ida, 1500m);
-
-        var result = await _serviceBusiness.AddPrice(1, request);
-
-        // Assert
-        result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Be(ReservePriceError.ReservePriceAlreadyExists);
-    }
-
-    [Fact]
-    public async Task AddPrice_ShouldSucceed_WhenValidData()
-    {
-        // Arrange
-        var serviceId = 1;
-        var reservePrices = new List<ReservePrice>();
-
-        var service = new Service
-        {
-            ServiceId = serviceId,
-            ReservePrices = reservePrices
-        };
-
-        _contextMock.Setup(x => x.Services)
-            .Returns(GetQueryableMockDbSet(new List<Service> { service }).Object);
-
-        _contextMock.Setup(x => x.ReservePrices.Add(It.IsAny<ReservePrice>()));
-
-        SetupSaveChangesWithOutboxAsync(_contextMock);
-
-        var dto = new ServicePriceAddDto((int)ReserveTypeIdEnum.Ida, 5000);
-
-        // Act
-        var result = await _serviceBusiness.AddPrice(serviceId, dto);
-
-        // Assert
-        result.IsSuccess.Should().BeTrue();
-    }
-
-    [Fact]
-    public async Task UpdatePrice_ShouldSucceed_WhenValidData()
-    {
-        // Arrange
-        var reservePrice = new ReservePrice
-        {
-            ReservePriceId = 10,
-            ReserveTypeId = ReserveTypeIdEnum.Ida,
-            Price = 3000,
-            Status = EntityStatusEnum.Active
-        };
-
-        var service = new Service
-        {
-            ServiceId = 1,
-            ReservePrices = new List<ReservePrice> { reservePrice }
-        };
-
-        _contextMock.Setup(x => x.Services)
-            .Returns(GetQueryableMockDbSet(new List<Service> { service }).Object);
-
-        _contextMock.Setup(x => x.ReservePrices.Update(It.IsAny<ReservePrice>()));
-
-        SetupSaveChangesWithOutboxAsync(_contextMock);
-
-        var dto = new ServicePriceUpdateDto((int)ReserveTypeIdEnum.Ida, 4500m);
-
-        // Act
-        var result = await _serviceBusiness.UpdatePrice(service.ServiceId, dto);
-
-        // Assert
-        result.IsSuccess.Should().BeTrue();
-        reservePrice.Price.Should().Be(4500);
     }
 
 

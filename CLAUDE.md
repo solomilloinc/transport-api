@@ -66,6 +66,11 @@ API (Azure Functions) → Business → Infrastructure → Domain
 - Business logic returns `Result<T>` or `Result<T, TError>` instead of throwing exceptions for business errors.
 - Use `Error.Validation()`, `Error.NotFound()`, `Error.Conflict()` for domain errors.
 - Middleware handles unexpected exceptions; business layer never throws for expected failures.
+- Chain operations with `BindAsync()` from `transport.api/Extensions/ResultExtensions.cs`:
+  ```csharp
+  var result = await ValidateAndMatchAsync(req, dto, validator)
+                      .BindAsync(_business.CreateAsync);
+  ```
 
 **Unit of Work Pattern:**
 - Wrap multi-step operations in `IUnitOfWork.ExecuteInTransactionAsync()` for ACID compliance.
@@ -76,6 +81,12 @@ API (Azure Functions) → Business → Infrastructure → Domain
 - Events stored in `OutboxMessage` table during `SaveChangesWithOutboxAsync()`.
 - `OutboxDispatcher` asynchronously publishes unprocessed messages to Azure Service Bus.
 - Guarantees eventual consistency between database and messaging.
+
+**Service Bus Subscriptions:**
+- Event handlers in `transport.api/Functions/Subscriptions/` consume Azure Service Bus messages.
+- Inherit from `ServiceBusSubscriptionBase<TEvent>` for automatic retry/dead-letter handling.
+- Implement `HandleAsync(TEvent)` for event processing logic.
+- Messages are dead-lettered after `MaxRetryAttempts` (default: 3) failures.
 
 **Optimistic Concurrency:**
 - `Reserve` entity uses SQL Server `RowVersion` (timestamp) for optimistic locking.
@@ -88,39 +99,85 @@ API (Azure Functions) → Business → Infrastructure → Domain
 
 ## Domain Model
 
-**Key Entities and Relationships:**
+**Entity Relationship Diagram:**
+```
+                    ┌──────────┐
+                    │   City   │
+                    └────┬─────┘
+                         │
+         ┌───────────────┼───────────────┐
+         │               │               │
+         ▼               ▼               ▼
+    ┌─────────┐    ┌──────────┐    ┌──────────┐
+    │  Trip   │    │ Service  │    │ Reserve  │
+    └────┬────┘    └────┬─────┘    └────┬─────┘
+         │              │               │
+         ▼              │               ▼
+    ┌───────────┐       │         ┌───────────┐
+    │ TripPrice │       │         │ Passenger │
+    └───────────┘       │         └─────┬─────┘
+                        │               │
+                        ▼               ▼
+                ┌───────────────┐ ┌──────────┐
+                │ServiceSchedule│ │ Customer │
+                └───────────────┘ └──────────┘
+```
 
-**Customer** (client who books transportation):
-- Has many `Passenger` records
-- Subscribes to `Service` via `ServiceCustomer`
-- Has `CustomerAccountTransaction` for payment tracking
-- Can create `ReserveSlotLock` to hold seats
+**Key Entities:**
 
-**Reserve** (booking for a trip):
-- Belongs to one `Service` (route)
-- Has one `ServiceSchedule` (departure time)
-- Assigned to `Vehicle` and optionally `Driver`
-- Contains multiple `Passenger` records
-- Has one `ReservePayment` for payment tracking
-- Protected by `RowVersion` for concurrency
+**Trip** (ruta con precios):
+- Define una ruta Origin → Destination entre ciudades
+- Contiene `TripPrice` con precios por ciudad destino y tipo de reserva
+- Desacoplado de Service para flexibilidad de precios
 
-**Service** (route/line):
-- Has origin and destination `City`
-- Assigned to a `Vehicle`
-- Has many `ServiceSchedule` entries (departure times)
-- Has `ReservePrices` varying by date/customer type
-- Customers subscribe via `ServiceCustomer`
+**TripPrice** (precio específico):
+- `TripId`: Pertenece a un Trip
+- `CityId`: Ciudad destino para el precio (ida = destino del trip, vuelta = origen del trip)
+- `DirectionId`: Opcional, para precios por parada específica
+- `ReserveTypeId`: Ida, Vuelta, o IdaVuelta
+- `Price`: Precio del pasaje
+- `Order`: Orden de paradas intermedias
 
-**Passenger** (individual traveler):
-- Belongs to one `Reserve`
-- Optionally linked to registered `Customer`
-- Has pickup/dropoff `Direction`
-- Individual pricing and status
+**Reserve** (reserva de viaje):
+- `TripId`: Referencia al Trip para precios
+- `ServiceId`: Opcional, si fue generada desde un Service batch
+- `OriginId`, `DestinationId`: Ciudades de la reserva
+- `RowVersion`: Control de concurrencia optimista
+- Contiene múltiples `Passenger`
 
-**Status Flow:**
-- Reserve: Pending → Confirmed → InProgress → Completed (or Cancelled)
-- Payment: Pending → Confirmed (or Failed)
-- Passenger: Confirmed (or Cancelled)
+**Service** (servicio recurrente):
+- Define rutas con horarios recurrentes (StartDay → EndDay)
+- Genera `Reserve` automáticamente vía batch
+- `Schedules`: Horarios de salida
+
+**Passenger** (pasajero individual):
+- `ReserveId`: Pertenece a una reserva
+- `ReserveRelatedId`: Para viajes IdaVuelta, referencia la otra reserva
+- `CustomerId`: Opcional, si es cliente registrado
+- `Price`: Precio individual calculado desde TripPrice
+
+**Customer** (cliente):
+- Puede crear reservas
+- Suscribirse a servicios vía `ServiceCustomer`
+- Tiene `CustomerAccountTransaction` para pagos
+
+**Status Flows:**
+- Reserve: `Pending → Confirmed → InProgress → Completed` (o `Cancelled`)
+- Passenger: `Confirmed` (o `Cancelled`)
+- Payment: `Pending → Confirmed` (o `Failed`)
+
+**Price Lookup Logic:**
+```csharp
+// En ReserveBusiness.GetRoutePriceAsync():
+// 1. Buscar Trip por OriginCityId y DestinationCityId
+// 2. Filtrar TripPrice por CityId (destino) y ReserveTypeId
+var trip = await Trips
+    .Where(t => t.OriginCityId == originId && t.DestinationCityId == destinationId)
+    .FirstOrDefaultAsync();
+
+var price = trip.Prices
+    .FirstOrDefault(p => p.CityId == destinationId && p.ReserveTypeId == reserveTypeId);
+```
 
 ## Authentication and Authorization
 
@@ -275,3 +332,106 @@ public class YourBusinessTests : TestBase
 **OpenAPI Documentation:**
 - All HTTP functions must have `[OpenApiOperation]` and response attributes.
 - Configured in `Program.cs` with API metadata.
+
+## Critical Files Reference
+
+**Domain Entities:**
+| Entity | Path |
+|--------|------|
+| Trip | `transport.domain/Trips/Trip.cs` |
+| TripPrice | `transport.domain/Trips/TripPrice.cs` |
+| Reserve | `transport.domain/Reserves/Reserve.cs` |
+| Passenger | `transport.domain/Passengers/Passenger.cs` |
+| Service | `transport.domain/Services/Service.cs` |
+| ServiceSchedule | `transport.domain/Services/ServiceSchedule.cs` |
+| Customer | `transport.domain/Customers/Customer.cs` |
+| City | `transport.domain/Cities/City.cs` |
+| Direction | `transport.domain/Directions/Direction.cs` |
+
+**Business Logic:**
+| Business | Path |
+|----------|------|
+| ReserveBusiness | `transport.application/ReserveBusiness/ReserveBusiness.cs` |
+| TripBusiness | `transport.application/TripBusiness/TripBusiness.cs` |
+| ServiceBusiness | `transport.application/ServiceBusiness/ServiceBusiness.cs` |
+| CustomerBusiness | `transport.application/CustomerBusiness/CustomerBusiness.cs` |
+| CityBusiness | `transport.application/CityBusiness/CityBusiness.cs` |
+
+**API Functions:**
+| Function | Path |
+|----------|------|
+| ReservesFunction | `transport.api/Functions/ReservesFunction.cs` |
+| TripsFunction | `transport.api/Functions/TripsFunction.cs` |
+| ServicesFunction | `transport.api/Functions/ServicesFunction.cs` |
+| CustomersFunction | `transport.api/Functions/CustomersFunction.cs` |
+
+**EF Core Configurations:**
+| Config | Path |
+|--------|------|
+| TripConfiguration | `transport.infraestructure/Database/EntityTypesConfigurations/TripConfiguration.cs` |
+| TripPriceConfiguration | `transport.infraestructure/Database/EntityTypesConfigurations/TripPriceConfiguration.cs` |
+| ReserveConfiguration | `transport.infraestructure/Database/EntityTypesConfigurations/ReserveConfiguration.cs` |
+| ApplicationDbContext | `transport.infraestructure/Database/ApplicationDbContext.cs` |
+
+**Tests:**
+| Test | Path |
+|------|------|
+| ReserveBusinessTest | `Transport.Tests/ReserveBusinessTest.cs` |
+| ServiceBusinessTest | `Transport.Tests/ServiceBusinessTest.cs` |
+| TestBase | `Transport.Tests/TestBase.cs` |
+
+**Configuration:**
+| File | Purpose |
+|------|---------|
+| `transport.api/local.settings.json` | Local Azure Functions settings |
+| `transport.application/DependencyInjection.cs` | Business layer DI registration |
+| `transport.infraestructure/DependencyInjection.cs` | Infrastructure layer DI registration |
+
+## Common Queries and Patterns
+
+**Finding Reserve Price (Trip/TripPrice):**
+```csharp
+// GetRoutePriceAsync en ReserveBusiness
+var trip = await _context.Trips
+    .Include(t => t.Prices)
+    .Where(t => t.OriginCityId == originId
+             && t.DestinationCityId == destinationId
+             && t.Status == EntityStatusEnum.Active)
+    .FirstOrDefaultAsync();
+
+var tripPrice = trip?.Prices
+    .FirstOrDefault(p => p.CityId == destinationCityId
+                      && p.ReserveTypeId == reserveTypeId
+                      && p.Status == EntityStatusEnum.Active);
+```
+
+**Creating Reserve with Passengers:**
+```csharp
+// CreatePassengerReserves flow:
+// 1. Validate reserve exists and has capacity
+// 2. Get price from Trip/TripPrice
+// 3. Create/Get Customer records
+// 4. Create Passenger records with calculated prices
+// 5. SaveChangesWithOutboxAsync for events
+```
+
+**Mocking DbSet in Tests:**
+```csharp
+var trips = new List<Trip> {
+    new Trip {
+        TripId = 1,
+        OriginCityId = 1,
+        DestinationCityId = 2,
+        Status = EntityStatusEnum.Active,
+        Prices = new List<TripPrice> {
+            new TripPrice {
+                CityId = 2,  // IMPORTANTE: CityId = destino para ida
+                ReserveTypeId = ReserveTypeIdEnum.Ida,
+                Price = 100,
+                Status = EntityStatusEnum.Active
+            }
+        }
+    }
+};
+_contextMock.Setup(c => c.Trips).Returns(GetQueryableMockDbSet(trips).Object);
+```

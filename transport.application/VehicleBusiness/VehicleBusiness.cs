@@ -134,10 +134,10 @@ public class VehicleBusiness : IVehicleBusiness
         if (!string.IsNullOrWhiteSpace(requestDto.Filters?.InternalNumber))
             query = query.Where(v => v.InternalNumber.Contains(requestDto.Filters.InternalNumber));
 
-        if (requestDto.Filters.VehicleTypeId is not null && requestDto.Filters.VehicleTypeId > 0)
+        if (requestDto.Filters?.VehicleTypeId is not null && requestDto.Filters?.VehicleTypeId > 0)
             query = query.Where(v => v.VehicleTypeId == requestDto.Filters.VehicleTypeId);
 
-        if (requestDto.Filters.status is not null)
+        if (requestDto.Filters?.status is not null)
             query = query.Where(v => v.Status == requestDto.Filters.status);
 
         var sortMappings = new Dictionary<string, Expression<Func<Vehicle, object>>>

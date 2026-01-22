@@ -12,6 +12,7 @@ using Transport.Domain.Services;
 using Transport.Domain.Directions;
 using Transport.SharedKernel;
 using Transport.Domain.Passengers;
+using Transport.Domain.Trips;
 
 namespace Transport.Business.Data;
 
@@ -28,7 +29,8 @@ public interface IApplicationDbContext
     DbSet<Service> Services { get; }
     DbSet<RefreshToken> RefreshTokens { get; }
     DbSet<Holiday> Holidays { get; }
-    DbSet<ReservePrice> ReservePrices { get; }
+    DbSet<Trip> Trips { get; }
+    DbSet<TripPrice> TripPrices { get; }
     DbSet<Passenger> Passengers { get; }
     DbSet<ServiceSchedule> ServiceSchedules { get; }
     DbSet<ReservePayment> ReservePayments { get; }
