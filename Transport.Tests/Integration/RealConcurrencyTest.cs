@@ -152,8 +152,7 @@ public class RealConcurrencyTest : IDisposable
         {
             Name = $"Test Service {timestamp}",
             TripId = trip.TripId,
-            OriginId = city.CityId,
-            DestinationId = city.CityId,
+
             VehicleId = vehicle.VehicleId,
             Status = Transport.SharedKernel.EntityStatusEnum.Active,
             CreatedBy = "Test"
@@ -180,8 +179,7 @@ public class RealConcurrencyTest : IDisposable
             ServiceId = service.ServiceId,
             ServiceScheduleId = serviceSchedule.ServiceScheduleId,
             TripId = trip.TripId,
-            OriginId = city.CityId,
-            DestinationId = city.CityId,
+
             ReserveDate = DateTime.Today.AddDays(1),
             DepartureHour = TimeSpan.FromHours(9),
             EstimatedDuration = TimeSpan.FromHours(2),

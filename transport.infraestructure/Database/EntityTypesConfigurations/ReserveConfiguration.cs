@@ -73,18 +73,6 @@ public class ReserveConfiguration : IEntityTypeConfiguration<Reserve>
                .IsRequired()
                .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasOne(r => r.Origin)
-               .WithMany(c => c.OriginReserves)
-               .HasForeignKey(r => r.OriginId)
-               .IsRequired()
-               .OnDelete(DeleteBehavior.Restrict);
-
-        builder.HasOne(r => r.Destination)
-               .WithMany(c => c.DestinationReserves)
-               .HasForeignKey(r => r.DestinationId)
-               .IsRequired()
-               .OnDelete(DeleteBehavior.Restrict);
-
         // Pasajeros
         builder.HasMany(r => r.Passengers)
                .WithOne(p => p.Reserve)
@@ -94,7 +82,6 @@ public class ReserveConfiguration : IEntityTypeConfiguration<Reserve>
         // Índices
         builder.HasIndex(r => new { r.ServiceId, r.ReserveDate });
         builder.HasIndex(r => new { r.Status, r.ReserveDate });
-        builder.HasIndex(r => new { r.OriginId, r.DestinationId, r.ReserveDate });
         builder.HasIndex(r => new { r.TripId, r.ReserveDate });
     }
 }

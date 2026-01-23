@@ -62,8 +62,11 @@ public class ReserveReportBusinessTest : TestBase
         var vehicle = new Vehicle { AvailableQuantity = 3 };
         var service = new Service
         {
-            Origin = new City { Name = "Buenos Aires" },
-            Destination = new City { Name = "Córdoba" },
+            Trip = new Trip
+            {
+                OriginCity = new City { Name = "Buenos Aires" },
+                DestinationCity = new City { Name = "Córdoba" }
+            },
             Vehicle = vehicle,
             Schedules = new List<ServiceSchedule> { schedule }
         };
@@ -80,8 +83,6 @@ public class ReserveReportBusinessTest : TestBase
             Vehicle = vehicle,
             OriginName = "Buenos Aires",
             DestinationName = "Córdoba",
-            OriginId = 1,
-            DestinationId = 2,
             TripId = 1,
             Passengers = new List<Passenger>
             {
@@ -160,16 +161,17 @@ public class ReserveReportBusinessTest : TestBase
             ServiceSchedule = schedule,
             Service = new Service
             {
-                Origin = new City { Name = "Rosario" },
-                Destination = new City { Name = "Santa Fe" },
+                Trip = new Trip
+                {
+                    OriginCity = new City { Name = "Rosario" },
+                    DestinationCity = new City { Name = "Santa Fe" }
+                },
                 Vehicle = vehicle1,
                 Schedules = new List<ServiceSchedule> { schedule }
             },
             Vehicle = vehicle1,
             OriginName = "Rosario",
             DestinationName = "Santa Fe",
-            OriginId = 1,
-            DestinationId = 2,
             TripId = 1,
             Passengers = new List<Passenger>()
         },
@@ -181,16 +183,17 @@ public class ReserveReportBusinessTest : TestBase
             ServiceSchedule = schedule,
             Service = new Service
             {
-                Origin = new City { Name = "Mendoza" },
-                Destination = new City { Name = "San Juan" },
+                Trip = new Trip
+                {
+                    OriginCity = new City { Name = "Mendoza" },
+                    DestinationCity = new City { Name = "San Juan" }
+                },
                 Vehicle = vehicle2,
                 Schedules = new List<ServiceSchedule> { schedule }
             },
             Vehicle = vehicle2,
             OriginName = "Mendoza",
             DestinationName = "San Juan",
-            OriginId = 3,
-            DestinationId = 4,
             TripId = 2,
             Passengers = new List<Passenger>()
         }
@@ -233,12 +236,14 @@ public class ReserveReportBusinessTest : TestBase
             Status = ReserveStatusEnum.Available,
             Service = new Service
             {
-                Origin = new City { Name = "Salta" },
-                Destination = new City { Name = "Jujuy" },
+                Trip = new Trip
+                {
+                    OriginCity = new City { Name = "Salta" },
+                    DestinationCity = new City { Name = "Jujuy" }
+                },
                 Vehicle = new Vehicle { AvailableQuantity = 2 }
             },
-            OriginId = 1,
-            DestinationId = 2,
+
             TripId = 1,
             Passengers = new List<Passenger>()
         }
@@ -278,12 +283,14 @@ public class ReserveReportBusinessTest : TestBase
             Status = ReserveStatusEnum.Rejected,
             Service = new Service
             {
-                Origin = new City { Name = "La Plata" },
-                Destination = new City { Name = "Mar del Plata" },
+                Trip = new Trip
+                {
+                    OriginCity = new City { Name = "La Plata" },
+                    DestinationCity = new City { Name = "Mar del Plata" }
+                },
                 Vehicle = new Vehicle { AvailableQuantity = 2 }
             },
-            OriginId = 1,
-            DestinationId = 2,
+
             TripId = 1,
             Passengers = new List<Passenger>()
         }
@@ -321,16 +328,26 @@ public class ReserveReportBusinessTest : TestBase
 
         var serviceIda = new Service
         {
-            Origin = new City { CityId = 1, Name = "Lobos" },
-            Destination = new City { CityId = 2, Name = "Ciudad Autonoma de Buenos Aires" },
+            Trip = new Trip
+            {
+                OriginCityId = 1,
+                DestinationCityId = 2,
+                OriginCity = new City { CityId = 1, Name = "Lobos" },
+                DestinationCity = new City { CityId = 2, Name = "Ciudad Autonoma de Buenos Aires" }
+            },
             Vehicle = vehicleIda,
             EstimatedDuration = TimeSpan.FromHours(2)
         };
 
         var serviceVuelta = new Service
         {
-            Origin = new City { CityId = 2, Name = "Ciudad Autonoma de Buenos Aires" },
-            Destination = new City { CityId = 1, Name = "Lobos" },
+            Trip = new Trip
+            {
+                OriginCityId = 2,
+                DestinationCityId = 1,
+                OriginCity = new City { CityId = 2, Name = "Ciudad Autonoma de Buenos Aires" },
+                DestinationCity = new City { CityId = 1, Name = "Lobos" }
+            },
             Vehicle = vehicleVuelta,
             EstimatedDuration = TimeSpan.FromHours(2)
         };
@@ -355,8 +372,7 @@ public class ReserveReportBusinessTest : TestBase
                 Status = ReserveStatusEnum.Confirmed,
                 Service = serviceIda,
                 Vehicle = vehicleIda,
-                OriginId = 1,
-                DestinationId = 2,
+                Trip = serviceIda.Trip,
                 TripId = 1,
                 OriginName = "Lobos",
                 DestinationName = "Ciudad Autonoma de Buenos Aires",
@@ -378,8 +394,7 @@ public class ReserveReportBusinessTest : TestBase
                 Status = ReserveStatusEnum.Confirmed,
                 Service = serviceVuelta,
                 Vehicle = vehicleVuelta,
-                OriginId = 2,
-                DestinationId = 1,
+                Trip = serviceVuelta.Trip,
                 TripId = 2,
                 OriginName = "Ciudad Autonoma de Buenos Aires",
                 DestinationName = "Lobos",
@@ -399,8 +414,7 @@ public class ReserveReportBusinessTest : TestBase
                 Status = ReserveStatusEnum.Confirmed,
                 Service = serviceVuelta,
                 Vehicle = vehicleVuelta,
-                OriginId = 2,
-                DestinationId = 1,
+                Trip = serviceVuelta.Trip,
                 TripId = 2,
                 OriginName = "Ciudad Autonoma de Buenos Aires",
                 DestinationName = "Lobos",
@@ -479,8 +493,13 @@ public class ReserveReportBusinessTest : TestBase
 
         var service = new Service
         {
-            Origin = new City { Name = "Rosario" },
-            Destination = new City { Name = "Santa Fe" },
+            Trip = new Trip
+            {
+                OriginCityId = 1,
+                DestinationCityId = 2,
+                OriginCity = new City { Name = "Rosario" },
+                DestinationCity = new City { Name = "Santa Fe" }
+            },
             Vehicle = vehicle,
             Schedules = new List<ServiceSchedule> { schedule }
         };
@@ -500,8 +519,7 @@ public class ReserveReportBusinessTest : TestBase
             ServiceSchedule = schedule,
             Service = service,
             Vehicle = vehicle,
-            OriginId = 1,
-            DestinationId = 2,
+            Trip = service.Trip,
             TripId = 1,
             OriginName = "Rosario",
             DestinationName = "Santa Fe",
@@ -561,8 +579,13 @@ public class ReserveReportBusinessTest : TestBase
 
         var serviceOutbound = new Service
         {
-            Origin = new City { CityId = 1, Name = "Rosario" },
-            Destination = new City { CityId = 2, Name = "Santa Fe" },
+            Trip = new Trip
+            {
+                OriginCityId = 1,
+                DestinationCityId = 2,
+                OriginCity = new City { CityId = 1, Name = "Rosario" },
+                DestinationCity = new City { CityId = 2, Name = "Santa Fe" }
+            },
             Vehicle = vehicleOutbound,
             Schedules = new List<ServiceSchedule> { schedule },
             EstimatedDuration = TimeSpan.FromHours(1)
@@ -570,8 +593,13 @@ public class ReserveReportBusinessTest : TestBase
 
         var serviceReturn = new Service
         {
-            Origin = new City { CityId = 2, Name = "Santa Fe" },
-            Destination = new City { CityId = 1, Name = "Rosario" },
+            Trip = new Trip
+            {
+                OriginCityId = 2,
+                DestinationCityId = 1,
+                OriginCity = new City { CityId = 2, Name = "Santa Fe" },
+                DestinationCity = new City { CityId = 1, Name = "Rosario" }
+            },
             Vehicle = vehicleReturn,
             Schedules = new List<ServiceSchedule> { schedule },
             EstimatedDuration = TimeSpan.FromHours(1)
@@ -595,8 +623,7 @@ public class ReserveReportBusinessTest : TestBase
             ServiceSchedule = schedule,
             Service = serviceOutbound,
             Vehicle = vehicleOutbound,
-            OriginId = 1,
-            DestinationId = 2,
+            Trip = serviceOutbound.Trip,
             TripId = 1,
             OriginName = "Rosario",
             DestinationName = "Santa Fe",
@@ -612,8 +639,7 @@ public class ReserveReportBusinessTest : TestBase
             ServiceSchedule = schedule,
             Service = serviceReturn,
             Vehicle = vehicleReturn,
-            OriginId = 2,
-            DestinationId = 1,
+            Trip = serviceReturn.Trip,
             TripId = 2,
             OriginName = "Santa Fe",
             DestinationName = "Rosario",

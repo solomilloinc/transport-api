@@ -18,8 +18,6 @@ public class Reserve: Entity, IAuditable
     public int? ServiceId { get; set;}
     public int? ServiceScheduleId { get; set; }
     public int TripId { get; set; }
-    public int OriginId { get; set; }
-    public int DestinationId { get; set; }
     public ReserveStatusEnum Status { get; set; }
     public string ServiceName { get; set; }
     public string OriginName { get; set; }
@@ -36,8 +34,6 @@ public class Reserve: Entity, IAuditable
     public Service? Service { get; set; }
     public ServiceSchedule? ServiceSchedule { get; set; }
     public Trip Trip { get; set; } = null!;
-    public City Origin { get; set; } = null!;
-    public City Destination { get; set; } = null!;
     public ICollection<Passenger> Passengers { get; set; } = new List<Passenger>();
     public ICollection<ReserveDirection> AllowedDirections { get; set; } = new List<ReserveDirection>();
 

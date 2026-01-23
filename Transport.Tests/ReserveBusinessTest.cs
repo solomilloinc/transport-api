@@ -151,6 +151,15 @@ public class ReserveBusinessTests : TestBase
     public async Task CreatePassengerReserves_Payments_ParentChildLogic_Works(int reserveCount, int paymentCount)
     {
         // Arrange
+        var trip = new Trip
+        {
+            TripId = 1,
+            OriginCityId = 1,
+            DestinationCityId = 2,
+            OriginCity = new City { CityId = 1, Name = "CityA" },
+            DestinationCity = new City { CityId = 2, Name = "CityB" }
+        };
+
         var reservesList = Enumerable.Range(1, reserveCount).Select(i => new Reserve
         {
             ReserveId = i,
@@ -158,9 +167,8 @@ public class ReserveBusinessTests : TestBase
             Passengers = new List<Passenger>(),
             VehicleId = 1,
             ServiceId = 1,
-            OriginId = 1,
-            DestinationId = 2,
             TripId = 1,
+            Trip = trip,
             Driver = new Driver { FirstName = "John", LastName = "Doe" }
         }).ToList();
 
@@ -168,12 +176,10 @@ public class ReserveBusinessTests : TestBase
         var service = new Service
         {
             ServiceId = 1,
-            OriginId = 1,
-            DestinationId = 2,
-            Origin = new City { CityId = 1, Name = "CityA" },
-            Destination = new City { CityId = 2, Name = "CityB" }
+            Trip = trip
         };
         var trips = new List<Trip> { new Trip { TripId = 1, OriginCityId = 1, DestinationCityId = 2, Status = EntityStatusEnum.Active, Prices = new List<TripPrice> { new TripPrice { ReserveTypeId = ReserveTypeIdEnum.IdaVuelta, Price = 100, Status = EntityStatusEnum.Active } } } };
+
 
         var customer = new Customer
         {
@@ -309,6 +315,15 @@ public class ReserveBusinessTests : TestBase
     public async Task CreatePassengerReservesExternal_IdaYVuelta_CreatesParentAndChildPayments()
     {
         // Arrange
+        var trip = new Trip
+        {
+            TripId = 1,
+            OriginCityId = 1,
+            DestinationCityId = 2,
+            OriginCity = new City { CityId = 1, Name = "Córdoba" },
+            DestinationCity = new City { CityId = 2, Name = "Rosario" }
+        };
+
         var reserve1 = new Reserve
         {
             ReserveId = 1,
@@ -316,9 +331,8 @@ public class ReserveBusinessTests : TestBase
             Passengers = new List<Passenger>(),
             VehicleId = 1,
             ServiceId = 1,
-            OriginId = 1,
-            DestinationId = 2,
             TripId = 1,
+            Trip = trip,
             Driver = new Driver { FirstName = "Mario", LastName = "Bros" }
         };
         var reserve2 = new Reserve
@@ -328,18 +342,14 @@ public class ReserveBusinessTests : TestBase
             Passengers = new List<Passenger>(),
             VehicleId = 1,
             ServiceId = 1,
-            OriginId = 1,
-            DestinationId = 2,
-            TripId = 1
+            TripId = 1,
+            Trip = trip
         };
         var vehicle = new Vehicle { VehicleId = 1, AvailableQuantity = 10 };
         var service = new Service
         {
             ServiceId = 1,
-            OriginId = 1,
-            DestinationId = 2,
-            Origin = new City { CityId = 1, Name = "Córdoba" },
-            Destination = new City { CityId = 2, Name = "Rosario" }
+            Trip = trip
         };
         var trips = new List<Trip>
         {
@@ -664,7 +674,7 @@ public class ReserveBusinessTests : TestBase
         // Arrange
         var paymentsDb = new List<ReservePayment>();
         var passengers = new List<Passenger> { new Passenger { PassengerId = 1, ReserveId = 1, CustomerId = 1, Price = 100, Status = PassengerStatusEnum.PendingPayment } };
-        var reserve = new Reserve { ReserveId = 1, ServiceId = 1, Passengers = passengers, ReserveDate = DateTime.Today, DepartureHour = TimeSpan.FromHours(9), OriginId = 1, DestinationId = 2, TripId = 1 };
+        var reserve = new Reserve { ReserveId = 1, ServiceId = 1, Passengers = passengers, ReserveDate = DateTime.Today, DepartureHour = TimeSpan.FromHours(9), TripId = 1 };
         var reserves = new List<Reserve> { reserve };
         var customer = new Customer { CustomerId = 1, DocumentNumber = "12345678", FirstName = "Test", LastName = "User", Email = "test@test.com" };
         var service = new Service { ServiceId = 1 };
@@ -746,8 +756,7 @@ public class ReserveBusinessTests : TestBase
             ReserveId = reserveId,
             ServiceId = 1,
             Passengers = passengers,
-            OriginId = 1,
-            DestinationId = 2,
+
             TripId = 1
         };
         var reserves = new List<Reserve> { reserve };
@@ -955,6 +964,15 @@ public class ReserveBusinessTests : TestBase
     {
         // Arrange
         var lockToken = Guid.NewGuid().ToString();
+        var trip = new Trip
+        {
+            TripId = 1,
+            OriginCityId = 1,
+            DestinationCityId = 2,
+            OriginCity = new City { CityId = 1, Name = "Origin" },
+            DestinationCity = new City { CityId = 2, Name = "Destination" }
+        };
+
         var reserves = new List<Reserve>
         {
             new Reserve
@@ -964,9 +982,8 @@ public class ReserveBusinessTests : TestBase
                 Passengers = new List<Passenger>(),
                 VehicleId = 1,
                 ServiceId = 1,
-                OriginId = 1,
-                DestinationId = 2,
-                TripId = 1
+                TripId = 1,
+                Trip = trip
             }
         };
 
@@ -988,8 +1005,11 @@ public class ReserveBusinessTests : TestBase
         var service = new Service
         {
             ServiceId = 1,
-            Origin = new City { Name = "Origin" },
-            Destination = new City { Name = "Destination" }
+            Trip = new Trip
+            {
+                OriginCity = new City { Name = "Origin" },
+                DestinationCity = new City { Name = "Destination" }
+            }
         };
 
         var trips = new List<Trip>
@@ -1311,6 +1331,15 @@ public class ReserveBusinessTests : TestBase
         var futureDate = DateTime.UtcNow.AddDays(1).Date;
         var futureTime = TimeSpan.FromHours(10);
 
+        var trip = new Trip
+        {
+            TripId = 1,
+            OriginCityId = 1,
+            DestinationCityId = 2,
+            OriginCity = new City { CityId = 1, Name = "Origin" },
+            DestinationCity = new City { CityId = 2, Name = "Dest" }
+        };
+
         // Reserva de HOY (más próxima en el sistema)
         var todayReserve = new Reserve
         {
@@ -1321,9 +1350,8 @@ public class ReserveBusinessTests : TestBase
             Passengers = new List<Passenger>(),
             VehicleId = 1,
             ServiceId = 1,
-            OriginId = 1,
-            DestinationId = 2,
             TripId = 1,
+            Trip = trip,
             Driver = new Driver { FirstName = "Driver", LastName = "Today" }
         };
 
@@ -1337,9 +1365,8 @@ public class ReserveBusinessTests : TestBase
             Passengers = new List<Passenger>(),
             VehicleId = 1,
             ServiceId = 1,
-            OriginId = 1,
-            DestinationId = 2,
             TripId = 1,
+            Trip = trip,
             Driver = new Driver { FirstName = "Driver", LastName = "Test" }
         };
 
@@ -1347,8 +1374,7 @@ public class ReserveBusinessTests : TestBase
         var service = new Service
         {
             ServiceId = 1,
-            Origin = new City { Name = "Origin" },
-            Destination = new City { Name = "Dest" }
+            Trip = trip
         };
 
         var trips = new List<Trip>
@@ -1435,6 +1461,15 @@ public class ReserveBusinessTests : TestBase
         var today = DateTime.UtcNow.Date;
         var tomorrow = DateTime.UtcNow.AddDays(1).Date;
 
+        var trip = new Trip
+        {
+            TripId = 1,
+            OriginCityId = 1,
+            DestinationCityId = 2,
+            OriginCity = new City { CityId = 1, Name = "Origin" },
+            DestinationCity = new City { CityId = 2, Name = "Dest" }
+        };
+
         // Reserva de HOY (más próxima en el sistema)
         var todayReserve = new Reserve
         {
@@ -1445,9 +1480,8 @@ public class ReserveBusinessTests : TestBase
             Passengers = new List<Passenger>(),
             VehicleId = 1,
             ServiceId = 1,
-            OriginId = 1,
-            DestinationId = 2,
             TripId = 1,
+            Trip = trip,
             Driver = new Driver { FirstName = "Driver", LastName = "Today" },
             ServiceName = "TestService",
             OriginName = "Origin",
@@ -1463,9 +1497,8 @@ public class ReserveBusinessTests : TestBase
             Passengers = new List<Passenger>(),
             VehicleId = 1,
             ServiceId = 1,
-            OriginId = 1,
-            DestinationId = 2,
             TripId = 1,
+            Trip = trip,
             Driver = new Driver { FirstName = "Driver", LastName = "Ida" },
             ServiceName = "TestService",
             OriginName = "Origin",
@@ -1481,9 +1514,8 @@ public class ReserveBusinessTests : TestBase
             Passengers = new List<Passenger>(),
             VehicleId = 1,
             ServiceId = 1,
-            OriginId = 1,
-            DestinationId = 2,
             TripId = 1,
+            Trip = trip,
             Driver = new Driver { FirstName = "Driver", LastName = "Vuelta" },
             ServiceName = "TestService",
             OriginName = "Origin",
@@ -1494,8 +1526,7 @@ public class ReserveBusinessTests : TestBase
         var service = new Service
         {
             ServiceId = 1,
-            Origin = new City { Name = "Origin" },
-            Destination = new City { Name = "Dest" }
+            Trip = trip
         };
 
         var trips = new List<Trip>
@@ -1607,6 +1638,15 @@ public class ReserveBusinessTests : TestBase
         // Arrange - 3 reservas el mismo día a diferentes horas: 15:00, 10:00, 20:00
         var today = DateTime.UtcNow.Date;
 
+        var trip = new Trip
+        {
+            TripId = 1,
+            OriginCityId = 1,
+            DestinationCityId = 2,
+            OriginCity = new City { CityId = 1, Name = "Origin" },
+            DestinationCity = new City { CityId = 2, Name = "Dest" }
+        };
+
         var reserve1 = new Reserve // Segunda cronológicamente
         {
             ReserveId = 1,
@@ -1616,9 +1656,8 @@ public class ReserveBusinessTests : TestBase
             Passengers = new List<Passenger>(),
             VehicleId = 1,
             ServiceId = 1,
-            OriginId = 1,
-            DestinationId = 2,
             TripId = 1,
+            Trip = trip,
             Driver = new Driver { FirstName = "Driver", LastName = "1" }
         };
 
@@ -1631,9 +1670,8 @@ public class ReserveBusinessTests : TestBase
             Passengers = new List<Passenger>(),
             VehicleId = 1,
             ServiceId = 1,
-            OriginId = 1,
-            DestinationId = 2,
             TripId = 1,
+            Trip = trip,
             Driver = new Driver { FirstName = "Driver", LastName = "2" }
         };
 
@@ -1646,9 +1684,8 @@ public class ReserveBusinessTests : TestBase
             Passengers = new List<Passenger>(),
             VehicleId = 1,
             ServiceId = 1,
-            OriginId = 1,
-            DestinationId = 2,
             TripId = 1,
+            Trip = trip,
             Driver = new Driver { FirstName = "Driver", LastName = "3" }
         };
 
@@ -1656,8 +1693,7 @@ public class ReserveBusinessTests : TestBase
         var service = new Service
         {
             ServiceId = 1,
-            Origin = new City { Name = "Origin" },
-            Destination = new City { Name = "Dest" }
+            Trip = trip
         };
 
         var trips = new List<Trip>
@@ -1989,8 +2025,7 @@ public class ReserveBusinessTests : TestBase
             Service = service,
             Vehicle = vehicle,
             Passengers = new List<Passenger>(),
-            OriginId = 1,
-            DestinationId = 2,
+
             TripId = 1
         };
 
@@ -2086,8 +2121,7 @@ public class ReserveBusinessTests : TestBase
             Service = service,
             Vehicle = vehicle,
             Passengers = new List<Passenger>(),
-            OriginId = 1,
-            DestinationId = 2,
+
             TripId = 1
         };
 

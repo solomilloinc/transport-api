@@ -42,20 +42,10 @@ public class ServiceBusiness : IServiceBusiness
         if (vehicle.Status != EntityStatusEnum.Active)
             return Result.Failure<int>(VehicleError.VehicleNotAvailable);
 
-        City origin = await _context.Cities.FindAsync(requestDto.OriginId);
-        if (origin is null)
-            return Result.Failure<int>(CityError.CityNotFound);
-
-        City destination = await _context.Cities.FindAsync(requestDto.DestinationId);
-        if (destination is null)
-            return Result.Failure<int>(CityError.CityNotFound);
-
         var service = new Service
         {
             Name = requestDto.Name,
             TripId = requestDto.TripId,
-            OriginId = requestDto.OriginId,
-            DestinationId = requestDto.DestinationId,
             EstimatedDuration = requestDto.EstimatedDuration,
             VehicleId = requestDto.VehicleId,
             Status = EntityStatusEnum.Active
@@ -101,8 +91,9 @@ public class ServiceBusiness : IServiceBusiness
     {
         var query = _context.Services
             .AsNoTracking()
-            .Include(s => s.Origin)
-            .Include(s => s.Destination)
+            .AsNoTracking()
+            .Include(s => s.Trip.OriginCity)
+            .Include(s => s.Trip.DestinationCity)
             .Include(s => s.Vehicle)
             .AsQueryable();
 
@@ -110,10 +101,10 @@ public class ServiceBusiness : IServiceBusiness
             query = query.Where(s => s.Name.Contains(requestDto.Filters.Name));
 
         if (requestDto.Filters?.OriginId is not null && requestDto.Filters.OriginId > 0)
-            query = query.Where(s => s.OriginId == requestDto.Filters.OriginId);
+            query = query.Where(s => s.Trip.OriginCityId == requestDto.Filters.OriginId);
 
         if (requestDto.Filters?.DestinationId is not null && requestDto.Filters.DestinationId > 0)
-            query = query.Where(s => s.DestinationId == requestDto.Filters.DestinationId);
+            query = query.Where(s => s.Trip.DestinationCityId == requestDto.Filters.DestinationId);
 
         if (requestDto.Filters?.VehicleId is not null && requestDto.Filters.VehicleId > 0)
             query = query.Where(s => s.VehicleId == requestDto.Filters.VehicleId);
@@ -124,8 +115,8 @@ public class ServiceBusiness : IServiceBusiness
         var sortMappings = new Dictionary<string, Expression<Func<Service, object>>>
         {
             ["name"] = s => s.Name,
-            ["originid"] = s => s.OriginId,
-            ["destinationid"] = s => s.DestinationId,
+            ["originid"] = s => s.Trip.OriginCityId,
+            ["destinationid"] = s => s.Trip.DestinationCityId,
             ["vehicleid"] = s => s.VehicleId,
             ["status"] = s => s.Status
         };
@@ -135,10 +126,10 @@ public class ServiceBusiness : IServiceBusiness
             selector: s => new ServiceReportResponseDto(
                 s.ServiceId,
                 s.Name,
-                s.OriginId,
-                s.Origin.Name,
-                s.DestinationId,
-                s.Destination.Name,
+                s.Trip.OriginCityId,
+                s.Trip.OriginCity.Name,
+                s.Trip.DestinationCityId,
+                s.Trip.DestinationCity.Name,
                 s.EstimatedDuration,
                 s.StartDay,
                 s.EndDay,
@@ -182,8 +173,6 @@ public class ServiceBusiness : IServiceBusiness
 
         service.Name = dto.Name;
         service.TripId = dto.TripId;
-        service.OriginId = dto.OriginId;
-        service.DestinationId = dto.DestinationId;
         service.EstimatedDuration = dto.EstimatedDuration;
         service.VehicleId = dto.VehicleId;
 
@@ -269,8 +258,8 @@ public class ServiceBusiness : IServiceBusiness
             .Include(s => s.Trip)
             .Include(s => s.Reserves.Where(r => r.Status != ReserveStatusEnum.Expired))
             .Include(s => s.Schedules.Where(sc => sc.Status == EntityStatusEnum.Active))
-            .Include(s => s.Origin)
-            .Include(s => s.Destination)
+            .Include(s => s.Trip.OriginCity)
+            .Include(s => s.Trip.DestinationCity)
             .ToListAsync();
 
         foreach (var service in services)
@@ -306,10 +295,8 @@ public class ServiceBusiness : IServiceBusiness
                         IsHoliday = schedule.IsHoliday,
                         ServiceName = service.Name,
                         TripId = service.TripId,
-                        OriginId = service.OriginId,
-                        DestinationId = service.DestinationId,
-                        OriginName = service.Origin.Name,
-                        DestinationName = service.Destination.Name,
+                        OriginName = service.Trip.OriginCity.Name,
+                        DestinationName = service.Trip.DestinationCity.Name,
                     };
 
                     _context.Reserves.Add(reserve);

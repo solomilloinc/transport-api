@@ -96,8 +96,6 @@ public class ReserveBusiness : IReserveBusiness
             VehicleId = dto.VehicleId,
             DriverId = dto.DriverId,
             TripId = trip.TripId,
-            OriginId = trip.OriginCityId,
-            DestinationId = trip.DestinationCityId,
             OriginName = trip.OriginCity.Name,
             DestinationName = trip.DestinationCity.Name,
             ServiceName = $"{trip.OriginCity.Name} - {trip.DestinationCity.Name}",
@@ -164,6 +162,7 @@ public class ReserveBusiness : IReserveBusiness
                 var reserve = await _context.Reserves
                     .Include(r => r.Passengers)
                     .Include(r => r.Driver)
+                    .Include(r => r.Trip)
                     .SingleOrDefaultAsync(r => r.ReserveId == dto.ReserveId);
 
                 if (reserve is null)
@@ -180,8 +179,8 @@ public class ReserveBusiness : IReserveBusiness
                     if (!servicesCache.TryGetValue(reserve.ServiceId.Value, out var service))
                     {
                         service = await _context.Services
-                            .Include(s => s.Origin)
-                            .Include(s => s.Destination)
+                            .Include(s => s.Trip.OriginCity)
+                            .Include(s => s.Trip.DestinationCity)
                             .SingleOrDefaultAsync(s => s.ServiceId == reserve.ServiceId.Value);
 
                         if (service is null)
@@ -200,7 +199,7 @@ public class ReserveBusiness : IReserveBusiness
                         existingPassengerCount, passengerReserves.Items.Count, vehicle?.AvailableQuantity ?? 0));
 
                 var reservePrice = await GetPassengerPriceAsync(
-                    reserve.OriginId, reserve.DestinationId, (ReserveTypeIdEnum)dto.ReserveTypeId, dto.DropoffLocationId);
+                    reserve.Trip.OriginCityId, reserve.Trip.DestinationCityId, (ReserveTypeIdEnum)dto.ReserveTypeId, dto.DropoffLocationId);
                 
                 if (reservePrice is null || dto.Price != reservePrice.Value)
                     return Result.Failure<bool>(ReserveError.PriceNotAvailable);
@@ -386,6 +385,7 @@ public class ReserveBusiness : IReserveBusiness
         {
             var reserve = await _context.Reserves
                .Include(r => r.Passengers)
+               .Include(r => r.Trip)
                .SingleOrDefaultAsync(r => r.ReserveId == passengerDto.ReserveId);
 
             if (reserve is null)
@@ -395,8 +395,8 @@ public class ReserveBusiness : IReserveBusiness
                 return Result.Failure<CreateReserveExternalResult>(ReserveError.NotAvailable);
 
             var service = await _context.Services
-                .Include(s => s.Origin)
-                .Include(s => s.Destination)
+                .Include(s => s.Trip.OriginCity)
+                .Include(s => s.Trip.DestinationCity)
                 .SingleOrDefaultAsync(s => s.ServiceId == reserve.ServiceId);
 
             var vehicle = await _context.Vehicles.FindAsync(reserve.VehicleId);
@@ -409,7 +409,7 @@ public class ReserveBusiness : IReserveBusiness
                     ReserveError.VehicleQuantityNotAvailable(existingPassengerCount, dto.Items.Count, vehicle.AvailableQuantity));
 
             var reservePrice = await GetPassengerPriceAsync(
-                reserve.OriginId, reserve.DestinationId, (ReserveTypeIdEnum)passengerDto.ReserveTypeId, passengerDto.DropoffLocationId);
+                reserve.Trip.OriginCityId, reserve.Trip.DestinationCityId, (ReserveTypeIdEnum)passengerDto.ReserveTypeId, passengerDto.DropoffLocationId);
 
             if (reservePrice is null)
                 return Result.Failure<CreateReserveExternalResult>(ReserveError.PriceNotAvailable);
@@ -663,9 +663,9 @@ public class ReserveBusiness : IReserveBusiness
             var rid = reserveIds[0];
             var reserve = reserveMap[rid];
             var originName = reserve.ServiceId.HasValue && servicesCache.TryGetValue(reserve.ServiceId.Value, out var svc)
-                ? svc.Origin.Name : reserve.OriginName;
+                ? svc.Trip.OriginCity.Name : reserve.OriginName;
             var destName = reserve.ServiceId.HasValue && servicesCache.TryGetValue(reserve.ServiceId.Value, out svc)
-                ? svc.Destination.Name : reserve.DestinationName;
+                ? svc.Trip.DestinationCity.Name : reserve.DestinationName;
             var type = passengerReserves.Items.First(i => i.ReserveId == rid).ReserveTypeId == (int)ReserveTypeIdEnum.IdaVuelta
                 ? "Ida y vuelta"
                 : "Ida";
@@ -678,13 +678,13 @@ public class ReserveBusiness : IReserveBusiness
         var reserve2 = reserveMap[rid2];
 
         var origin1 = reserve1.ServiceId.HasValue && servicesCache.TryGetValue(reserve1.ServiceId.Value, out var svc1)
-            ? svc1.Origin.Name : reserve1.OriginName;
+            ? svc1.Trip.OriginCity.Name : reserve1.OriginName;
         var dest1 = reserve1.ServiceId.HasValue && servicesCache.TryGetValue(reserve1.ServiceId.Value, out svc1)
-            ? svc1.Destination.Name : reserve1.DestinationName;
+            ? svc1.Trip.DestinationCity.Name : reserve1.DestinationName;
         var origin2 = reserve2.ServiceId.HasValue && servicesCache.TryGetValue(reserve2.ServiceId.Value, out var svc2)
-            ? svc2.Origin.Name : reserve2.OriginName;
+            ? svc2.Trip.OriginCity.Name : reserve2.OriginName;
         var dest2 = reserve2.ServiceId.HasValue && servicesCache.TryGetValue(reserve2.ServiceId.Value, out svc2)
-            ? svc2.Destination.Name : reserve2.DestinationName;
+            ? svc2.Trip.DestinationCity.Name : reserve2.DestinationName;
 
         var desc1 = $"Ida #{rid1} - {origin1} - {dest1} {reserve1.ReserveDate:HH:mm}";
         var desc2 = $"Vuelta #{rid2} - {dest2} - {origin2} {reserve2.ReserveDate:HH:mm}";
@@ -969,6 +969,7 @@ public class ReserveBusiness : IReserveBusiness
         var query = _context.Reserves
             .Include(r => r.Vehicle)
             .Include(r => r.Passengers)
+            .Include(r => r.Trip)
             .Where(rp => rp.Status == ReserveStatusEnum.Confirmed &&
                         (rp.ReserveDate.Date == idaDate ||
                          (vueltaDate.HasValue && rp.ReserveDate.Date == vueltaDate.Value)));
@@ -977,7 +978,7 @@ public class ReserveBusiness : IReserveBusiness
 
         var idaItems = items
             .Where(rp => rp.ReserveDate.Date == idaDate)
-            .Where(rp => rp.OriginId == originId && rp.DestinationId == destinationId)
+            .Where(rp => rp.Trip.OriginCityId == originId && rp.Trip.DestinationCityId == destinationId)
             .Where(rp =>
             {
                 int totalReserved = rp.Passengers
@@ -1010,7 +1011,7 @@ public class ReserveBusiness : IReserveBusiness
         var vueltaItems = vueltaDate.HasValue
             ? items
                 .Where(rp => rp.ReserveDate.Date == vueltaDate.Value)
-                .Where(rp => rp.OriginId == destinationId && rp.DestinationId == originId)
+                .Where(rp => rp.Trip.OriginCityId == destinationId && rp.Trip.DestinationCityId == originId)
                 .Where(rp =>
                 {
                     int totalReserved = rp.Passengers

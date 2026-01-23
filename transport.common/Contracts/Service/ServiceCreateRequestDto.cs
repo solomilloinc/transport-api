@@ -3,8 +3,6 @@
 public record ServiceCreateRequestDto(
     string Name,
     int TripId,
-    int OriginId,
-    int DestinationId,
     TimeSpan EstimatedDuration,
     int VehicleId,
     List<ServiceScheduleCreateDto> Schedules,

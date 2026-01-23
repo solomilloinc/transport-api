@@ -50,8 +50,6 @@ public class ServiceBusinessTests : TestBase
         var requestDto = new ServiceCreateRequestDto(
             Name: "Test",
             TripId: 999,
-            OriginId: 1,
-            DestinationId: 2,
             EstimatedDuration: TimeSpan.FromHours(1),
             VehicleId: 1,
             Schedules: schedules
@@ -80,8 +78,6 @@ public class ServiceBusinessTests : TestBase
         var requestDto = new ServiceCreateRequestDto(
             Name: "Test",
             TripId: 1,
-            OriginId: 1,
-            DestinationId: 2,
             EstimatedDuration: TimeSpan.FromHours(1),
             VehicleId: 999,
             Schedules: schedules
@@ -110,8 +106,6 @@ public class ServiceBusinessTests : TestBase
         var request = new ServiceCreateRequestDto(
             Name: "Test",
             TripId: 1,
-            OriginId: 1,
-            DestinationId: 2,
             EstimatedDuration: TimeSpan.FromHours(1),
             VehicleId: 1,
             Schedules: schedules
@@ -123,72 +117,9 @@ public class ServiceBusinessTests : TestBase
         result.Error.Should().Be(VehicleError.VehicleNotAvailable);
     }
 
-    [Fact]
-    public async Task Create_ShouldFail_WhenOriginCityNotFound()
-    {
-        _contextMock.Setup(x => x.Trips.FindAsync(It.IsAny<int>()))
-            .ReturnsAsync(new Trip { TripId = 1, Status = EntityStatusEnum.Active });
 
-        _contextMock.Setup(x => x.Vehicles.FindAsync(It.IsAny<int>()))
-            .ReturnsAsync(new Vehicle { VehicleId = 1, Status = EntityStatusEnum.Active });
 
-        _contextMock.Setup(x => x.Cities.FindAsync(It.IsAny<int>()))
-            .ReturnsAsync((City)null);
 
-        var schedules = new List<ServiceScheduleCreateDto>
-        {
-            new(0, false, TimeSpan.FromHours(8))
-        };
-
-        var request = new ServiceCreateRequestDto(
-            Name: "Test",
-            TripId: 1,
-            OriginId: 1,
-            DestinationId: 2,
-            EstimatedDuration: TimeSpan.FromHours(1),
-            VehicleId: 1,
-            Schedules: schedules
-        );
-
-        var result = await _serviceBusiness.Create(request);
-
-        result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Be(CityError.CityNotFound);
-    }
-
-    [Fact]
-    public async Task Create_ShouldFail_WhenDestinationCityNotFound()
-    {
-        _contextMock.Setup(x => x.Trips.FindAsync(It.IsAny<int>()))
-            .ReturnsAsync(new Trip { TripId = 1, Status = EntityStatusEnum.Active });
-
-        _contextMock.Setup(x => x.Vehicles.FindAsync(It.IsAny<int>()))
-            .ReturnsAsync(new Vehicle { VehicleId = 1, Status = EntityStatusEnum.Active });
-
-        _contextMock.SetupSequence(x => x.Cities.FindAsync(It.IsAny<int>()))
-            .ReturnsAsync(new City { CityId = 1 })
-            .ReturnsAsync((City)null);
-
-        var schedules = new List<ServiceScheduleCreateDto>
-        {
-            new(0, false, TimeSpan.FromHours(8))
-        };
-
-        var request = new ServiceCreateRequestDto(
-            Name: "Test",
-            TripId: 1,
-            OriginId: 1,
-            DestinationId: 2,
-            EstimatedDuration: TimeSpan.FromHours(1),
-            VehicleId: 1,
-            Schedules: schedules
-        );
-
-        var result = await _serviceBusiness.Create(request);
-
-        result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Be(CityError.CityNotFound);
-    }
 
     [Fact]
     public async Task Create_ShouldSucceed_WhenDataIsValid()
@@ -219,8 +150,6 @@ public class ServiceBusinessTests : TestBase
         var request = new ServiceCreateRequestDto(
             Name: "TestService",
             TripId: 1,
-            OriginId: 1,
-            DestinationId: 2,
             EstimatedDuration: TimeSpan.FromHours(3),
             VehicleId: 1,
             Schedules: schedules
@@ -241,8 +170,11 @@ public class ServiceBusinessTests : TestBase
         {
             ServiceId = 1,
             Name = "Servicio A",
-            Origin = new City { CityId = 1, Name = "Ciudad A" },
-            Destination = new City { CityId = 2, Name = "Ciudad B" },
+            Trip = new Trip
+            {
+                OriginCity = new City { CityId = 1, Name = "Ciudad A" },
+                DestinationCity = new City { CityId = 2, Name = "Ciudad B" }
+            },
             EstimatedDuration = TimeSpan.FromHours(2),
             Vehicle = new Vehicle
             {
@@ -262,8 +194,11 @@ public class ServiceBusinessTests : TestBase
         {
             ServiceId = 2,
             Name = "Servicio B",
-            Origin = new City { CityId = 3, Name = "Ciudad C" },
-            Destination = new City { CityId = 4, Name = "Ciudad D" },
+            Trip = new Trip
+            {
+                OriginCity = new City { CityId = 3, Name = "Ciudad C" },
+                DestinationCity = new City { CityId = 4, Name = "Ciudad D" }
+            },
             EstimatedDuration = TimeSpan.FromHours(1),
             Vehicle = new Vehicle
             {
@@ -324,8 +259,6 @@ public class ServiceBusinessTests : TestBase
         var result = await _serviceBusiness.Update(1, new ServiceCreateRequestDto(
             Name: "Updated",
             TripId: 1,
-            OriginId: 1,
-            DestinationId: 2,
             EstimatedDuration: TimeSpan.FromHours(2),
             VehicleId: 1,
             Schedules: schedules
@@ -362,8 +295,6 @@ public class ServiceBusinessTests : TestBase
         var dto = new ServiceCreateRequestDto(
             Name: "Updated",
             TripId: 1,
-            OriginId: 1,
-            DestinationId: 2,
             EstimatedDuration: TimeSpan.FromHours(2),
             VehicleId: 1,
             Schedules: schedules
@@ -392,7 +323,7 @@ public class ServiceBusinessTests : TestBase
             VehicleType = new VehicleType { Name = "Bus", Quantity = 50 }
         };
 
-        var trip = new Trip { TripId = 1, OriginCityId = 1, DestinationCityId = 2, Status = EntityStatusEnum.Active };
+        var trip = new Trip { TripId = 1, OriginCityId = 1, DestinationCityId = 2, Status = EntityStatusEnum.Active, OriginCity = new City { CityId = 1, Name = "Origin City" }, DestinationCity = new City { CityId = 2, Name = "Destination City" } };
 
         var service = new Service
         {
@@ -403,10 +334,7 @@ public class ServiceBusinessTests : TestBase
             VehicleId = vehicle.VehicleId,
             TripId = trip.TripId,
             Trip = trip,
-            OriginId = 1,
-            Origin = new City() { CityId = 1, Name = "Origin City" },
-            DestinationId = 2,
-            Destination = new City() { CityId = 2, Name = "Destination City" },
+
             StartDay = today.DayOfWeek,
             EndDay = today.DayOfWeek,
             Schedules = new List<ServiceSchedule>
@@ -474,8 +402,7 @@ public class ServiceBusinessTests : TestBase
             Vehicle = vehicle,
             TripId = trip.TripId,
             Trip = trip,
-            OriginId = 1,
-            DestinationId = 2,
+
             StartDay = DayOfWeek.Sunday,
             EndDay = DayOfWeek.Sunday,
             Schedules = new List<ServiceSchedule>
@@ -524,7 +451,7 @@ public class ServiceBusinessTests : TestBase
         reserveOptionMock.Setup(x => x.ReserveGenerationDays).Returns(2); // Lunes y martes
 
         var vehicle = new Vehicle { VehicleId = 1, Status = EntityStatusEnum.Active };
-        var trip = new Trip { TripId = 1, OriginCityId = 1, DestinationCityId = 2, Status = EntityStatusEnum.Active };
+        var trip = new Trip { TripId = 1, OriginCityId = 1, DestinationCityId = 2, Status = EntityStatusEnum.Active, OriginCity = new City { CityId = 1, Name = "Origin City" }, DestinationCity = new City { CityId = 2, Name = "Destination City" } };
 
         var service = new Service
         {
@@ -534,10 +461,7 @@ public class ServiceBusinessTests : TestBase
             Vehicle = vehicle,
             TripId = trip.TripId,
             Trip = trip,
-            OriginId = 1,
-            Origin = new City() { CityId = 1, Name = "Origin City" },
-            DestinationId = 2,
-            Destination = new City() { CityId = 2, Name = "Destination City" },
+
             StartDay = DayOfWeek.Monday,
             EndDay = DayOfWeek.Tuesday,
             Schedules = new List<ServiceSchedule>
@@ -590,7 +514,7 @@ public class ServiceBusinessTests : TestBase
         reserveOptionMock.Setup(x => x.ReserveGenerationDays).Returns(2);
 
         var vehicle = new Vehicle { VehicleId = 1, Status = EntityStatusEnum.Active };
-        var trip = new Trip { TripId = 1, OriginCityId = 1, DestinationCityId = 2, Status = EntityStatusEnum.Active };
+        var trip = new Trip { TripId = 1, OriginCityId = 1, DestinationCityId = 2, Status = EntityStatusEnum.Active, OriginCity = new City { CityId = 1, Name = "Origin City" }, DestinationCity = new City { CityId = 2, Name = "Destination City" } };
 
         var service = new Service
         {
@@ -600,10 +524,7 @@ public class ServiceBusinessTests : TestBase
             Vehicle = vehicle,
             TripId = trip.TripId,
             Trip = trip,
-            OriginId = 1,
-            Origin = new City() { CityId = 1, Name = "Origin City" },
-            DestinationId = 2,
-            Destination = new City() { CityId = 2, Name = "Destination City" },
+
             StartDay = DayOfWeek.Monday,
             EndDay = DayOfWeek.Friday,
             Schedules = new List<ServiceSchedule>

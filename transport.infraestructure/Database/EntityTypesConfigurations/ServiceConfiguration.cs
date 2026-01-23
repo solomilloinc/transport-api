@@ -16,16 +16,6 @@ public class ServiceConfiguration : IEntityTypeConfiguration<Service>
         builder.Property(s => s.EndDay).IsRequired();
         builder.Property(s => s.Status).IsRequired();
 
-        builder.HasOne(s => s.Origin)
-            .WithMany(c => c.OriginServices)
-            .HasForeignKey(s => s.OriginId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        builder.HasOne(s => s.Destination)
-            .WithMany(c => c.DestinationServices)
-            .HasForeignKey(s => s.DestinationId)
-            .OnDelete(DeleteBehavior.Restrict);
-
         builder.HasOne(s => s.Trip)
             .WithMany()
             .HasForeignKey(s => s.TripId)
