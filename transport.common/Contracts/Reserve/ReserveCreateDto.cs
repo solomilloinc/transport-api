@@ -7,5 +7,6 @@ public record ReserveCreateDto(
     int TripId,
     TimeSpan DepartureHour,
     TimeSpan EstimatedDuration,
-    bool IsHoliday = false
+    bool IsHoliday = false,
+    List<int>? AllowedDirectionIds = null
 );

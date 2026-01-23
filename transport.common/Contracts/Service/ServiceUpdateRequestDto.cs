@@ -5,5 +5,6 @@ public record ServiceUpdateRequestDto(
     int OriginId,
     int DestinationId,
     TimeSpan EstimatedDuration,
-    int VehicleId
+    int VehicleId,
+    List<int>? AllowedDirectionIds = null
 );

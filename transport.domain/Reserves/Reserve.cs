@@ -39,6 +39,7 @@ public class Reserve: Entity, IAuditable
     public City Origin { get; set; } = null!;
     public City Destination { get; set; } = null!;
     public ICollection<Passenger> Passengers { get; set; } = new List<Passenger>();
+    public ICollection<ReserveDirection> AllowedDirections { get; set; } = new List<ReserveDirection>();
 
     public string CreatedBy { get; set; } = null!;
     public string? UpdatedBy { get; set; }

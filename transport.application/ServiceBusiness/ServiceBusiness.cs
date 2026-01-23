@@ -77,6 +77,18 @@ public class ServiceBusiness : IServiceBusiness
             }
         }
 
+        // Add allowed directions whitelist
+        if (requestDto.AllowedDirectionIds?.Any() == true)
+        {
+            foreach (var directionId in requestDto.AllowedDirectionIds.Distinct())
+            {
+                service.AllowedDirections.Add(new ServiceDirection
+                {
+                    DirectionId = directionId
+                });
+            }
+        }
+
         await _context.Services.AddAsync(service);
         await _context.SaveChangesWithOutboxAsync();
 
@@ -155,6 +167,7 @@ public class ServiceBusiness : IServiceBusiness
     {
         var service = await _context.Services
             .Include(s => s.Schedules)
+            .Include(s => s.AllowedDirections)
             .SingleOrDefaultAsync(s => s.ServiceId == serviceId);
 
         if (service == null)
@@ -189,6 +202,21 @@ public class ServiceBusiness : IServiceBusiness
                 };
 
                 _context.ServiceSchedules.Add(newSchedule);
+            }
+        }
+
+        // Update allowed directions whitelist (replace all)
+        if (dto.AllowedDirectionIds is not null)
+        {
+            _context.ServiceDirections.RemoveRange(service.AllowedDirections);
+
+            foreach (var directionId in dto.AllowedDirectionIds.Distinct())
+            {
+                _context.ServiceDirections.Add(new ServiceDirection
+                {
+                    ServiceId = serviceId,
+                    DirectionId = directionId
+                });
             }
         }
 

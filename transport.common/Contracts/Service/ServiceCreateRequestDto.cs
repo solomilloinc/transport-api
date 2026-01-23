@@ -7,4 +7,5 @@ public record ServiceCreateRequestDto(
     int DestinationId,
     TimeSpan EstimatedDuration,
     int VehicleId,
-    List<ServiceScheduleCreateDto> Schedules);
+    List<ServiceScheduleCreateDto> Schedules,
+    List<int>? AllowedDirectionIds = null);

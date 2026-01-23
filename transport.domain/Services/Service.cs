@@ -31,6 +31,7 @@ public class Service : Entity, IAuditable
     public ICollection<ServiceCustomer> Customers { get; set; } = new List<ServiceCustomer>();
     public ICollection<Reserve> Reserves { get; set; } = new List<Reserve>();
     public ICollection<ServiceSchedule> Schedules { get; set; } = new List<ServiceSchedule>();
+    public ICollection<ServiceDirection> AllowedDirections { get; set; } = new List<ServiceDirection>();
 
     public bool IsDayWithinScheduleRange(DayOfWeek day)
     {

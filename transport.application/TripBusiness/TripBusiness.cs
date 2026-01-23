@@ -4,6 +4,7 @@ using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
 using Transport.Business.Data;
 using Transport.Domain.Cities;
+using Transport.Domain.Directions;
 using Transport.Domain.Reserves;
 using Transport.Domain.Trips;
 using Transport.Domain.Trips.Abstraction;
@@ -190,7 +191,7 @@ public class TripBusiness : ITripBusiness
         return Result.Success(pagedResult);
     }
 
-    public async Task<Result<TripReportResponseDto>> GetTripById(int tripId)
+    public async Task<Result<TripReportResponseDto>> GetTripById(int tripId, int? reserveId = null)
     {
         var trip = await _context.Trips
             .AsNoTracking()
@@ -218,6 +219,43 @@ public class TripBusiness : ITripBusiness
             .Include(c => c.Directions.Where(d => d.Status == EntityStatusEnum.Active))
             .ToListAsync();
 
+        // Get allowed directions whitelist if reserveId is provided
+        HashSet<int>? allowedDirectionIds = null;
+        if (reserveId.HasValue)
+        {
+            var reserve = await _context.Reserves
+                .AsNoTracking()
+                .FirstOrDefaultAsync(r => r.ReserveId == reserveId.Value);
+
+            if (reserve is not null)
+            {
+                if (reserve.ServiceId.HasValue)
+                {
+                    // Reserve from batch: get whitelist from ServiceDirections
+                    var serviceDirections = await _context.ServiceDirections
+                        .AsNoTracking()
+                        .Where(sd => sd.ServiceId == reserve.ServiceId.Value)
+                        .Select(sd => sd.DirectionId)
+                        .ToListAsync();
+
+                    if (serviceDirections.Any())
+                        allowedDirectionIds = serviceDirections.ToHashSet();
+                }
+                else
+                {
+                    // Individual reserve: get whitelist from ReserveDirections
+                    var reserveDirections = await _context.ReserveDirections
+                        .AsNoTracking()
+                        .Where(rd => rd.ReserveId == reserveId.Value)
+                        .Select(rd => rd.DirectionId)
+                        .ToListAsync();
+
+                    if (reserveDirections.Any())
+                        allowedDirectionIds = reserveDirections.ToHashSet();
+                }
+            }
+        }
+
         var relevantCitiesDto = citiesWithDirections.Select(c => new CityDirectionsDto(
             c.CityId,
             c.Name,
@@ -225,11 +263,17 @@ public class TripBusiness : ITripBusiness
         )).ToList();
 
         // Frontend-ready: Pickup options from origin city directions
-        var pickupOptions = citiesWithDirections
+        var originDirections = citiesWithDirections
             .FirstOrDefault(c => c.CityId == trip.OriginCityId)?
-            .Directions
+            .Directions ?? new List<Direction>();
+
+        // Filter by whitelist if exists
+        if (allowedDirectionIds is not null)
+            originDirections = originDirections.Where(d => allowedDirectionIds.Contains(d.DirectionId)).ToList();
+
+        var pickupOptions = originDirections
             .Select(d => new PickupOptionDto(d.DirectionId, d.Name))
-            .ToList() ?? new List<PickupOptionDto>();
+            .ToList();
 
         // Helper to build dropoff options grouped by city
         List<DropoffOptionDto> BuildDropoffOptions(ReserveTypeIdEnum reserveType, bool onlyDestination = false)
@@ -246,16 +290,18 @@ public class TripBusiness : ITripBusiness
                 // Get ALL directions for this city
                 var cityDirections = citiesWithDirections
                     .FirstOrDefault(c => c.CityId == price.CityId)?
-                    .Directions
-                    .Select(d => new DropoffDirectionDto(d.DirectionId, d.Name))
-                    .ToList() ?? new List<DropoffDirectionDto>();
+                    .Directions ?? new List<Direction>();
+
+                // Filter by whitelist if exists
+                if (allowedDirectionIds is not null)
+                    cityDirections = cityDirections.Where(d => allowedDirectionIds.Contains(d.DirectionId)).ToList();
 
                 return new DropoffOptionDto(
                     price.CityId,
                     price.City.Name,
                     price.Price,
                     price.CityId == trip.DestinationCityId,
-                    cityDirections
+                    cityDirections.Select(d => new DropoffDirectionDto(d.DirectionId, d.Name)).ToList()
                 );
             }).ToList();
         }

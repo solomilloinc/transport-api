@@ -10,7 +10,7 @@ public interface ITripBusiness
     Task<Result<bool>> DeleteTrip(int tripId);
     Task<Result<bool>> UpdateTripStatus(int tripId, EntityStatusEnum status);
     Task<Result<PagedReportResponseDto<TripReportResponseDto>>> GetTripReport(PagedReportRequestDto<TripReportFilterDto> request);
-    Task<Result<TripReportResponseDto>> GetTripById(int tripId);
+    Task<Result<TripReportResponseDto>> GetTripById(int tripId, int? reserveId = null);
 
     // Price management
     Task<Result<int>> AddPrice(TripPriceCreateDto dto);

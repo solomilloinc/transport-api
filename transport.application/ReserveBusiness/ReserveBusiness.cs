@@ -109,6 +109,18 @@ public class ReserveBusiness : IReserveBusiness
             ServiceScheduleId = null
         };
 
+        // Add allowed directions whitelist for individual reserve
+        if (dto.AllowedDirectionIds?.Any() == true)
+        {
+            foreach (var directionId in dto.AllowedDirectionIds.Distinct())
+            {
+                reserve.AllowedDirections.Add(new ReserveDirection
+                {
+                    DirectionId = directionId
+                });
+            }
+        }
+
         _context.Reserves.Add(reserve);
         await _context.SaveChangesWithOutboxAsync();
 

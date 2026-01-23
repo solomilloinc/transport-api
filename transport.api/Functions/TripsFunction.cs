@@ -84,15 +84,24 @@ public sealed class TripsFunction : FunctionBase
     }
 
     [Function("GetTripById")]
-    [Authorize("Admin")]
-    [OpenApiOperation(operationId: "trip-get", tags: new[] { "Trip" }, Summary = "Get Trip by ID", Description = "Returns a trip with its prices", Visibility = OpenApiVisibilityType.Important)]
+    [Authorize("Admin", "User")]
+    [OpenApiOperation(operationId: "trip-get", tags: new[] { "Trip" }, Summary = "Get Trip by ID", Description = "Returns a trip with its prices. Optionally filter directions by reserveId.", Visibility = OpenApiVisibilityType.Important)]
     [OpenApiParameter("tripId", In = ParameterLocation.Path, Required = true, Type = typeof(int), Description = "Trip ID")]
+    [OpenApiParameter("reserveId", In = ParameterLocation.Query, Required = false, Type = typeof(int), Description = "Optional Reserve ID to filter available directions")]
     [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(TripReportResponseDto), Summary = "Trip Details")]
     public async Task<HttpResponseData> GetTripById(
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "trip/{tripId:int}")] HttpRequestData req,
         int tripId)
     {
-        var result = await _tripBusiness.GetTripById(tripId);
+        // Parse optional reserveId from query string
+        int? reserveId = null;
+        var reserveIdParam = req.Query["reserveId"];
+        if (!string.IsNullOrEmpty(reserveIdParam) && int.TryParse(reserveIdParam, out var parsedReserveId))
+        {
+            reserveId = parsedReserveId;
+        }
+
+        var result = await _tripBusiness.GetTripById(tripId, reserveId);
         return await MatchResultAsync(req, result);
     }
 

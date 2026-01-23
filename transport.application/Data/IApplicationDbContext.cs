@@ -37,6 +37,8 @@ public interface IApplicationDbContext
     DbSet<ReserveSlotLock> ReserveSlotLocks { get; }
     DbSet<CustomerAccountTransaction> CustomerAccountTransactions { get; }
     DbSet<CashBox> CashBoxes { get; }
+    DbSet<ServiceDirection> ServiceDirections { get; }
+    DbSet<ReserveDirection> ReserveDirections { get; }
     DbSet<OutboxMessage> OutboxMessages { get; }
     EntityEntry<TEntity> Entry<TEntity>(TEntity entity) where TEntity : class;
     Task<int> SaveChangesWithOutboxAsync(CancellationToken cancellationToken = default);
