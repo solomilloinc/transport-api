@@ -1011,7 +1011,8 @@ public class ReserveBusiness : IReserveBusiness
                     arrivalTime.ToString(@"hh\:mm"),
                     idaPrice,
                     rp.Vehicle.AvailableQuantity - totalReserved,
-                    rp.Vehicle.InternalNumber
+                    rp.Vehicle.InternalNumber,
+                    rp.TripId
                 );
             })
             .ToList();
@@ -1044,7 +1045,8 @@ public class ReserveBusiness : IReserveBusiness
                         arrivalTime.ToString(@"hh\:mm"),
                         vueltaPrice,
                         rp.Vehicle.AvailableQuantity - totalReserved,
-                        rp.Vehicle.InternalNumber
+                        rp.Vehicle.InternalNumber,
+                        rp.TripId
                     );
                 })
                 .ToList()

@@ -84,7 +84,8 @@ public sealed class TripsFunction : FunctionBase
     }
 
     [Function("GetTripById")]
-    [Authorize("Admin", "User")]
+    //[Authorize("Admin", "User")]
+    [AllowAnonymous]
     [OpenApiOperation(operationId: "trip-get", tags: new[] { "Trip" }, Summary = "Get Trip by ID", Description = "Returns a trip with its prices. Optionally filter directions by reserveId.", Visibility = OpenApiVisibilityType.Important)]
     [OpenApiParameter("tripId", In = ParameterLocation.Path, Required = true, Type = typeof(int), Description = "Trip ID")]
     [OpenApiParameter("reserveId", In = ParameterLocation.Query, Required = false, Type = typeof(int), Description = "Optional Reserve ID to filter available directions")]
