@@ -185,7 +185,11 @@ public class ServiceBusiness : IServiceBusiness
 
         if (dto.Schedules?.Any() == true)
         {
-            _context.ServiceSchedules.RemoveRange(service.Schedules);
+            // Soft delete existing schedules (can't hard delete due to FK from Reserves)
+            foreach (var existingSchedule in service.Schedules)
+            {
+                existingSchedule.Status = EntityStatusEnum.Deleted;
+            }
 
             foreach (var scheduleDto in dto.Schedules)
             {
