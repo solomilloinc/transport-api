@@ -91,10 +91,11 @@ public class ServiceBusiness : IServiceBusiness
     {
         var query = _context.Services
             .AsNoTracking()
-            .AsNoTracking()
             .Include(s => s.Trip.OriginCity)
             .Include(s => s.Trip.DestinationCity)
             .Include(s => s.Vehicle)
+            .Include(s => s.AllowedDirections)
+                .ThenInclude(ad => ad.Direction)
             .AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(requestDto.Filters?.Name))
@@ -126,6 +127,7 @@ public class ServiceBusiness : IServiceBusiness
             selector: s => new ServiceReportResponseDto(
                 s.ServiceId,
                 s.Name,
+                s.TripId,
                 s.Trip.OriginCityId,
                 s.Trip.OriginCity.Name,
                 s.Trip.DestinationCityId,
@@ -146,6 +148,11 @@ public class ServiceBusiness : IServiceBusiness
                     sc.DepartureHour,
                     sc.IsHoliday,
                     sc.Status.ToString()
+                )).ToList(),
+                s.AllowedDirections.Select(ad => new ServiceDirectionResponseDto(
+                    ad.DirectionId,
+                    ad.Direction.Name,
+                    ad.Direction.CityId
                 )).ToList()
             ),
             sortMappings: sortMappings
