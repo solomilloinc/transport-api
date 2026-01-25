@@ -13,7 +13,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE TABLE [City] (
@@ -32,7 +32,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE TABLE [Customer] (
@@ -56,7 +56,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE TABLE [Driver] (
@@ -76,7 +76,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE TABLE [Holiday] (
@@ -94,7 +94,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE TABLE [OutboxMessage] (
@@ -112,7 +112,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE TABLE [Role] (
@@ -129,7 +129,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE TABLE [VehicleType] (
@@ -149,7 +149,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE TABLE [Direction] (
@@ -171,30 +171,29 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
-    CREATE TABLE [ReservePrice] (
-        [ReservePriceId] int NOT NULL IDENTITY,
-        [OriginId] int NOT NULL,
-        [DestinationId] int NOT NULL,
-        [Price] decimal(10,2) NOT NULL,
-        [ReserveTypeId] int NOT NULL,
-        [Status] int NOT NULL,
+    CREATE TABLE [Trip] (
+        [TripId] int NOT NULL IDENTITY,
+        [Description] nvarchar(200) NOT NULL,
+        [OriginCityId] int NOT NULL,
+        [DestinationCityId] int NOT NULL,
+        [Status] nvarchar(max) NOT NULL,
         [CreatedBy] VARCHAR(256) NOT NULL DEFAULT 'System',
         [UpdatedBy] VARCHAR(256) NULL,
         [CreatedDate] datetime2 NOT NULL DEFAULT (GETDATE()),
         [UpdatedDate] datetime2 NULL,
-        CONSTRAINT [PK_ReservePrice] PRIMARY KEY ([ReservePriceId]),
-        CONSTRAINT [FK_ReservePrice_City_DestinationId] FOREIGN KEY ([DestinationId]) REFERENCES [City] ([CityId]) ON DELETE NO ACTION,
-        CONSTRAINT [FK_ReservePrice_City_OriginId] FOREIGN KEY ([OriginId]) REFERENCES [City] ([CityId]) ON DELETE NO ACTION
+        CONSTRAINT [PK_Trip] PRIMARY KEY ([TripId]),
+        CONSTRAINT [FK_Trip_City_DestinationCityId] FOREIGN KEY ([DestinationCityId]) REFERENCES [City] ([CityId]) ON DELETE NO ACTION,
+        CONSTRAINT [FK_Trip_City_OriginCityId] FOREIGN KEY ([OriginCityId]) REFERENCES [City] ([CityId]) ON DELETE NO ACTION
     );
 END;
 GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE TABLE [User] (
@@ -213,7 +212,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE TABLE [Vehicle] (
@@ -234,7 +233,33 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
+)
+BEGIN
+    CREATE TABLE [TripPrice] (
+        [TripPriceId] int NOT NULL IDENTITY,
+        [TripId] int NOT NULL,
+        [CityId] int NOT NULL,
+        [DirectionId] int NULL,
+        [ReserveTypeId] nvarchar(450) NOT NULL,
+        [Price] decimal(18,2) NOT NULL,
+        [Order] int NOT NULL,
+        [Status] nvarchar(max) NOT NULL,
+        [CreatedBy] VARCHAR(256) NOT NULL DEFAULT 'System',
+        [UpdatedBy] VARCHAR(256) NULL,
+        [CreatedDate] datetime2 NOT NULL DEFAULT (GETDATE()),
+        [UpdatedDate] datetime2 NULL,
+        CONSTRAINT [PK_TripPrice] PRIMARY KEY ([TripPriceId]),
+        CONSTRAINT [FK_TripPrice_City_CityId] FOREIGN KEY ([CityId]) REFERENCES [City] ([CityId]) ON DELETE NO ACTION,
+        CONSTRAINT [FK_TripPrice_Direction_DirectionId] FOREIGN KEY ([DirectionId]) REFERENCES [Direction] ([DirectionId]) ON DELETE NO ACTION,
+        CONSTRAINT [FK_TripPrice_Trip_TripId] FOREIGN KEY ([TripId]) REFERENCES [Trip] ([TripId]) ON DELETE CASCADE
+    );
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE TABLE [RefreshToken] (
@@ -259,12 +284,13 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE TABLE [Service] (
         [ServiceId] int NOT NULL IDENTITY,
         [Name] nvarchar(250) NOT NULL,
+        [TripId] int NOT NULL,
         [OriginId] int NOT NULL,
         [DestinationId] int NOT NULL,
         [EstimatedDuration] time NOT NULL,
@@ -279,6 +305,7 @@ BEGIN
         CONSTRAINT [PK_Service] PRIMARY KEY ([ServiceId]),
         CONSTRAINT [FK_Service_City_DestinationId] FOREIGN KEY ([DestinationId]) REFERENCES [City] ([CityId]) ON DELETE NO ACTION,
         CONSTRAINT [FK_Service_City_OriginId] FOREIGN KEY ([OriginId]) REFERENCES [City] ([CityId]) ON DELETE NO ACTION,
+        CONSTRAINT [FK_Service_Trip_TripId] FOREIGN KEY ([TripId]) REFERENCES [Trip] ([TripId]) ON DELETE NO ACTION,
         CONSTRAINT [FK_Service_Vehicle_VehicleId] FOREIGN KEY ([VehicleId]) REFERENCES [Vehicle] ([VehicleId]) ON DELETE CASCADE
     );
 END;
@@ -286,7 +313,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE TABLE [ServiceCustomer] (
@@ -306,7 +333,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE TABLE [ServiceSchedule] (
@@ -327,7 +354,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE TABLE [Reserve] (
@@ -337,6 +364,7 @@ BEGIN
         [DriverId] int NULL,
         [ServiceId] int NULL,
         [ServiceScheduleId] int NULL,
+        [TripId] int NOT NULL,
         [OriginId] int NOT NULL,
         [DestinationId] int NOT NULL,
         [Status] VARCHAR(20) NOT NULL,
@@ -357,6 +385,7 @@ BEGIN
         CONSTRAINT [FK_Reserve_Driver_DriverId] FOREIGN KEY ([DriverId]) REFERENCES [Driver] ([DriverId]) ON DELETE SET NULL,
         CONSTRAINT [FK_Reserve_ServiceSchedule_ServiceScheduleId] FOREIGN KEY ([ServiceScheduleId]) REFERENCES [ServiceSchedule] ([ServiceScheduleId]) ON DELETE NO ACTION,
         CONSTRAINT [FK_Reserve_Service_ServiceId] FOREIGN KEY ([ServiceId]) REFERENCES [Service] ([ServiceId]) ON DELETE NO ACTION,
+        CONSTRAINT [FK_Reserve_Trip_TripId] FOREIGN KEY ([TripId]) REFERENCES [Trip] ([TripId]) ON DELETE NO ACTION,
         CONSTRAINT [FK_Reserve_Vehicle_VehicleId] FOREIGN KEY ([VehicleId]) REFERENCES [Vehicle] ([VehicleId]) ON DELETE NO ACTION
     );
 END;
@@ -364,7 +393,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE TABLE [CashBox] (
@@ -390,7 +419,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE TABLE [Passenger] (
@@ -430,7 +459,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE TABLE [ReserveSlotLock] (
@@ -459,7 +488,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE TABLE [ReservePayment] (
@@ -492,7 +521,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE TABLE [CustomerAccountTransactions] (
@@ -518,14 +547,14 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     IF EXISTS (SELECT * FROM [sys].[identity_columns] WHERE [name] IN (N'RoleId', N'CreatedBy', N'CreatedDate', N'Name', N'UpdatedBy', N'UpdatedDate') AND [object_id] = OBJECT_ID(N'[Role]'))
         SET IDENTITY_INSERT [Role] ON;
     EXEC(N'INSERT INTO [Role] ([RoleId], [CreatedBy], [CreatedDate], [Name], [UpdatedBy], [UpdatedDate])
-    VALUES (1, ''System'', ''2026-01-16T00:46:46.0539484Z'', N''Administrador'', NULL, NULL),
-    (2, ''System'', ''2026-01-16T00:46:46.0539486Z'', N''Cliente'', NULL, NULL)');
+    VALUES (1, ''System'', ''2026-01-19T22:28:02.1829444Z'', N''Administrador'', NULL, NULL),
+    (2, ''System'', ''2026-01-19T22:28:02.1829448Z'', N''Cliente'', NULL, NULL)');
     IF EXISTS (SELECT * FROM [sys].[identity_columns] WHERE [name] IN (N'RoleId', N'CreatedBy', N'CreatedDate', N'Name', N'UpdatedBy', N'UpdatedDate') AND [object_id] = OBJECT_ID(N'[Role]'))
         SET IDENTITY_INSERT [Role] OFF;
 END;
@@ -533,7 +562,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE INDEX [IX_CashBox_ClosedByUserId] ON [CashBox] ([ClosedByUserId]);
@@ -542,7 +571,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE INDEX [IX_CashBox_OpenedAt] ON [CashBox] ([OpenedAt]);
@@ -551,7 +580,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE INDEX [IX_CashBox_OpenedByUserId] ON [CashBox] ([OpenedByUserId]);
@@ -560,7 +589,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE INDEX [IX_CashBox_ReserveId] ON [CashBox] ([ReserveId]);
@@ -569,7 +598,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE INDEX [IX_CashBox_Status] ON [CashBox] ([Status]);
@@ -578,7 +607,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE INDEX [IX_CashBox_Status_OpenedAt] ON [CashBox] ([Status], [OpenedAt]);
@@ -587,7 +616,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE UNIQUE INDEX [IX_City_Code] ON [City] ([Code]);
@@ -596,7 +625,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE UNIQUE INDEX [IX_Customer_DocumentNumber] ON [Customer] ([DocumentNumber]);
@@ -605,7 +634,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE UNIQUE INDEX [IX_Customer_Email] ON [Customer] ([Email]);
@@ -614,7 +643,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE INDEX [IX_CustomerAccountTransactions_CustomerId] ON [CustomerAccountTransactions] ([CustomerId]);
@@ -623,7 +652,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE INDEX [IX_CustomerAccountTransactions_Date] ON [CustomerAccountTransactions] ([Date]);
@@ -632,7 +661,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE INDEX [IX_CustomerAccountTransactions_RelatedReserveId] ON [CustomerAccountTransactions] ([RelatedReserveId]);
@@ -641,7 +670,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE INDEX [IX_CustomerAccountTransactions_ReservePaymentId] ON [CustomerAccountTransactions] ([ReservePaymentId]);
@@ -650,7 +679,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE INDEX [IX_CustomerAccountTransactions_Type] ON [CustomerAccountTransactions] ([Type]);
@@ -659,7 +688,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE INDEX [IX_Direction_CityId] ON [Direction] ([CityId]);
@@ -668,7 +697,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE UNIQUE INDEX [IX_Driver_DocumentNumber] ON [Driver] ([DocumentNumber]);
@@ -677,7 +706,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE UNIQUE INDEX [IX_Holiday_HolidayDate] ON [Holiday] ([HolidayDate]);
@@ -686,7 +715,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE INDEX [IX_Passenger_CustomerId] ON [Passenger] ([CustomerId]);
@@ -695,7 +724,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE INDEX [IX_Passenger_DirectionId] ON [Passenger] ([DirectionId]);
@@ -704,7 +733,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE INDEX [IX_Passenger_DirectionId1] ON [Passenger] ([DirectionId1]);
@@ -713,7 +742,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE INDEX [IX_Passenger_DropoffLocationId] ON [Passenger] ([DropoffLocationId]);
@@ -722,7 +751,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE INDEX [IX_Passenger_PickupLocationId] ON [Passenger] ([PickupLocationId]);
@@ -731,7 +760,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE INDEX [IX_Passenger_ReserveId] ON [Passenger] ([ReserveId]);
@@ -740,7 +769,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE UNIQUE INDEX [IX_Passenger_ReserveId_DocumentNumber] ON [Passenger] ([ReserveId], [DocumentNumber]);
@@ -749,7 +778,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE INDEX [IX_Passenger_ReserveRelatedId] ON [Passenger] ([ReserveRelatedId]);
@@ -758,7 +787,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE INDEX [IX_Passenger_Status] ON [Passenger] ([Status]);
@@ -767,7 +796,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE INDEX [IX_RefreshToken_UserId] ON [RefreshToken] ([UserId]);
@@ -776,7 +805,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE INDEX [IX_Reserve_DestinationId] ON [Reserve] ([DestinationId]);
@@ -785,7 +814,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE INDEX [IX_Reserve_DriverId] ON [Reserve] ([DriverId]);
@@ -794,7 +823,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE INDEX [IX_Reserve_OriginId_DestinationId_ReserveDate] ON [Reserve] ([OriginId], [DestinationId], [ReserveDate]);
@@ -803,7 +832,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE INDEX [IX_Reserve_ServiceId_ReserveDate] ON [Reserve] ([ServiceId], [ReserveDate]);
@@ -812,7 +841,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE INDEX [IX_Reserve_ServiceScheduleId] ON [Reserve] ([ServiceScheduleId]);
@@ -821,7 +850,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE INDEX [IX_Reserve_Status_ReserveDate] ON [Reserve] ([Status], [ReserveDate]);
@@ -830,7 +859,16 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
+)
+BEGIN
+    CREATE INDEX [IX_Reserve_TripId_ReserveDate] ON [Reserve] ([TripId], [ReserveDate]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE INDEX [IX_Reserve_VehicleId] ON [Reserve] ([VehicleId]);
@@ -839,7 +877,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE INDEX [IX_ReservePayment_CashBoxId] ON [ReservePayment] ([CashBoxId]);
@@ -848,7 +886,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE INDEX [IX_ReservePayment_CustomerId] ON [ReservePayment] ([CustomerId]);
@@ -857,7 +895,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE INDEX [IX_ReservePayment_ParentReservePaymentId] ON [ReservePayment] ([ParentReservePaymentId]);
@@ -866,7 +904,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE INDEX [IX_ReservePayment_PaymentExternalId] ON [ReservePayment] ([PaymentExternalId]);
@@ -875,7 +913,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE INDEX [IX_ReservePayment_ReserveId] ON [ReservePayment] ([ReserveId]);
@@ -884,7 +922,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE INDEX [IX_ReservePayment_Status] ON [ReservePayment] ([Status]);
@@ -893,25 +931,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
-)
-BEGIN
-    CREATE INDEX [IX_ReservePrice_DestinationId] ON [ReservePrice] ([DestinationId]);
-END;
-GO
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
-)
-BEGIN
-    EXEC(N'CREATE UNIQUE INDEX [IX_ReservePrice_OriginId_DestinationId_ReserveTypeId] ON [ReservePrice] ([OriginId], [DestinationId], [ReserveTypeId]) WHERE [Status] = 1');
-END;
-GO
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE INDEX [IX_ReserveSlotLock_CreatedDate] ON [ReserveSlotLock] ([CreatedDate]);
@@ -920,7 +940,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE INDEX [IX_ReserveSlotLock_CustomerId] ON [ReserveSlotLock] ([CustomerId]);
@@ -929,7 +949,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE UNIQUE INDEX [IX_ReserveSlotLock_LockToken] ON [ReserveSlotLock] ([LockToken]);
@@ -938,7 +958,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE INDEX [IX_ReserveSlotLock_OutboundReserveId] ON [ReserveSlotLock] ([OutboundReserveId]);
@@ -947,7 +967,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE INDEX [IX_ReserveSlotLock_ReturnReserveId] ON [ReserveSlotLock] ([ReturnReserveId]);
@@ -956,7 +976,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE INDEX [IX_ReserveSlotLock_Status_ExpiresAt] ON [ReserveSlotLock] ([Status], [ExpiresAt]);
@@ -965,7 +985,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE INDEX [IX_Service_DestinationId] ON [Service] ([DestinationId]);
@@ -974,7 +994,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE INDEX [IX_Service_OriginId] ON [Service] ([OriginId]);
@@ -983,7 +1003,16 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
+)
+BEGIN
+    CREATE INDEX [IX_Service_TripId] ON [Service] ([TripId]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE INDEX [IX_Service_VehicleId] ON [Service] ([VehicleId]);
@@ -992,7 +1021,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE INDEX [IX_ServiceCustomer_CustomerId] ON [ServiceCustomer] ([CustomerId]);
@@ -1001,7 +1030,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE INDEX [IX_ServiceCustomer_ServiceId] ON [ServiceCustomer] ([ServiceId]);
@@ -1010,7 +1039,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE INDEX [IX_ServiceSchedule_ServiceId] ON [ServiceSchedule] ([ServiceId]);
@@ -1019,7 +1048,52 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
+)
+BEGIN
+    CREATE INDEX [IX_Trip_DestinationCityId] ON [Trip] ([DestinationCityId]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
+)
+BEGIN
+    EXEC(N'CREATE UNIQUE INDEX [IX_Trip_OriginCityId_DestinationCityId] ON [Trip] ([OriginCityId], [DestinationCityId]) WHERE [Status] = ''Active''');
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
+)
+BEGIN
+    CREATE INDEX [IX_TripPrice_CityId] ON [TripPrice] ([CityId]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
+)
+BEGIN
+    CREATE INDEX [IX_TripPrice_DirectionId] ON [TripPrice] ([DirectionId]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
+)
+BEGIN
+    EXEC(N'CREATE UNIQUE INDEX [IX_TripPrice_TripId_CityId_DirectionId_ReserveTypeId] ON [TripPrice] ([TripId], [CityId], [DirectionId], [ReserveTypeId]) WHERE [Status] = ''Active''');
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     EXEC(N'CREATE UNIQUE INDEX [IX_User_CustomerId] ON [User] ([CustomerId]) WHERE [CustomerId] IS NOT NULL');
@@ -1028,7 +1102,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE INDEX [IX_User_RoleId] ON [User] ([RoleId]);
@@ -1037,7 +1111,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE INDEX [IX_Vehicle_VehicleTypeId] ON [Vehicle] ([VehicleTypeId]);
@@ -1046,7 +1120,7 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     CREATE UNIQUE INDEX [IX_VehicleType_Name] ON [VehicleType] ([Name]);
@@ -1055,11 +1129,295 @@ GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260116004646_InitialCreate'
+    WHERE [MigrationId] = N'20260119222802_InitialCreate'
 )
 BEGIN
     INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
-    VALUES (N'20260116004646_InitialCreate', N'8.0.14');
+    VALUES (N'20260119222802_InitialCreate', N'8.0.14');
+END;
+GO
+
+COMMIT;
+GO
+
+BEGIN TRANSACTION;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260123202229_AddDirectionsInReserveAndService'
+)
+BEGIN
+    CREATE TABLE [ReserveDirection] (
+        [ReserveDirectionId] int NOT NULL IDENTITY,
+        [ReserveId] int NOT NULL,
+        [DirectionId] int NOT NULL,
+        [CreatedBy] VARCHAR(256) NOT NULL DEFAULT 'System',
+        [UpdatedBy] VARCHAR(256) NULL,
+        [CreatedDate] datetime2 NOT NULL DEFAULT (GETDATE()),
+        [UpdatedDate] datetime2 NULL,
+        CONSTRAINT [PK_ReserveDirection] PRIMARY KEY ([ReserveDirectionId]),
+        CONSTRAINT [FK_ReserveDirection_Direction_DirectionId] FOREIGN KEY ([DirectionId]) REFERENCES [Direction] ([DirectionId]) ON DELETE NO ACTION,
+        CONSTRAINT [FK_ReserveDirection_Reserve_ReserveId] FOREIGN KEY ([ReserveId]) REFERENCES [Reserve] ([ReserveId]) ON DELETE CASCADE
+    );
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260123202229_AddDirectionsInReserveAndService'
+)
+BEGIN
+    CREATE TABLE [ServiceDirection] (
+        [ServiceDirectionId] int NOT NULL IDENTITY,
+        [ServiceId] int NOT NULL,
+        [DirectionId] int NOT NULL,
+        [CreatedBy] VARCHAR(256) NOT NULL DEFAULT 'System',
+        [UpdatedBy] VARCHAR(256) NULL,
+        [CreatedDate] datetime2 NOT NULL DEFAULT (GETDATE()),
+        [UpdatedDate] datetime2 NULL,
+        CONSTRAINT [PK_ServiceDirection] PRIMARY KEY ([ServiceDirectionId]),
+        CONSTRAINT [FK_ServiceDirection_Direction_DirectionId] FOREIGN KEY ([DirectionId]) REFERENCES [Direction] ([DirectionId]) ON DELETE NO ACTION,
+        CONSTRAINT [FK_ServiceDirection_Service_ServiceId] FOREIGN KEY ([ServiceId]) REFERENCES [Service] ([ServiceId]) ON DELETE CASCADE
+    );
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260123202229_AddDirectionsInReserveAndService'
+)
+BEGIN
+    EXEC(N'UPDATE [Role] SET [CreatedDate] = ''2026-01-23T20:22:29.3484391Z''
+    WHERE [RoleId] = 1;
+    SELECT @@ROWCOUNT');
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260123202229_AddDirectionsInReserveAndService'
+)
+BEGIN
+    EXEC(N'UPDATE [Role] SET [CreatedDate] = ''2026-01-23T20:22:29.3484393Z''
+    WHERE [RoleId] = 2;
+    SELECT @@ROWCOUNT');
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260123202229_AddDirectionsInReserveAndService'
+)
+BEGIN
+    CREATE INDEX [IX_ReserveDirection_DirectionId] ON [ReserveDirection] ([DirectionId]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260123202229_AddDirectionsInReserveAndService'
+)
+BEGIN
+    CREATE UNIQUE INDEX [IX_ReserveDirection_ReserveId_DirectionId] ON [ReserveDirection] ([ReserveId], [DirectionId]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260123202229_AddDirectionsInReserveAndService'
+)
+BEGIN
+    CREATE INDEX [IX_ServiceDirection_DirectionId] ON [ServiceDirection] ([DirectionId]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260123202229_AddDirectionsInReserveAndService'
+)
+BEGIN
+    CREATE UNIQUE INDEX [IX_ServiceDirection_ServiceId_DirectionId] ON [ServiceDirection] ([ServiceId], [DirectionId]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260123202229_AddDirectionsInReserveAndService'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20260123202229_AddDirectionsInReserveAndService', N'8.0.14');
+END;
+GO
+
+COMMIT;
+GO
+
+BEGIN TRANSACTION;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260123221228_DeleteOriginIdAndDestionationServiceAndReserve'
+)
+BEGIN
+    ALTER TABLE [Reserve] DROP CONSTRAINT [FK_Reserve_City_DestinationId];
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260123221228_DeleteOriginIdAndDestionationServiceAndReserve'
+)
+BEGIN
+    ALTER TABLE [Reserve] DROP CONSTRAINT [FK_Reserve_City_OriginId];
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260123221228_DeleteOriginIdAndDestionationServiceAndReserve'
+)
+BEGIN
+    ALTER TABLE [Service] DROP CONSTRAINT [FK_Service_City_DestinationId];
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260123221228_DeleteOriginIdAndDestionationServiceAndReserve'
+)
+BEGIN
+    ALTER TABLE [Service] DROP CONSTRAINT [FK_Service_City_OriginId];
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260123221228_DeleteOriginIdAndDestionationServiceAndReserve'
+)
+BEGIN
+    DROP INDEX [IX_Service_DestinationId] ON [Service];
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260123221228_DeleteOriginIdAndDestionationServiceAndReserve'
+)
+BEGIN
+    DROP INDEX [IX_Service_OriginId] ON [Service];
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260123221228_DeleteOriginIdAndDestionationServiceAndReserve'
+)
+BEGIN
+    DROP INDEX [IX_Reserve_DestinationId] ON [Reserve];
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260123221228_DeleteOriginIdAndDestionationServiceAndReserve'
+)
+BEGIN
+    DROP INDEX [IX_Reserve_OriginId_DestinationId_ReserveDate] ON [Reserve];
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260123221228_DeleteOriginIdAndDestionationServiceAndReserve'
+)
+BEGIN
+    DECLARE @var0 sysname;
+    SELECT @var0 = [d].[name]
+    FROM [sys].[default_constraints] [d]
+    INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
+    WHERE ([d].[parent_object_id] = OBJECT_ID(N'[Service]') AND [c].[name] = N'DestinationId');
+    IF @var0 IS NOT NULL EXEC(N'ALTER TABLE [Service] DROP CONSTRAINT [' + @var0 + '];');
+    ALTER TABLE [Service] DROP COLUMN [DestinationId];
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260123221228_DeleteOriginIdAndDestionationServiceAndReserve'
+)
+BEGIN
+    DECLARE @var1 sysname;
+    SELECT @var1 = [d].[name]
+    FROM [sys].[default_constraints] [d]
+    INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
+    WHERE ([d].[parent_object_id] = OBJECT_ID(N'[Service]') AND [c].[name] = N'OriginId');
+    IF @var1 IS NOT NULL EXEC(N'ALTER TABLE [Service] DROP CONSTRAINT [' + @var1 + '];');
+    ALTER TABLE [Service] DROP COLUMN [OriginId];
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260123221228_DeleteOriginIdAndDestionationServiceAndReserve'
+)
+BEGIN
+    DECLARE @var2 sysname;
+    SELECT @var2 = [d].[name]
+    FROM [sys].[default_constraints] [d]
+    INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
+    WHERE ([d].[parent_object_id] = OBJECT_ID(N'[Reserve]') AND [c].[name] = N'DestinationId');
+    IF @var2 IS NOT NULL EXEC(N'ALTER TABLE [Reserve] DROP CONSTRAINT [' + @var2 + '];');
+    ALTER TABLE [Reserve] DROP COLUMN [DestinationId];
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260123221228_DeleteOriginIdAndDestionationServiceAndReserve'
+)
+BEGIN
+    DECLARE @var3 sysname;
+    SELECT @var3 = [d].[name]
+    FROM [sys].[default_constraints] [d]
+    INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
+    WHERE ([d].[parent_object_id] = OBJECT_ID(N'[Reserve]') AND [c].[name] = N'OriginId');
+    IF @var3 IS NOT NULL EXEC(N'ALTER TABLE [Reserve] DROP CONSTRAINT [' + @var3 + '];');
+    ALTER TABLE [Reserve] DROP COLUMN [OriginId];
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260123221228_DeleteOriginIdAndDestionationServiceAndReserve'
+)
+BEGIN
+    EXEC(N'UPDATE [Role] SET [CreatedDate] = ''2026-01-23T22:12:27.8790375Z''
+    WHERE [RoleId] = 1;
+    SELECT @@ROWCOUNT');
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260123221228_DeleteOriginIdAndDestionationServiceAndReserve'
+)
+BEGIN
+    EXEC(N'UPDATE [Role] SET [CreatedDate] = ''2026-01-23T22:12:27.8790378Z''
+    WHERE [RoleId] = 2;
+    SELECT @@ROWCOUNT');
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260123221228_DeleteOriginIdAndDestionationServiceAndReserve'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20260123221228_DeleteOriginIdAndDestionationServiceAndReserve', N'8.0.14');
 END;
 GO
 
