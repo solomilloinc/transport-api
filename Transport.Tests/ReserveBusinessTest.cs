@@ -27,6 +27,7 @@ using Transport.Domain.CashBoxes;
 using Transport.Domain.CashBoxes.Abstraction;
 using Transport.Domain.Customers.Abstraction;
 using Transport.Domain.Passengers;
+using Transport.Domain.Trips;
 using Transport.SharedKernel.Contracts.Passenger;
 using Transport.SharedKernel.Configuration;
 
@@ -150,6 +151,15 @@ public class ReserveBusinessTests : TestBase
     public async Task CreatePassengerReserves_Payments_ParentChildLogic_Works(int reserveCount, int paymentCount)
     {
         // Arrange
+        var trip = new Trip
+        {
+            TripId = 1,
+            OriginCityId = 1,
+            DestinationCityId = 2,
+            OriginCity = new City { CityId = 1, Name = "CityA" },
+            DestinationCity = new City { CityId = 2, Name = "CityB" }
+        };
+
         var reservesList = Enumerable.Range(1, reserveCount).Select(i => new Reserve
         {
             ReserveId = i,
@@ -157,6 +167,8 @@ public class ReserveBusinessTests : TestBase
             Passengers = new List<Passenger>(),
             VehicleId = 1,
             ServiceId = 1,
+            TripId = 1,
+            Trip = trip,
             Driver = new Driver { FirstName = "John", LastName = "Doe" }
         }).ToList();
 
@@ -164,10 +176,10 @@ public class ReserveBusinessTests : TestBase
         var service = new Service
         {
             ServiceId = 1,
-            ReservePrices = new List<ReservePrice> { new ReservePrice { ReserveTypeId = ReserveTypeIdEnum.IdaVuelta, Price = 100 } },
-            Origin = new City { Name = "CityA" },
-            Destination = new City { Name = "CityB" }
+            Trip = trip
         };
+        var trips = new List<Trip> { new Trip { TripId = 1, OriginCityId = 1, DestinationCityId = 2, Status = EntityStatusEnum.Active, Prices = new List<TripPrice> { new TripPrice { ReserveTypeId = ReserveTypeIdEnum.IdaVuelta, Price = 100, Status = EntityStatusEnum.Active } } } };
+
 
         var customer = new Customer
         {
@@ -202,6 +214,7 @@ public class ReserveBusinessTests : TestBase
         _contextMock.Setup(c => c.Directions.FindAsync(It.IsAny<int>())).ReturnsAsync(origin);
         _contextMock.Setup(c => c.Passengers).Returns(GetMockDbSetWithIdentity(passengers).Object);
         _contextMock.Setup(c => c.Users).Returns(GetQueryableMockDbSet(users).Object);
+        _contextMock.Setup(c => c.Trips).Returns(GetQueryableMockDbSet(trips).Object);
 
         _contextMock.Setup(c => c.Customers.Update(It.IsAny<Customer>())).Callback<Customer>(c =>
         {
@@ -302,6 +315,15 @@ public class ReserveBusinessTests : TestBase
     public async Task CreatePassengerReservesExternal_IdaYVuelta_CreatesParentAndChildPayments()
     {
         // Arrange
+        var trip = new Trip
+        {
+            TripId = 1,
+            OriginCityId = 1,
+            DestinationCityId = 2,
+            OriginCity = new City { CityId = 1, Name = "Córdoba" },
+            DestinationCity = new City { CityId = 2, Name = "Rosario" }
+        };
+
         var reserve1 = new Reserve
         {
             ReserveId = 1,
@@ -309,6 +331,8 @@ public class ReserveBusinessTests : TestBase
             Passengers = new List<Passenger>(),
             VehicleId = 1,
             ServiceId = 1,
+            TripId = 1,
+            Trip = trip,
             Driver = new Driver { FirstName = "Mario", LastName = "Bros" }
         };
         var reserve2 = new Reserve
@@ -317,19 +341,22 @@ public class ReserveBusinessTests : TestBase
             Status = ReserveStatusEnum.Confirmed,
             Passengers = new List<Passenger>(),
             VehicleId = 1,
-            ServiceId = 1
+            ServiceId = 1,
+            TripId = 1,
+            Trip = trip
         };
         var vehicle = new Vehicle { VehicleId = 1, AvailableQuantity = 10 };
         var service = new Service
         {
             ServiceId = 1,
-            ReservePrices = new List<ReservePrice>
+            Trip = trip
+        };
+        var trips = new List<Trip>
         {
-            new ReservePrice { ReserveTypeId = ReserveTypeIdEnum.Ida, Price = 100 },
-            new ReservePrice { ReserveTypeId = ReserveTypeIdEnum.IdaVuelta, Price = 100 }
-        },
-            Origin = new City { Name = "Córdoba" },
-            Destination = new City { Name = "Rosario" }
+            new Trip { TripId = 1, OriginCityId = 1, DestinationCityId = 2, Status = EntityStatusEnum.Active, Prices = new List<TripPrice> {
+                new TripPrice { ReserveTypeId = ReserveTypeIdEnum.Ida, Price = 100, Status = EntityStatusEnum.Active },
+                new TripPrice { ReserveTypeId = ReserveTypeIdEnum.IdaVuelta, Price = 100, Status = EntityStatusEnum.Active }
+            }}
         };
         var origin = new Direction { DirectionId = 1, Name = "Pickup" };
         var destination = new Direction { DirectionId = 2, Name = "Dropoff" };
@@ -354,6 +381,7 @@ public class ReserveBusinessTests : TestBase
         _contextMock.Setup(c => c.Passengers).Returns(GetMockDbSetWithIdentity(passengers).Object);
         _contextMock.Setup(c => c.Reserves).Returns(GetMockDbSetWithIdentity(reservesList).Object);
         _contextMock.Setup(c => c.Customers).Returns(GetMockDbSetWithIdentity(new List<Customer> { customer }).Object);
+        _contextMock.Setup(c => c.Trips).Returns(GetQueryableMockDbSet(trips).Object);
 
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
@@ -646,10 +674,16 @@ public class ReserveBusinessTests : TestBase
         // Arrange
         var paymentsDb = new List<ReservePayment>();
         var passengers = new List<Passenger> { new Passenger { PassengerId = 1, ReserveId = 1, CustomerId = 1, Price = 100, Status = PassengerStatusEnum.PendingPayment } };
-        var reserve = new Reserve { ReserveId = 1, ServiceId = 1, Passengers = passengers, ReserveDate = DateTime.Today, DepartureHour = TimeSpan.FromHours(9) };
+        var reserve = new Reserve { ReserveId = 1, ServiceId = 1, Passengers = passengers, ReserveDate = DateTime.Today, DepartureHour = TimeSpan.FromHours(9), TripId = 1 };
         var reserves = new List<Reserve> { reserve };
         var customer = new Customer { CustomerId = 1, DocumentNumber = "12345678", FirstName = "Test", LastName = "User", Email = "test@test.com" };
-        var service = new Service { ServiceId = 1, ReservePrices = new List<ReservePrice> { new ReservePrice { ReserveTypeId = ReserveTypeIdEnum.Ida, Price = 100 } } };
+        var service = new Service { ServiceId = 1 };
+        var trips = new List<Trip>
+        {
+            new Trip { TripId = 1, OriginCityId = 1, DestinationCityId = 2, Status = EntityStatusEnum.Active, Prices = new List<TripPrice> {
+                new TripPrice { ReserveTypeId = ReserveTypeIdEnum.Ida, Price = 100, Status = EntityStatusEnum.Active }
+            }}
+        };
 
         var customers = new List<Customer> { customer };
         _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(reserves).Object);
@@ -657,6 +691,7 @@ public class ReserveBusinessTests : TestBase
         _contextMock.Setup(c => c.Customers).Returns(GetQueryableMockDbSet(customers).Object);
         _contextMock.Setup(c => c.Customers.FindAsync(1)).ReturnsAsync(customer);
         _contextMock.Setup(c => c.Services).Returns(GetQueryableMockDbSet(new List<Service> { service }).Object);
+        _contextMock.Setup(c => c.Trips).Returns(GetQueryableMockDbSet(trips).Object);
 
         var customerAccountTransactions = new List<CustomerAccountTransaction>();
         var reservePaymentsDbSet = GetMockDbSetWithIdentity(paymentsDb);
@@ -720,7 +755,9 @@ public class ReserveBusinessTests : TestBase
         {
             ReserveId = reserveId,
             ServiceId = 1,
-            Passengers = passengers
+            Passengers = passengers,
+
+            TripId = 1
         };
         var reserves = new List<Reserve> { reserve };
 
@@ -728,15 +765,13 @@ public class ReserveBusinessTests : TestBase
 
         var service = new Service
         {
-            ServiceId = 1,
-            ReservePrices = new List<ReservePrice>
+            ServiceId = 1
+        };
+        var trips = new List<Trip>
         {
-            new ReservePrice
-            {
-                ReserveTypeId = ReserveTypeIdEnum.Ida,
-                Price = 5000m
-            }
-        }
+            new Trip { TripId = 1, OriginCityId = 1, DestinationCityId = 2, Status = EntityStatusEnum.Active, Prices = new List<TripPrice> {
+                new TripPrice { ReserveTypeId = ReserveTypeIdEnum.Ida, Price = 5000m, Status = EntityStatusEnum.Active }
+            }}
         };
 
         var payments = new List<CreatePaymentRequestDto>
@@ -752,6 +787,7 @@ public class ReserveBusinessTests : TestBase
             .ReturnsAsync(customer);
         _contextMock.Setup(c => c.Services)
             .Returns(GetMockDbSetWithIdentity(new List<Service> { service }).Object);
+        _contextMock.Setup(c => c.Trips).Returns(GetQueryableMockDbSet(trips).Object);
 
         _unitOfWorkMock
     .Setup(uow => uow.ExecuteInTransactionAsync<bool>(
@@ -775,6 +811,7 @@ public class ReserveBusinessTests : TestBase
     public async Task LockReserveSlots_ShouldSucceed_WhenValidRequest()
     {
         // Arrange
+        var vehicle = new Vehicle { AvailableQuantity = 10 };
         var reserves = new List<Reserve>
         {
             new Reserve
@@ -782,7 +819,8 @@ public class ReserveBusinessTests : TestBase
                 ReserveId = 1,
                 Status = ReserveStatusEnum.Confirmed,
                 Passengers = new List<Passenger>(),
-                Service = new Service { Vehicle = new Vehicle { AvailableQuantity = 10 } }
+                Vehicle = vehicle,
+                Service = new Service { Vehicle = vehicle }
             }
         };
 
@@ -824,6 +862,7 @@ public class ReserveBusinessTests : TestBase
     public async Task LockReserveSlots_ShouldFail_WhenInsufficientSlots()
     {
         // Arrange - Reserva con pocos cupos disponibles
+        var vehicle = new Vehicle { AvailableQuantity = 10 };
         var reserves = new List<Reserve>
         {
             new Reserve
@@ -843,7 +882,8 @@ public class ReserveBusinessTests : TestBase
                     new Passenger { Status = PassengerStatusEnum.Confirmed },
                     new Passenger { Status = PassengerStatusEnum.Confirmed }
                 }, // 10 pasajeros confirmados
-                Service = new Service { Vehicle = new Vehicle { AvailableQuantity = 10 } } // Solo 10 cupos en total
+                Vehicle = vehicle,
+                Service = new Service { Vehicle = vehicle } // Solo 10 cupos en total
             }
         };
 
@@ -924,6 +964,15 @@ public class ReserveBusinessTests : TestBase
     {
         // Arrange
         var lockToken = Guid.NewGuid().ToString();
+        var trip = new Trip
+        {
+            TripId = 1,
+            OriginCityId = 1,
+            DestinationCityId = 2,
+            OriginCity = new City { CityId = 1, Name = "Origin" },
+            DestinationCity = new City { CityId = 2, Name = "Destination" }
+        };
+
         var reserves = new List<Reserve>
         {
             new Reserve
@@ -932,7 +981,9 @@ public class ReserveBusinessTests : TestBase
                 Status = ReserveStatusEnum.Confirmed,
                 Passengers = new List<Passenger>(),
                 VehicleId = 1,
-                ServiceId = 1
+                ServiceId = 1,
+                TripId = 1,
+                Trip = trip
             }
         };
 
@@ -954,12 +1005,18 @@ public class ReserveBusinessTests : TestBase
         var service = new Service
         {
             ServiceId = 1,
-            ReservePrices = new List<ReservePrice>
+            Trip = new Trip
             {
-                new ReservePrice { ReserveTypeId = ReserveTypeIdEnum.Ida, Price = 100 }
-            },
-            Origin = new City { Name = "Origin" },
-            Destination = new City { Name = "Destination" }
+                OriginCity = new City { Name = "Origin" },
+                DestinationCity = new City { Name = "Destination" }
+            }
+        };
+
+        var trips = new List<Trip>
+        {
+            new Trip { TripId = 1, OriginCityId = 1, DestinationCityId = 2, Status = EntityStatusEnum.Active, Prices = new List<TripPrice> {
+                new TripPrice { ReserveTypeId = ReserveTypeIdEnum.Ida, Price = 100, Status = EntityStatusEnum.Active }
+            }}
         };
 
         var direction = new Direction { DirectionId = 1, Name = "Location" };
@@ -970,6 +1027,7 @@ public class ReserveBusinessTests : TestBase
         _contextMock.Setup(c => c.ReservePayments).Returns(GetMockDbSetWithIdentity(payments).Object);
         _contextMock.Setup(c => c.Vehicles.FindAsync(It.IsAny<int>())).ReturnsAsync(vehicle);
         _contextMock.Setup(c => c.Services).Returns(GetQueryableMockDbSet(new List<Service> { service }).Object);
+        _contextMock.Setup(c => c.Trips).Returns(GetQueryableMockDbSet(trips).Object);
         _contextMock.Setup(c => c.Directions.FindAsync(It.IsAny<int>())).ReturnsAsync(direction);
         _contextMock.Setup(c => c.Customers).Returns(GetQueryableMockDbSet(new List<Customer>()).Object);
 
@@ -1166,6 +1224,7 @@ public class ReserveBusinessTests : TestBase
         // El test real de concurrencia se maneja en los tests de integración
 
         // Arrange - Reserve con solo 3 cupos disponibles
+        var vehicle = new Vehicle { AvailableQuantity = 10 };
         var reserve = new Reserve
         {
             ReserveId = 1,
@@ -1181,7 +1240,8 @@ public class ReserveBusinessTests : TestBase
                 new Passenger { Status = PassengerStatusEnum.Confirmed },
                 new Passenger { Status = PassengerStatusEnum.Confirmed }
             },
-            Service = new Service { Vehicle = new Vehicle { AvailableQuantity = 10 } } // Total 10 cupos
+            Vehicle = vehicle,
+            Service = new Service { Vehicle = vehicle } // Total 10 cupos
         };
         var reserves = new List<Reserve> { reserve };
 
@@ -1271,6 +1331,15 @@ public class ReserveBusinessTests : TestBase
         var futureDate = DateTime.UtcNow.AddDays(1).Date;
         var futureTime = TimeSpan.FromHours(10);
 
+        var trip = new Trip
+        {
+            TripId = 1,
+            OriginCityId = 1,
+            DestinationCityId = 2,
+            OriginCity = new City { CityId = 1, Name = "Origin" },
+            DestinationCity = new City { CityId = 2, Name = "Dest" }
+        };
+
         // Reserva de HOY (más próxima en el sistema)
         var todayReserve = new Reserve
         {
@@ -1281,6 +1350,8 @@ public class ReserveBusinessTests : TestBase
             Passengers = new List<Passenger>(),
             VehicleId = 1,
             ServiceId = 1,
+            TripId = 1,
+            Trip = trip,
             Driver = new Driver { FirstName = "Driver", LastName = "Today" }
         };
 
@@ -1294,6 +1365,8 @@ public class ReserveBusinessTests : TestBase
             Passengers = new List<Passenger>(),
             VehicleId = 1,
             ServiceId = 1,
+            TripId = 1,
+            Trip = trip,
             Driver = new Driver { FirstName = "Driver", LastName = "Test" }
         };
 
@@ -1301,12 +1374,14 @@ public class ReserveBusinessTests : TestBase
         var service = new Service
         {
             ServiceId = 1,
-            ReservePrices = new List<ReservePrice>
-            {
-                new ReservePrice { ReserveTypeId = ReserveTypeIdEnum.Ida, Price = 100 }
-            },
-            Origin = new City { Name = "Origin" },
-            Destination = new City { Name = "Dest" }
+            Trip = trip
+        };
+
+        var trips = new List<Trip>
+        {
+            new Trip { TripId = 1, OriginCityId = 1, DestinationCityId = 2, Status = EntityStatusEnum.Active, Prices = new List<TripPrice> {
+                new TripPrice { ReserveTypeId = ReserveTypeIdEnum.Ida, Price = 100, Status = EntityStatusEnum.Active }
+            }}
         };
 
         var customer = new Customer
@@ -1328,6 +1403,7 @@ public class ReserveBusinessTests : TestBase
         _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(new List<Reserve> { todayReserve, reserve }).Object);
         _contextMock.Setup(c => c.Vehicles.FindAsync(It.IsAny<int>())).ReturnsAsync(vehicle);
         _contextMock.Setup(c => c.Services).Returns(GetQueryableMockDbSet(new List<Service> { service }).Object);
+        _contextMock.Setup(c => c.Trips).Returns(GetQueryableMockDbSet(trips).Object);
         _contextMock.Setup(c => c.Customers).Returns(GetQueryableMockDbSet(new List<Customer> { customer }).Object);
         _contextMock.Setup(c => c.Customers.FindAsync(1)).ReturnsAsync(customer);
         _contextMock.Setup(c => c.Directions.FindAsync(It.IsAny<int>())).ReturnsAsync(direction);
@@ -1385,6 +1461,15 @@ public class ReserveBusinessTests : TestBase
         var today = DateTime.UtcNow.Date;
         var tomorrow = DateTime.UtcNow.AddDays(1).Date;
 
+        var trip = new Trip
+        {
+            TripId = 1,
+            OriginCityId = 1,
+            DestinationCityId = 2,
+            OriginCity = new City { CityId = 1, Name = "Origin" },
+            DestinationCity = new City { CityId = 2, Name = "Dest" }
+        };
+
         // Reserva de HOY (más próxima en el sistema)
         var todayReserve = new Reserve
         {
@@ -1395,6 +1480,8 @@ public class ReserveBusinessTests : TestBase
             Passengers = new List<Passenger>(),
             VehicleId = 1,
             ServiceId = 1,
+            TripId = 1,
+            Trip = trip,
             Driver = new Driver { FirstName = "Driver", LastName = "Today" },
             ServiceName = "TestService",
             OriginName = "Origin",
@@ -1410,6 +1497,8 @@ public class ReserveBusinessTests : TestBase
             Passengers = new List<Passenger>(),
             VehicleId = 1,
             ServiceId = 1,
+            TripId = 1,
+            Trip = trip,
             Driver = new Driver { FirstName = "Driver", LastName = "Ida" },
             ServiceName = "TestService",
             OriginName = "Origin",
@@ -1425,6 +1514,8 @@ public class ReserveBusinessTests : TestBase
             Passengers = new List<Passenger>(),
             VehicleId = 1,
             ServiceId = 1,
+            TripId = 1,
+            Trip = trip,
             Driver = new Driver { FirstName = "Driver", LastName = "Vuelta" },
             ServiceName = "TestService",
             OriginName = "Origin",
@@ -1435,13 +1526,15 @@ public class ReserveBusinessTests : TestBase
         var service = new Service
         {
             ServiceId = 1,
-            ReservePrices = new List<ReservePrice>
-            {
-                new ReservePrice { ReserveTypeId = ReserveTypeIdEnum.Ida, Price = 100 },
-                new ReservePrice { ReserveTypeId = ReserveTypeIdEnum.IdaVuelta, Price = 100 } // Precio IdaVuelta = 100
-            },
-            Origin = new City { Name = "Origin" },
-            Destination = new City { Name = "Dest" }
+            Trip = trip
+        };
+
+        var trips = new List<Trip>
+        {
+            new Trip { TripId = 1, OriginCityId = 1, DestinationCityId = 2, Status = EntityStatusEnum.Active, Prices = new List<TripPrice> {
+                new TripPrice { ReserveTypeId = ReserveTypeIdEnum.Ida, Price = 100, Status = EntityStatusEnum.Active },
+                new TripPrice { ReserveTypeId = ReserveTypeIdEnum.IdaVuelta, Price = 100, Status = EntityStatusEnum.Active }
+            }}
         };
 
         var customer = new Customer
@@ -1463,6 +1556,7 @@ public class ReserveBusinessTests : TestBase
         _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(new List<Reserve> { reserveIda, reserveVuelta }).Object);
         _contextMock.Setup(c => c.Vehicles.FindAsync(It.IsAny<int>())).ReturnsAsync(vehicle);
         _contextMock.Setup(c => c.Services).Returns(GetQueryableMockDbSet(new List<Service> { service }).Object);
+        _contextMock.Setup(c => c.Trips).Returns(GetQueryableMockDbSet(trips).Object);
         _contextMock.Setup(c => c.Customers).Returns(GetQueryableMockDbSet(new List<Customer> { customer }).Object);
         _contextMock.Setup(c => c.Customers.FindAsync(1)).ReturnsAsync(customer);
         _contextMock.Setup(c => c.Directions.FindAsync(It.IsAny<int>())).ReturnsAsync(direction);
@@ -1544,6 +1638,15 @@ public class ReserveBusinessTests : TestBase
         // Arrange - 3 reservas el mismo día a diferentes horas: 15:00, 10:00, 20:00
         var today = DateTime.UtcNow.Date;
 
+        var trip = new Trip
+        {
+            TripId = 1,
+            OriginCityId = 1,
+            DestinationCityId = 2,
+            OriginCity = new City { CityId = 1, Name = "Origin" },
+            DestinationCity = new City { CityId = 2, Name = "Dest" }
+        };
+
         var reserve1 = new Reserve // Segunda cronológicamente
         {
             ReserveId = 1,
@@ -1553,6 +1656,8 @@ public class ReserveBusinessTests : TestBase
             Passengers = new List<Passenger>(),
             VehicleId = 1,
             ServiceId = 1,
+            TripId = 1,
+            Trip = trip,
             Driver = new Driver { FirstName = "Driver", LastName = "1" }
         };
 
@@ -1565,6 +1670,8 @@ public class ReserveBusinessTests : TestBase
             Passengers = new List<Passenger>(),
             VehicleId = 1,
             ServiceId = 1,
+            TripId = 1,
+            Trip = trip,
             Driver = new Driver { FirstName = "Driver", LastName = "2" }
         };
 
@@ -1577,6 +1684,8 @@ public class ReserveBusinessTests : TestBase
             Passengers = new List<Passenger>(),
             VehicleId = 1,
             ServiceId = 1,
+            TripId = 1,
+            Trip = trip,
             Driver = new Driver { FirstName = "Driver", LastName = "3" }
         };
 
@@ -1584,12 +1693,14 @@ public class ReserveBusinessTests : TestBase
         var service = new Service
         {
             ServiceId = 1,
-            ReservePrices = new List<ReservePrice>
-            {
-                new ReservePrice { ReserveTypeId = ReserveTypeIdEnum.Ida, Price = 100 }
-            },
-            Origin = new City { Name = "Origin" },
-            Destination = new City { Name = "Dest" }
+            Trip = trip
+        };
+
+        var trips = new List<Trip>
+        {
+            new Trip { TripId = 1, OriginCityId = 1, DestinationCityId = 2, Status = EntityStatusEnum.Active, Prices = new List<TripPrice> {
+                new TripPrice { ReserveTypeId = ReserveTypeIdEnum.Ida, Price = 100, Status = EntityStatusEnum.Active }
+            }}
         };
 
         var customer = new Customer
@@ -1611,6 +1722,7 @@ public class ReserveBusinessTests : TestBase
         _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(new List<Reserve> { reserve1, reserve2, reserve3 }).Object);
         _contextMock.Setup(c => c.Vehicles.FindAsync(It.IsAny<int>())).ReturnsAsync(vehicle);
         _contextMock.Setup(c => c.Services).Returns(GetQueryableMockDbSet(new List<Service> { service }).Object);
+        _contextMock.Setup(c => c.Trips).Returns(GetQueryableMockDbSet(trips).Object);
         _contextMock.Setup(c => c.Customers).Returns(GetQueryableMockDbSet(new List<Customer> { customer }).Object);
         _contextMock.Setup(c => c.Customers.FindAsync(1)).ReturnsAsync(customer);
         _contextMock.Setup(c => c.Directions.FindAsync(It.IsAny<int>())).ReturnsAsync(direction);
@@ -1907,14 +2019,22 @@ public class ReserveBusinessTests : TestBase
 
         var vehicle = new Vehicle { AvailableQuantity = 10 };
         var service = new Service { Vehicle = vehicle };
-        var reserve1 = new Reserve { ReserveId = reserveId, Service = service };
+        var reserve1 = new Reserve
+        {
+            ReserveId = reserveId,
+            Service = service,
+            Vehicle = vehicle,
+            Passengers = new List<Passenger>(),
+
+            TripId = 1
+        };
 
         var passengers = new List<Passenger>
         {
-            new Passenger 
-            { 
-                PassengerId = 1, 
-                ReserveId = reserveId, 
+            new Passenger
+            {
+                PassengerId = 1,
+                ReserveId = reserveId,
                 ReserveRelatedId = relatedReserveId,
                 CustomerId = customerId,
                 FirstName = "Juan",
@@ -1923,32 +2043,42 @@ public class ReserveBusinessTests : TestBase
                 Reserve = reserve1
             }
         };
+        reserve1.Passengers = passengers;
 
         var payments = new List<ReservePayment>
         {
             // Pago en la reserva actual (Ida) - Efectivo 1000
-            new ReservePayment 
-            { 
-                ReservePaymentId = 1, 
-                ReserveId = reserveId, 
-                CustomerId = customerId, 
-                Amount = 1000, 
-                Method = PaymentMethodEnum.Cash 
+            new ReservePayment
+            {
+                ReservePaymentId = 1,
+                ReserveId = reserveId,
+                CustomerId = customerId,
+                Amount = 1000,
+                Method = PaymentMethodEnum.Cash
             },
             // Pago en la reserva relacionada (Vuelta) - Online 2000
-            new ReservePayment 
-            { 
-                ReservePaymentId = 2, 
-                ReserveId = relatedReserveId, 
-                CustomerId = customerId, 
-                Amount = 2000, 
-                Method = PaymentMethodEnum.Online 
+            new ReservePayment
+            {
+                ReservePaymentId = 2,
+                ReserveId = relatedReserveId,
+                CustomerId = customerId,
+                Amount = 2000,
+                Method = PaymentMethodEnum.Online
             }
+        };
+
+        var trips = new List<Trip>
+        {
+            new Trip { TripId = 1, OriginCityId = 1, DestinationCityId = 2, Status = EntityStatusEnum.Active, Prices = new List<TripPrice> {
+                new TripPrice { ReserveTypeId = ReserveTypeIdEnum.Ida, Price = 100, Status = EntityStatusEnum.Active },
+                new TripPrice { ReserveTypeId = ReserveTypeIdEnum.IdaVuelta, Price = 200, Status = EntityStatusEnum.Active }
+            }}
         };
 
         _contextMock.Setup(c => c.Passengers).Returns(GetQueryableMockDbSet(passengers).Object);
         _contextMock.Setup(c => c.ReservePayments).Returns(GetQueryableMockDbSet(payments).Object);
         _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(new List<Reserve> { reserve1 }).Object);
+        _contextMock.Setup(c => c.Trips).Returns(GetQueryableMockDbSet(trips).Object);
 
         var request = new PagedReportRequestDto<PassengerReserveReportFilterRequestDto>
         {
@@ -1976,41 +2106,53 @@ public class ReserveBusinessTests : TestBase
         var passengerIdUnpaidIda = 1;
         var passengerIdUnpaidIdaVuelta = 2;
 
-        var prices = new List<ReservePrice>
+        var trips = new List<Trip>
         {
-            new ReservePrice { ReserveTypeId = ReserveTypeIdEnum.Ida, Price = 1500 },
-            new ReservePrice { ReserveTypeId = ReserveTypeIdEnum.IdaVuelta, Price = 2500 }
+            new Trip { TripId = 1, OriginCityId = 1, DestinationCityId = 2, Status = EntityStatusEnum.Active, Prices = new List<TripPrice> {
+                new TripPrice { ReserveTypeId = ReserveTypeIdEnum.Ida, Price = 1500, Status = EntityStatusEnum.Active },
+                new TripPrice { ReserveTypeId = ReserveTypeIdEnum.IdaVuelta, Price = 2500, Status = EntityStatusEnum.Active }
+            }}
         };
         var vehicle = new Vehicle { AvailableQuantity = 10 };
-        var service = new Service { Vehicle = vehicle, ReservePrices = prices };
-        var reserve1 = new Reserve { ReserveId = reserveId, Service = service };
+        var service = new Service { Vehicle = vehicle };
+        var reserve1 = new Reserve
+        {
+            ReserveId = reserveId,
+            Service = service,
+            Vehicle = vehicle,
+            Passengers = new List<Passenger>(),
+
+            TripId = 1
+        };
 
         var passengers = new List<Passenger>
         {
             // Pasajero 1: Solo Ida, sin pago
-            new Passenger 
-            { 
-                PassengerId = passengerIdUnpaidIda, 
-                ReserveId = reserveId, 
-                FirstName = "Unpaid", 
+            new Passenger
+            {
+                PassengerId = passengerIdUnpaidIda,
+                ReserveId = reserveId,
+                FirstName = "Unpaid",
                 LastName = "Ida",
                 DocumentNumber = "001",
                 Reserve = reserve1
             },
             // Pasajero 2: Ida y Vuelta, sin pago
-            new Passenger 
-            { 
-                PassengerId = passengerIdUnpaidIdaVuelta, 
-                ReserveId = reserveId, 
+            new Passenger
+            {
+                PassengerId = passengerIdUnpaidIdaVuelta,
+                ReserveId = reserveId,
                 ReserveRelatedId = 3, // Indica que es Ida y Vuelta
-                FirstName = "Unpaid", 
+                FirstName = "Unpaid",
                 LastName = "IdaVuelta",
                 DocumentNumber = "002",
                 Reserve = reserve1
             }
         };
+        reserve1.Passengers = passengers;
 
         _contextMock.Setup(c => c.Passengers).Returns(GetQueryableMockDbSet(passengers).Object);
+        _contextMock.Setup(c => c.Trips).Returns(GetQueryableMockDbSet(trips).Object);
         _contextMock.Setup(c => c.ReservePayments).Returns(GetQueryableMockDbSet(new List<ReservePayment>()).Object);
         _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(new List<Reserve> { reserve1 }).Object);
 

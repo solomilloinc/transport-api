@@ -15,6 +15,7 @@ using Transport.Business.Authentication;
 using Transport.Business.Services.Payment;
 using Transport.Domain.Customers.Abstraction;
 using Transport.Domain.Passengers;
+using Transport.Domain.Trips;
 
 namespace Transport.Tests;
 
@@ -58,11 +59,15 @@ public class ReserveReportBusinessTest : TestBase
             Status = EntityStatusEnum.Active
         };
 
+        var vehicle = new Vehicle { AvailableQuantity = 3 };
         var service = new Service
         {
-            Origin = new City { Name = "Buenos Aires" },
-            Destination = new City { Name = "Córdoba" },
-            Vehicle = new Vehicle { AvailableQuantity = 3 },
+            Trip = new Trip
+            {
+                OriginCity = new City { Name = "Buenos Aires" },
+                DestinationCity = new City { Name = "Córdoba" }
+            },
+            Vehicle = vehicle,
             Schedules = new List<ServiceSchedule> { schedule }
         };
 
@@ -75,8 +80,10 @@ public class ReserveReportBusinessTest : TestBase
             Status = ReserveStatusEnum.Confirmed,
             ServiceSchedule = schedule,
             Service = service,
+            Vehicle = vehicle,
             OriginName = "Buenos Aires",
             DestinationName = "Córdoba",
+            TripId = 1,
             Passengers = new List<Passenger>
             {
                 new Passenger
@@ -112,6 +119,8 @@ public class ReserveReportBusinessTest : TestBase
 
         _contextMock.Setup(x => x.Reserves)
             .Returns(GetQueryableMockDbSet(reserves).Object);
+        _contextMock.Setup(x => x.Trips)
+            .Returns(GetQueryableMockDbSet(new List<Trip>()).Object);
 
         // Act
         var result = await _reserveBusiness.GetReserveReport(reserveDate, request);
@@ -122,8 +131,7 @@ public class ReserveReportBusinessTest : TestBase
         Assert.Equal("Buenos Aires", item.OriginName);
         Assert.Equal("Córdoba", item.DestinationName);
         Assert.Equal(3, item.AvailableQuantity);
-        Assert.Single(item.Passengers);
-        Assert.Equal("Ana López", item.Passengers[0].FullName);
+        Assert.Equal(1, item.ReservedQuantity);
     }
 
     [Fact]
@@ -140,6 +148,9 @@ public class ReserveReportBusinessTest : TestBase
             Status = EntityStatusEnum.Active
         };
 
+        var vehicle1 = new Vehicle { AvailableQuantity = 2 };
+        var vehicle2 = new Vehicle { AvailableQuantity = 5 };
+
         var reserves = new List<Reserve>
     {
         new Reserve
@@ -150,13 +161,18 @@ public class ReserveReportBusinessTest : TestBase
             ServiceSchedule = schedule,
             Service = new Service
             {
-                Origin = new City { Name = "Rosario" },
-                Destination = new City { Name = "Santa Fe" },
-                Vehicle = new Vehicle { AvailableQuantity = 2 },
+                Trip = new Trip
+                {
+                    OriginCity = new City { Name = "Rosario" },
+                    DestinationCity = new City { Name = "Santa Fe" }
+                },
+                Vehicle = vehicle1,
                 Schedules = new List<ServiceSchedule> { schedule }
             },
+            Vehicle = vehicle1,
             OriginName = "Rosario",
             DestinationName = "Santa Fe",
+            TripId = 1,
             Passengers = new List<Passenger>()
         },
         new Reserve
@@ -167,13 +183,18 @@ public class ReserveReportBusinessTest : TestBase
             ServiceSchedule = schedule,
             Service = new Service
             {
-                Origin = new City { Name = "Mendoza" },
-                Destination = new City { Name = "San Juan" },
-                Vehicle = new Vehicle { AvailableQuantity = 5 },
+                Trip = new Trip
+                {
+                    OriginCity = new City { Name = "Mendoza" },
+                    DestinationCity = new City { Name = "San Juan" }
+                },
+                Vehicle = vehicle2,
                 Schedules = new List<ServiceSchedule> { schedule }
             },
+            Vehicle = vehicle2,
             OriginName = "Mendoza",
             DestinationName = "San Juan",
+            TripId = 2,
             Passengers = new List<Passenger>()
         }
     };
@@ -186,6 +207,8 @@ public class ReserveReportBusinessTest : TestBase
 
         _contextMock.Setup(x => x.Reserves)
             .Returns(GetQueryableMockDbSet(reserves).Object);
+        _contextMock.Setup(x => x.Trips)
+            .Returns(GetQueryableMockDbSet(new List<Trip>()).Object);
 
         // Act
         var result = await _reserveBusiness.GetReserveReport(reserveDate, request);
@@ -213,10 +236,15 @@ public class ReserveReportBusinessTest : TestBase
             Status = ReserveStatusEnum.Available,
             Service = new Service
             {
-                Origin = new City { Name = "Salta" },
-                Destination = new City { Name = "Jujuy" },
+                Trip = new Trip
+                {
+                    OriginCity = new City { Name = "Salta" },
+                    DestinationCity = new City { Name = "Jujuy" }
+                },
                 Vehicle = new Vehicle { AvailableQuantity = 2 }
             },
+
+            TripId = 1,
             Passengers = new List<Passenger>()
         }
     };
@@ -229,6 +257,8 @@ public class ReserveReportBusinessTest : TestBase
 
         _contextMock.Setup(x => x.Reserves)
             .Returns(GetQueryableMockDbSet(reserves).Object);
+        _contextMock.Setup(x => x.Trips)
+            .Returns(GetQueryableMockDbSet(new List<Trip>()).Object);
 
         // Act
         var result = await _reserveBusiness.GetReserveReport(requestDate, request);
@@ -253,10 +283,15 @@ public class ReserveReportBusinessTest : TestBase
             Status = ReserveStatusEnum.Rejected,
             Service = new Service
             {
-                Origin = new City { Name = "La Plata" },
-                Destination = new City { Name = "Mar del Plata" },
+                Trip = new Trip
+                {
+                    OriginCity = new City { Name = "La Plata" },
+                    DestinationCity = new City { Name = "Mar del Plata" }
+                },
                 Vehicle = new Vehicle { AvailableQuantity = 2 }
             },
+
+            TripId = 1,
             Passengers = new List<Passenger>()
         }
     };
@@ -269,6 +304,8 @@ public class ReserveReportBusinessTest : TestBase
 
         _contextMock.Setup(x => x.Reserves)
             .Returns(GetQueryableMockDbSet(reserves).Object);
+        _contextMock.Setup(x => x.Trips)
+            .Returns(GetQueryableMockDbSet(new List<Trip>()).Object);
 
         // Act
         var result = await _reserveBusiness.GetReserveReport(reserveDate, request);
@@ -286,26 +323,43 @@ public class ReserveReportBusinessTest : TestBase
         var returnDate = new DateTime(2025, 1, 20);
         var passengersRequested = 2;
 
+        var vehicleIda = new Vehicle { AvailableQuantity = 3, InternalNumber = "V001" };
+        var vehicleVuelta = new Vehicle { AvailableQuantity = 3, InternalNumber = "V002" };
+
         var serviceIda = new Service
         {
-            Origin = new City { Name = "Lobos" },
-            Destination = new City { Name = "Ciudad Autonoma de Buenos Aires" },
-            Vehicle = new Vehicle { AvailableQuantity = 3 },
-            ReservePrices = new List<ReservePrice>
+            Trip = new Trip
             {
-                new ReservePrice { ReserveTypeId = ReserveTypeIdEnum.Ida, Price = 10 }
-            }
+                OriginCityId = 1,
+                DestinationCityId = 2,
+                OriginCity = new City { CityId = 1, Name = "Lobos" },
+                DestinationCity = new City { CityId = 2, Name = "Ciudad Autonoma de Buenos Aires" }
+            },
+            Vehicle = vehicleIda,
+            EstimatedDuration = TimeSpan.FromHours(2)
         };
 
         var serviceVuelta = new Service
         {
-            Origin = new City { Name = "Ciudad Autonoma de Buenos Aires" },
-            Destination = new City { Name = "Lobos" },
-            Vehicle = new Vehicle { AvailableQuantity = 3 },
-            ReservePrices = new List<ReservePrice>
+            Trip = new Trip
             {
-                new ReservePrice { ReserveTypeId = ReserveTypeIdEnum.Ida, Price = 12 }
-            }
+                OriginCityId = 2,
+                DestinationCityId = 1,
+                OriginCity = new City { CityId = 2, Name = "Ciudad Autonoma de Buenos Aires" },
+                DestinationCity = new City { CityId = 1, Name = "Lobos" }
+            },
+            Vehicle = vehicleVuelta,
+            EstimatedDuration = TimeSpan.FromHours(2)
+        };
+
+        var trips = new List<Trip>
+        {
+            new Trip { TripId = 1, OriginCityId = 1, DestinationCityId = 2, Status = EntityStatusEnum.Active, Prices = new List<TripPrice> {
+                new TripPrice { ReserveTypeId = ReserveTypeIdEnum.Ida, CityId = 2, Price = 10, Status = EntityStatusEnum.Active }
+            }},
+            new Trip { TripId = 2, OriginCityId = 2, DestinationCityId = 1, Status = EntityStatusEnum.Active, Prices = new List<TripPrice> {
+                new TripPrice { ReserveTypeId = ReserveTypeIdEnum.Ida, CityId = 1, Price = 12, Status = EntityStatusEnum.Active }
+            }}
         };
 
         var reserves = new List<Reserve>
@@ -317,7 +371,13 @@ public class ReserveReportBusinessTest : TestBase
                 ReserveDate = departureDate,
                 Status = ReserveStatusEnum.Confirmed,
                 Service = serviceIda,
+                Vehicle = vehicleIda,
+                Trip = serviceIda.Trip,
+                TripId = 1,
+                OriginName = "Lobos",
+                DestinationName = "Ciudad Autonoma de Buenos Aires",
                 DepartureHour = new TimeSpan(9,0,0),
+                EstimatedDuration = TimeSpan.FromHours(2),
                 Passengers = new List<Passenger>
                 {
                     new Passenger
@@ -333,7 +393,13 @@ public class ReserveReportBusinessTest : TestBase
                 ReserveDate = returnDate,
                 Status = ReserveStatusEnum.Confirmed,
                 Service = serviceVuelta,
+                Vehicle = vehicleVuelta,
+                Trip = serviceVuelta.Trip,
+                TripId = 2,
+                OriginName = "Ciudad Autonoma de Buenos Aires",
+                DestinationName = "Lobos",
                 DepartureHour = new TimeSpan(18,0,0),
+                EstimatedDuration = TimeSpan.FromHours(2),
                 Passengers = new List<Passenger>
                 {
                     new Passenger { Status = PassengerStatusEnum.Confirmed },
@@ -347,14 +413,19 @@ public class ReserveReportBusinessTest : TestBase
                 ReserveDate = returnDate,
                 Status = ReserveStatusEnum.Confirmed,
                 Service = serviceVuelta,
+                Vehicle = vehicleVuelta,
+                Trip = serviceVuelta.Trip,
+                TripId = 2,
+                OriginName = "Ciudad Autonoma de Buenos Aires",
+                DestinationName = "Lobos",
                 DepartureHour = new TimeSpan(20,0,0),
+                EstimatedDuration = TimeSpan.FromHours(2),
                 Passengers = new List<Passenger>() // no passengers
             }
         };
 
         var filter = new ReserveReportFilterRequestDto(
-            OriginId: 0, // Not used in the method filter directly, but could be set
-            DestinationId: 0,
+            TripId: 1,
             TripType: "IdaVuelta",
             Passengers: passengersRequested,
             DepartureDate: departureDate,
@@ -370,6 +441,9 @@ public class ReserveReportBusinessTest : TestBase
 
         _contextMock.Setup(x => x.Reserves)
             .Returns(GetQueryableMockDbSet(reserves).Object);
+
+        _contextMock.Setup(x => x.Trips)
+            .Returns(GetQueryableMockDbSet(trips).Object);
 
         // Act
         var result = await _reserveBusiness.GetReserveReport(request);
@@ -418,14 +492,22 @@ public class ReserveReportBusinessTest : TestBase
 
         var service = new Service
         {
-            Origin = new City { Name = "Rosario" },
-            Destination = new City { Name = "Santa Fe" },
+            Trip = new Trip
+            {
+                OriginCityId = 1,
+                DestinationCityId = 2,
+                OriginCity = new City { Name = "Rosario" },
+                DestinationCity = new City { Name = "Santa Fe" }
+            },
             Vehicle = vehicle,
-            Schedules = new List<ServiceSchedule> { schedule },
-            ReservePrices = new List<ReservePrice>
+            Schedules = new List<ServiceSchedule> { schedule }
+        };
+
+        var trips = new List<Trip>
         {
-            new ReservePrice { ReserveTypeId = ReserveTypeIdEnum.Ida, Price = 15m }
-        }
+            new Trip { TripId = 1, OriginCityId = 1, DestinationCityId = 2, Status = EntityStatusEnum.Active, Prices = new List<TripPrice> {
+                new TripPrice { ReserveTypeId = ReserveTypeIdEnum.Ida, Price = 15m, Status = EntityStatusEnum.Active }
+            }}
         };
 
         var reserve = new Reserve
@@ -435,6 +517,12 @@ public class ReserveReportBusinessTest : TestBase
             Status = ReserveStatusEnum.Confirmed,
             ServiceSchedule = schedule,
             Service = service,
+            Vehicle = vehicle,
+            Trip = service.Trip,
+            TripId = 1,
+            OriginName = "Rosario",
+            DestinationName = "Santa Fe",
+            EstimatedDuration = TimeSpan.FromHours(1),
             Passengers = new List<Passenger>
         {
             new Passenger { Status = PassengerStatusEnum.Confirmed },
@@ -449,8 +537,7 @@ public class ReserveReportBusinessTest : TestBase
             PageNumber = 1,
             PageSize = 10,
             Filters = new ReserveReportFilterRequestDto(
-                OriginId: 1,
-                DestinationId: 2,
+                TripId: 1,
                 TripType: "Ida",
                 Passengers: passengersRequested,
                 DepartureDate: departureDate,
@@ -458,6 +545,7 @@ public class ReserveReportBusinessTest : TestBase
         };
 
         _contextMock.Setup(x => x.Reserves).Returns(GetQueryableMockDbSet(reserves).Object);
+        _contextMock.Setup(x => x.Trips).Returns(GetQueryableMockDbSet(trips).Object);
 
         // Act
         var result = await _reserveBusiness.GetReserveReport(request);
@@ -484,31 +572,45 @@ public class ReserveReportBusinessTest : TestBase
             Status = EntityStatusEnum.Active
         };
 
-        var vehicleOutbound = new Vehicle { AvailableQuantity = 5 };
-        var vehicleReturn = new Vehicle { AvailableQuantity = 2 }; // less capacity than requested passengers
+        var vehicleOutbound = new Vehicle { AvailableQuantity = 5, InternalNumber = "V001" };
+        var vehicleReturn = new Vehicle { AvailableQuantity = 2, InternalNumber = "V002" }; // less capacity than requested passengers
 
         var serviceOutbound = new Service
         {
-            Origin = new City { CityId = 1, Name = "Rosario" },
-            Destination = new City { CityId = 2, Name = "Santa Fe" },
+            Trip = new Trip
+            {
+                OriginCityId = 1,
+                DestinationCityId = 2,
+                OriginCity = new City { CityId = 1, Name = "Rosario" },
+                DestinationCity = new City { CityId = 2, Name = "Santa Fe" }
+            },
             Vehicle = vehicleOutbound,
             Schedules = new List<ServiceSchedule> { schedule },
-            ReservePrices = new List<ReservePrice>
-        {
-            new ReservePrice { ReserveTypeId = ReserveTypeIdEnum.Ida, Price = 20m }
-        }
+            EstimatedDuration = TimeSpan.FromHours(1)
         };
 
         var serviceReturn = new Service
         {
-            Origin = new City { CityId = 2, Name = "Santa Fe" },
-            Destination = new City { CityId = 1, Name = "Rosario" },
+            Trip = new Trip
+            {
+                OriginCityId = 2,
+                DestinationCityId = 1,
+                OriginCity = new City { CityId = 2, Name = "Santa Fe" },
+                DestinationCity = new City { CityId = 1, Name = "Rosario" }
+            },
             Vehicle = vehicleReturn,
             Schedules = new List<ServiceSchedule> { schedule },
-            ReservePrices = new List<ReservePrice>
+            EstimatedDuration = TimeSpan.FromHours(1)
+        };
+
+        var trips = new List<Trip>
         {
-            new ReservePrice { ReserveTypeId = ReserveTypeIdEnum.Ida, Price = 20m }
-        }
+            new Trip { TripId = 1, OriginCityId = 1, DestinationCityId = 2, Status = EntityStatusEnum.Active, Prices = new List<TripPrice> {
+                new TripPrice { ReserveTypeId = ReserveTypeIdEnum.Ida, Price = 20m, Status = EntityStatusEnum.Active }
+            }},
+            new Trip { TripId = 2, OriginCityId = 2, DestinationCityId = 1, Status = EntityStatusEnum.Active, Prices = new List<TripPrice> {
+                new TripPrice { ReserveTypeId = ReserveTypeIdEnum.Ida, Price = 20m, Status = EntityStatusEnum.Active }
+            }}
         };
 
         var reserveOutbound = new Reserve
@@ -518,6 +620,12 @@ public class ReserveReportBusinessTest : TestBase
             Status = ReserveStatusEnum.Confirmed,
             ServiceSchedule = schedule,
             Service = serviceOutbound,
+            Vehicle = vehicleOutbound,
+            Trip = serviceOutbound.Trip,
+            TripId = 1,
+            OriginName = "Rosario",
+            DestinationName = "Santa Fe",
+            EstimatedDuration = TimeSpan.FromHours(1),
             Passengers = new List<Passenger>()
         };
 
@@ -528,6 +636,12 @@ public class ReserveReportBusinessTest : TestBase
             Status = ReserveStatusEnum.Confirmed,
             ServiceSchedule = schedule,
             Service = serviceReturn,
+            Vehicle = vehicleReturn,
+            Trip = serviceReturn.Trip,
+            TripId = 2,
+            OriginName = "Santa Fe",
+            DestinationName = "Rosario",
+            EstimatedDuration = TimeSpan.FromHours(1),
             Passengers = new List<Passenger>()
         };
 
@@ -538,8 +652,7 @@ public class ReserveReportBusinessTest : TestBase
             PageNumber = 1,
             PageSize = 10,
             Filters = new ReserveReportFilterRequestDto(
-                OriginId: 1,
-                DestinationId: 2,
+                TripId: 1,
                 TripType: "IdaVuelta",
                 Passengers: passengersRequested,
                 DepartureDate: departureDate,
@@ -547,6 +660,7 @@ public class ReserveReportBusinessTest : TestBase
         };
 
         _contextMock.Setup(x => x.Reserves).Returns(GetQueryableMockDbSet(reserves).Object);
+        _contextMock.Setup(x => x.Trips).Returns(GetQueryableMockDbSet(trips).Object);
 
         // Act
         var result = await _reserveBusiness.GetReserveReport(request);

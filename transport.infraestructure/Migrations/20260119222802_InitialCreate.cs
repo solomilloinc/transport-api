@@ -5,10 +5,10 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #pragma warning disable CA1814 // Prefer jagged arrays over multidimensional
 
-namespace Transport.Infraestructure.Migrations
+namespace transport.infraestructure.Migrations
 {
     /// <inheritdoc />
-    public partial class InitialMigration : Migration
+    public partial class InitialCreate : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -176,6 +176,38 @@ namespace Transport.Infraestructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "Trip",
+                columns: table => new
+                {
+                    TripId = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    Description = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: false),
+                    OriginCityId = table.Column<int>(type: "int", nullable: false),
+                    DestinationCityId = table.Column<int>(type: "int", nullable: false),
+                    Status = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    CreatedBy = table.Column<string>(type: "VARCHAR(256)", maxLength: 100, nullable: false, defaultValue: "System"),
+                    UpdatedBy = table.Column<string>(type: "VARCHAR(256)", maxLength: 100, nullable: true),
+                    CreatedDate = table.Column<DateTime>(type: "datetime2", nullable: false, defaultValueSql: "GETDATE()"),
+                    UpdatedDate = table.Column<DateTime>(type: "datetime2", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Trip", x => x.TripId);
+                    table.ForeignKey(
+                        name: "FK_Trip_City_DestinationCityId",
+                        column: x => x.DestinationCityId,
+                        principalTable: "City",
+                        principalColumn: "CityId",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_Trip_City_OriginCityId",
+                        column: x => x.OriginCityId,
+                        principalTable: "City",
+                        principalColumn: "CityId",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "User",
                 columns: table => new
                 {
@@ -230,6 +262,47 @@ namespace Transport.Infraestructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "TripPrice",
+                columns: table => new
+                {
+                    TripPriceId = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    TripId = table.Column<int>(type: "int", nullable: false),
+                    CityId = table.Column<int>(type: "int", nullable: false),
+                    DirectionId = table.Column<int>(type: "int", nullable: true),
+                    ReserveTypeId = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    Price = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: false),
+                    Order = table.Column<int>(type: "int", nullable: false),
+                    Status = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    CreatedBy = table.Column<string>(type: "VARCHAR(256)", maxLength: 100, nullable: false, defaultValue: "System"),
+                    UpdatedBy = table.Column<string>(type: "VARCHAR(256)", maxLength: 100, nullable: true),
+                    CreatedDate = table.Column<DateTime>(type: "datetime2", nullable: false, defaultValueSql: "GETDATE()"),
+                    UpdatedDate = table.Column<DateTime>(type: "datetime2", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_TripPrice", x => x.TripPriceId);
+                    table.ForeignKey(
+                        name: "FK_TripPrice_City_CityId",
+                        column: x => x.CityId,
+                        principalTable: "City",
+                        principalColumn: "CityId",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_TripPrice_Direction_DirectionId",
+                        column: x => x.DirectionId,
+                        principalTable: "Direction",
+                        principalColumn: "DirectionId",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_TripPrice_Trip_TripId",
+                        column: x => x.TripId,
+                        principalTable: "Trip",
+                        principalColumn: "TripId",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "RefreshToken",
                 columns: table => new
                 {
@@ -266,10 +339,13 @@ namespace Transport.Infraestructure.Migrations
                     ServiceId = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
                     Name = table.Column<string>(type: "nvarchar(250)", maxLength: 250, nullable: false),
+                    TripId = table.Column<int>(type: "int", nullable: false),
                     OriginId = table.Column<int>(type: "int", nullable: false),
                     DestinationId = table.Column<int>(type: "int", nullable: false),
                     EstimatedDuration = table.Column<TimeSpan>(type: "time", nullable: false),
                     VehicleId = table.Column<int>(type: "int", nullable: false),
+                    StartDay = table.Column<int>(type: "int", nullable: false),
+                    EndDay = table.Column<int>(type: "int", nullable: false),
                     Status = table.Column<int>(type: "int", nullable: false),
                     CreatedBy = table.Column<string>(type: "VARCHAR(256)", nullable: false, defaultValue: "System"),
                     UpdatedBy = table.Column<string>(type: "VARCHAR(256)", nullable: true),
@@ -292,36 +368,16 @@ namespace Transport.Infraestructure.Migrations
                         principalColumn: "CityId",
                         onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
+                        name: "FK_Service_Trip_TripId",
+                        column: x => x.TripId,
+                        principalTable: "Trip",
+                        principalColumn: "TripId",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
                         name: "FK_Service_Vehicle_VehicleId",
                         column: x => x.VehicleId,
                         principalTable: "Vehicle",
                         principalColumn: "VehicleId",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "ReservePrice",
-                columns: table => new
-                {
-                    ReservePriceId = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    ServiceId = table.Column<int>(type: "int", nullable: false),
-                    Price = table.Column<decimal>(type: "decimal(10,2)", nullable: false),
-                    ReserveTypeId = table.Column<int>(type: "int", maxLength: 50, nullable: false),
-                    Status = table.Column<int>(type: "int", nullable: false),
-                    CreatedBy = table.Column<string>(type: "VARCHAR(256)", nullable: false, defaultValue: "System"),
-                    UpdatedBy = table.Column<string>(type: "VARCHAR(256)", nullable: true),
-                    CreatedDate = table.Column<DateTime>(type: "datetime2", nullable: false, defaultValueSql: "GETDATE()"),
-                    UpdatedDate = table.Column<DateTime>(type: "datetime2", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_ReservePrice", x => x.ReservePriceId);
-                    table.ForeignKey(
-                        name: "FK_ReservePrice_Service_ServiceId",
-                        column: x => x.ServiceId,
-                        principalTable: "Service",
-                        principalColumn: "ServiceId",
                         onDelete: ReferentialAction.Cascade);
                 });
 
@@ -362,8 +418,6 @@ namespace Transport.Infraestructure.Migrations
                     ServiceScheduleId = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
                     ServiceId = table.Column<int>(type: "int", nullable: false),
-                    StartDay = table.Column<int>(type: "int", nullable: false),
-                    EndDay = table.Column<int>(type: "int", nullable: false),
                     DepartureHour = table.Column<TimeSpan>(type: "time", nullable: false),
                     IsHoliday = table.Column<bool>(type: "bit", nullable: false),
                     Status = table.Column<int>(type: "int", nullable: false),
@@ -392,14 +446,19 @@ namespace Transport.Infraestructure.Migrations
                     ReserveDate = table.Column<DateTime>(type: "datetime2", nullable: false),
                     VehicleId = table.Column<int>(type: "int", nullable: false),
                     DriverId = table.Column<int>(type: "int", nullable: true),
-                    ServiceId = table.Column<int>(type: "int", nullable: false),
-                    ServiceScheduleId = table.Column<int>(type: "int", nullable: false),
+                    ServiceId = table.Column<int>(type: "int", nullable: true),
+                    ServiceScheduleId = table.Column<int>(type: "int", nullable: true),
+                    TripId = table.Column<int>(type: "int", nullable: false),
+                    OriginId = table.Column<int>(type: "int", nullable: false),
+                    DestinationId = table.Column<int>(type: "int", nullable: false),
                     Status = table.Column<string>(type: "VARCHAR(20)", nullable: false),
                     ServiceName = table.Column<string>(type: "VARCHAR(250)", nullable: false),
                     OriginName = table.Column<string>(type: "VARCHAR(100)", nullable: false),
                     DestinationName = table.Column<string>(type: "VARCHAR(100)", nullable: false),
                     DepartureHour = table.Column<TimeSpan>(type: "time", nullable: false),
+                    EstimatedDuration = table.Column<TimeSpan>(type: "time", nullable: false),
                     IsHoliday = table.Column<bool>(type: "bit", nullable: false),
+                    RowVersion = table.Column<byte[]>(type: "rowversion", rowVersion: true, nullable: false),
                     CreatedBy = table.Column<string>(type: "VARCHAR(256)", nullable: false, defaultValue: "System"),
                     UpdatedBy = table.Column<string>(type: "VARCHAR(256)", nullable: true),
                     CreatedDate = table.Column<DateTime>(type: "datetime2", nullable: false, defaultValueSql: "GETDATE()"),
@@ -408,6 +467,18 @@ namespace Transport.Infraestructure.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Reserve", x => x.ReserveId);
+                    table.ForeignKey(
+                        name: "FK_Reserve_City_DestinationId",
+                        column: x => x.DestinationId,
+                        principalTable: "City",
+                        principalColumn: "CityId",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_Reserve_City_OriginId",
+                        column: x => x.OriginId,
+                        principalTable: "City",
+                        principalColumn: "CityId",
+                        onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
                         name: "FK_Reserve_Driver_DriverId",
                         column: x => x.DriverId,
@@ -427,10 +498,57 @@ namespace Transport.Infraestructure.Migrations
                         principalColumn: "ServiceId",
                         onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
+                        name: "FK_Reserve_Trip_TripId",
+                        column: x => x.TripId,
+                        principalTable: "Trip",
+                        principalColumn: "TripId",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
                         name: "FK_Reserve_Vehicle_VehicleId",
                         column: x => x.VehicleId,
                         principalTable: "Vehicle",
                         principalColumn: "VehicleId",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "CashBox",
+                columns: table => new
+                {
+                    CashBoxId = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    Description = table.Column<string>(type: "NVARCHAR(200)", nullable: true),
+                    OpenedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    ClosedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    Status = table.Column<string>(type: "VARCHAR(20)", nullable: false),
+                    OpenedByUserId = table.Column<int>(type: "int", nullable: false),
+                    ClosedByUserId = table.Column<int>(type: "int", nullable: true),
+                    ReserveId = table.Column<int>(type: "int", nullable: true),
+                    CreatedBy = table.Column<string>(type: "VARCHAR(256)", nullable: false, defaultValue: "System"),
+                    UpdatedBy = table.Column<string>(type: "VARCHAR(256)", nullable: true),
+                    CreatedDate = table.Column<DateTime>(type: "datetime2", nullable: false, defaultValueSql: "GETDATE()"),
+                    UpdatedDate = table.Column<DateTime>(type: "datetime2", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_CashBox", x => x.CashBoxId);
+                    table.ForeignKey(
+                        name: "FK_CashBox_Reserve_ReserveId",
+                        column: x => x.ReserveId,
+                        principalTable: "Reserve",
+                        principalColumn: "ReserveId",
+                        onDelete: ReferentialAction.SetNull);
+                    table.ForeignKey(
+                        name: "FK_CashBox_User_ClosedByUserId",
+                        column: x => x.ClosedByUserId,
+                        principalTable: "User",
+                        principalColumn: "UserId",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_CashBox_User_OpenedByUserId",
+                        column: x => x.OpenedByUserId,
+                        principalTable: "User",
+                        principalColumn: "UserId",
                         onDelete: ReferentialAction.Restrict);
                 });
 
@@ -441,6 +559,7 @@ namespace Transport.Infraestructure.Migrations
                     PassengerId = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
                     ReserveId = table.Column<int>(type: "int", nullable: false),
+                    ReserveRelatedId = table.Column<int>(type: "int", nullable: true),
                     FirstName = table.Column<string>(type: "VARCHAR(100)", nullable: false),
                     LastName = table.Column<string>(type: "VARCHAR(100)", nullable: false),
                     DocumentNumber = table.Column<string>(type: "VARCHAR(50)", nullable: false),
@@ -494,6 +613,55 @@ namespace Transport.Infraestructure.Migrations
                         column: x => x.ReserveId,
                         principalTable: "Reserve",
                         principalColumn: "ReserveId");
+                    table.ForeignKey(
+                        name: "FK_Passenger_Reserve_ReserveRelatedId",
+                        column: x => x.ReserveRelatedId,
+                        principalTable: "Reserve",
+                        principalColumn: "ReserveId");
+                });
+
+            migrationBuilder.CreateTable(
+                name: "ReserveSlotLock",
+                columns: table => new
+                {
+                    ReserveSlotLockId = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    LockToken = table.Column<string>(type: "VARCHAR(50)", nullable: false),
+                    OutboundReserveId = table.Column<int>(type: "int", nullable: false),
+                    ReturnReserveId = table.Column<int>(type: "int", nullable: true),
+                    SlotsLocked = table.Column<int>(type: "int", nullable: false),
+                    ExpiresAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    Status = table.Column<string>(type: "VARCHAR(20)", nullable: false),
+                    RowVersion = table.Column<byte[]>(type: "rowversion", rowVersion: true, nullable: false),
+                    UserEmail = table.Column<string>(type: "VARCHAR(100)", nullable: true),
+                    UserDocumentNumber = table.Column<string>(type: "VARCHAR(20)", nullable: true),
+                    CustomerId = table.Column<int>(type: "int", nullable: true),
+                    CreatedBy = table.Column<string>(type: "VARCHAR(256)", nullable: false, defaultValue: "System"),
+                    CreatedDate = table.Column<DateTime>(type: "datetime2", nullable: false, defaultValueSql: "GETDATE()"),
+                    UpdatedBy = table.Column<string>(type: "VARCHAR(256)", nullable: true),
+                    UpdatedDate = table.Column<DateTime>(type: "datetime2", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ReserveSlotLock", x => x.ReserveSlotLockId);
+                    table.ForeignKey(
+                        name: "FK_ReserveSlotLock_Customer_CustomerId",
+                        column: x => x.CustomerId,
+                        principalTable: "Customer",
+                        principalColumn: "CustomerId",
+                        onDelete: ReferentialAction.SetNull);
+                    table.ForeignKey(
+                        name: "FK_ReserveSlotLock_Reserve_OutboundReserveId",
+                        column: x => x.OutboundReserveId,
+                        principalTable: "Reserve",
+                        principalColumn: "ReserveId",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_ReserveSlotLock_Reserve_ReturnReserveId",
+                        column: x => x.ReturnReserveId,
+                        principalTable: "Reserve",
+                        principalColumn: "ReserveId",
+                        onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateTable(
@@ -514,6 +682,7 @@ namespace Transport.Infraestructure.Migrations
                     PayerDocumentNumber = table.Column<string>(type: "VARCHAR(50)", nullable: true),
                     PayerEmail = table.Column<string>(type: "VARCHAR(150)", nullable: true),
                     ParentReservePaymentId = table.Column<int>(type: "int", nullable: true),
+                    CashBoxId = table.Column<int>(type: "int", nullable: true),
                     CreatedBy = table.Column<string>(type: "VARCHAR(256)", nullable: false, defaultValue: "System"),
                     UpdatedBy = table.Column<string>(type: "VARCHAR(256)", nullable: true),
                     CreatedDate = table.Column<DateTime>(type: "datetime2", nullable: false, defaultValueSql: "GETDATE()"),
@@ -522,6 +691,12 @@ namespace Transport.Infraestructure.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_ReservePayment", x => x.ReservePaymentId);
+                    table.ForeignKey(
+                        name: "FK_ReservePayment_CashBox_CashBoxId",
+                        column: x => x.CashBoxId,
+                        principalTable: "CashBox",
+                        principalColumn: "CashBoxId",
+                        onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
                         name: "FK_ReservePayment_Customer_CustomerId",
                         column: x => x.CustomerId,
@@ -587,9 +762,39 @@ namespace Transport.Infraestructure.Migrations
                 columns: new[] { "RoleId", "CreatedBy", "CreatedDate", "Name", "UpdatedBy", "UpdatedDate" },
                 values: new object[,]
                 {
-                    { 1, "System", new DateTime(2025, 8, 31, 21, 9, 34, 705, DateTimeKind.Utc).AddTicks(2618), "Administrador", null, null },
-                    { 2, "System", new DateTime(2025, 8, 31, 21, 9, 34, 705, DateTimeKind.Utc).AddTicks(2620), "Cliente", null, null }
+                    { 1, "System", new DateTime(2026, 1, 19, 22, 28, 2, 182, DateTimeKind.Utc).AddTicks(9444), "Administrador", null, null },
+                    { 2, "System", new DateTime(2026, 1, 19, 22, 28, 2, 182, DateTimeKind.Utc).AddTicks(9448), "Cliente", null, null }
                 });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_CashBox_ClosedByUserId",
+                table: "CashBox",
+                column: "ClosedByUserId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_CashBox_OpenedAt",
+                table: "CashBox",
+                column: "OpenedAt");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_CashBox_OpenedByUserId",
+                table: "CashBox",
+                column: "OpenedByUserId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_CashBox_ReserveId",
+                table: "CashBox",
+                column: "ReserveId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_CashBox_Status",
+                table: "CashBox",
+                column: "Status");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_CashBox_Status_OpenedAt",
+                table: "CashBox",
+                columns: new[] { "Status", "OpenedAt" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_City_Code",
@@ -688,6 +893,11 @@ namespace Transport.Infraestructure.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "IX_Passenger_ReserveRelatedId",
+                table: "Passenger",
+                column: "ReserveRelatedId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Passenger_Status",
                 table: "Passenger",
                 column: "Status");
@@ -698,9 +908,19 @@ namespace Transport.Infraestructure.Migrations
                 column: "UserId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_Reserve_DestinationId",
+                table: "Reserve",
+                column: "DestinationId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Reserve_DriverId",
                 table: "Reserve",
                 column: "DriverId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Reserve_OriginId_DestinationId_ReserveDate",
+                table: "Reserve",
+                columns: new[] { "OriginId", "DestinationId", "ReserveDate" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_Reserve_ServiceId_ReserveDate",
@@ -718,9 +938,19 @@ namespace Transport.Infraestructure.Migrations
                 columns: new[] { "Status", "ReserveDate" });
 
             migrationBuilder.CreateIndex(
+                name: "IX_Reserve_TripId_ReserveDate",
+                table: "Reserve",
+                columns: new[] { "TripId", "ReserveDate" });
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Reserve_VehicleId",
                 table: "Reserve",
                 column: "VehicleId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ReservePayment_CashBoxId",
+                table: "ReservePayment",
+                column: "CashBoxId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_ReservePayment_CustomerId",
@@ -748,9 +978,35 @@ namespace Transport.Infraestructure.Migrations
                 column: "Status");
 
             migrationBuilder.CreateIndex(
-                name: "IX_ReservePrice_ServiceId_ReserveTypeId",
-                table: "ReservePrice",
-                columns: new[] { "ServiceId", "ReserveTypeId" });
+                name: "IX_ReserveSlotLock_CreatedDate",
+                table: "ReserveSlotLock",
+                column: "CreatedDate");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ReserveSlotLock_CustomerId",
+                table: "ReserveSlotLock",
+                column: "CustomerId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ReserveSlotLock_LockToken",
+                table: "ReserveSlotLock",
+                column: "LockToken",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ReserveSlotLock_OutboundReserveId",
+                table: "ReserveSlotLock",
+                column: "OutboundReserveId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ReserveSlotLock_ReturnReserveId",
+                table: "ReserveSlotLock",
+                column: "ReturnReserveId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ReserveSlotLock_Status_ExpiresAt",
+                table: "ReserveSlotLock",
+                columns: new[] { "Status", "ExpiresAt" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_Service_DestinationId",
@@ -761,6 +1017,11 @@ namespace Transport.Infraestructure.Migrations
                 name: "IX_Service_OriginId",
                 table: "Service",
                 column: "OriginId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Service_TripId",
+                table: "Service",
+                column: "TripId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Service_VehicleId",
@@ -781,6 +1042,35 @@ namespace Transport.Infraestructure.Migrations
                 name: "IX_ServiceSchedule_ServiceId",
                 table: "ServiceSchedule",
                 column: "ServiceId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Trip_DestinationCityId",
+                table: "Trip",
+                column: "DestinationCityId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Trip_OriginCityId_DestinationCityId",
+                table: "Trip",
+                columns: new[] { "OriginCityId", "DestinationCityId" },
+                unique: true,
+                filter: "[Status] = 'Active'");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_TripPrice_CityId",
+                table: "TripPrice",
+                column: "CityId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_TripPrice_DirectionId",
+                table: "TripPrice",
+                column: "DirectionId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_TripPrice_TripId_CityId_DirectionId_ReserveTypeId",
+                table: "TripPrice",
+                columns: new[] { "TripId", "CityId", "DirectionId", "ReserveTypeId" },
+                unique: true,
+                filter: "[Status] = 'Active'");
 
             migrationBuilder.CreateIndex(
                 name: "IX_User_CustomerId",
@@ -825,10 +1115,13 @@ namespace Transport.Infraestructure.Migrations
                 name: "RefreshToken");
 
             migrationBuilder.DropTable(
-                name: "ReservePrice");
+                name: "ReserveSlotLock");
 
             migrationBuilder.DropTable(
                 name: "ServiceCustomer");
+
+            migrationBuilder.DropTable(
+                name: "TripPrice");
 
             migrationBuilder.DropTable(
                 name: "ReservePayment");
@@ -837,16 +1130,13 @@ namespace Transport.Infraestructure.Migrations
                 name: "Direction");
 
             migrationBuilder.DropTable(
-                name: "User");
+                name: "CashBox");
 
             migrationBuilder.DropTable(
                 name: "Reserve");
 
             migrationBuilder.DropTable(
-                name: "Customer");
-
-            migrationBuilder.DropTable(
-                name: "Role");
+                name: "User");
 
             migrationBuilder.DropTable(
                 name: "Driver");
@@ -855,13 +1145,22 @@ namespace Transport.Infraestructure.Migrations
                 name: "ServiceSchedule");
 
             migrationBuilder.DropTable(
+                name: "Customer");
+
+            migrationBuilder.DropTable(
+                name: "Role");
+
+            migrationBuilder.DropTable(
                 name: "Service");
 
             migrationBuilder.DropTable(
-                name: "City");
+                name: "Trip");
 
             migrationBuilder.DropTable(
                 name: "Vehicle");
+
+            migrationBuilder.DropTable(
+                name: "City");
 
             migrationBuilder.DropTable(
                 name: "VehicleType");

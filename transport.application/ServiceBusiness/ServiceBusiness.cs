@@ -5,6 +5,7 @@ using Transport.Domain.Cities;
 using Transport.Domain.Reserves;
 using Transport.Domain.Services;
 using Transport.Domain.Services.Abstraction;
+using Transport.Domain.Trips;
 using Transport.Domain.Vehicles;
 using Transport.SharedKernel;
 using Transport.SharedKernel.Configuration;
@@ -27,6 +28,13 @@ public class ServiceBusiness : IServiceBusiness
 
     public async Task<Result<int>> Create(ServiceCreateRequestDto requestDto)
     {
+        var trip = await _context.Trips.FindAsync(requestDto.TripId);
+        if (trip is null)
+            return Result.Failure<int>(TripError.TripNotFound);
+
+        if (trip.Status != EntityStatusEnum.Active)
+            return Result.Failure<int>(TripError.TripNotActive);
+
         Vehicle vehicle = await _context.Vehicles.FindAsync(requestDto.VehicleId);
         if (vehicle is null)
             return Result.Failure<int>(VehicleError.VehicleNotFound);
@@ -34,19 +42,10 @@ public class ServiceBusiness : IServiceBusiness
         if (vehicle.Status != EntityStatusEnum.Active)
             return Result.Failure<int>(VehicleError.VehicleNotAvailable);
 
-        City origin = await _context.Cities.FindAsync(requestDto.OriginId);
-        if (origin is null)
-            return Result.Failure<int>(CityError.CityNotFound);
-
-        City destination = await _context.Cities.FindAsync(requestDto.DestinationId);
-        if (destination is null)
-            return Result.Failure<int>(CityError.CityNotFound);
-
         var service = new Service
         {
             Name = requestDto.Name,
-            OriginId = requestDto.OriginId,
-            DestinationId = requestDto.DestinationId,
+            TripId = requestDto.TripId,
             EstimatedDuration = requestDto.EstimatedDuration,
             VehicleId = requestDto.VehicleId,
             Status = EntityStatusEnum.Active
@@ -68,6 +67,18 @@ public class ServiceBusiness : IServiceBusiness
             }
         }
 
+        // Add allowed directions whitelist
+        if (requestDto.AllowedDirectionIds?.Any() == true)
+        {
+            foreach (var directionId in requestDto.AllowedDirectionIds.Distinct())
+            {
+                service.AllowedDirections.Add(new ServiceDirection
+                {
+                    DirectionId = directionId
+                });
+            }
+        }
+
         await _context.Services.AddAsync(service);
         await _context.SaveChangesWithOutboxAsync();
 
@@ -80,19 +91,21 @@ public class ServiceBusiness : IServiceBusiness
     {
         var query = _context.Services
             .AsNoTracking()
-            .Include(s => s.Origin)
-            .Include(s => s.Destination)
+            .Include(s => s.Trip.OriginCity)
+            .Include(s => s.Trip.DestinationCity)
             .Include(s => s.Vehicle)
+            .Include(s => s.AllowedDirections)
+                .ThenInclude(ad => ad.Direction)
             .AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(requestDto.Filters?.Name))
             query = query.Where(s => s.Name.Contains(requestDto.Filters.Name));
 
         if (requestDto.Filters?.OriginId is not null && requestDto.Filters.OriginId > 0)
-            query = query.Where(s => s.OriginId == requestDto.Filters.OriginId);
+            query = query.Where(s => s.Trip.OriginCityId == requestDto.Filters.OriginId);
 
         if (requestDto.Filters?.DestinationId is not null && requestDto.Filters.DestinationId > 0)
-            query = query.Where(s => s.DestinationId == requestDto.Filters.DestinationId);
+            query = query.Where(s => s.Trip.DestinationCityId == requestDto.Filters.DestinationId);
 
         if (requestDto.Filters?.VehicleId is not null && requestDto.Filters.VehicleId > 0)
             query = query.Where(s => s.VehicleId == requestDto.Filters.VehicleId);
@@ -103,8 +116,8 @@ public class ServiceBusiness : IServiceBusiness
         var sortMappings = new Dictionary<string, Expression<Func<Service, object>>>
         {
             ["name"] = s => s.Name,
-            ["originid"] = s => s.OriginId,
-            ["destinationid"] = s => s.DestinationId,
+            ["originid"] = s => s.Trip.OriginCityId,
+            ["destinationid"] = s => s.Trip.DestinationCityId,
             ["vehicleid"] = s => s.VehicleId,
             ["status"] = s => s.Status
         };
@@ -114,10 +127,11 @@ public class ServiceBusiness : IServiceBusiness
             selector: s => new ServiceReportResponseDto(
                 s.ServiceId,
                 s.Name,
-                s.OriginId,
-                s.Origin.Name,
-                s.DestinationId,
-                s.Destination.Name,
+                s.TripId,
+                s.Trip.OriginCityId,
+                s.Trip.OriginCity.Name,
+                s.Trip.DestinationCityId,
+                s.Trip.DestinationCity.Name,
                 s.EstimatedDuration,
                 s.StartDay,
                 s.EndDay,
@@ -128,13 +142,17 @@ public class ServiceBusiness : IServiceBusiness
                     s.Vehicle.VehicleType.Name,
                     s.Vehicle.VehicleType.ImageBase64),
                 s.Status.ToString(),
-                s.ReservePrices.Select(p => new ReservePriceReport((int)p.ReserveTypeId, p.Price)).ToList(),
                 s.Schedules.Select(sc => new ServiceScheduleReportResponseDto(
                     sc.ServiceScheduleId,
                     sc.ServiceId,
                     sc.DepartureHour,
                     sc.IsHoliday,
                     sc.Status.ToString()
+                )).ToList(),
+                s.AllowedDirections.Select(ad => new ServiceDirectionResponseDto(
+                    ad.DirectionId,
+                    ad.Direction.Name,
+                    ad.Direction.CityId
                 )).ToList()
             ),
             sortMappings: sortMappings
@@ -147,21 +165,31 @@ public class ServiceBusiness : IServiceBusiness
     {
         var service = await _context.Services
             .Include(s => s.Schedules)
-            .Include(s => s.ReservePrices)
+            .Include(s => s.AllowedDirections)
             .SingleOrDefaultAsync(s => s.ServiceId == serviceId);
 
         if (service == null)
             return Result.Failure<bool>(ServiceError.ServiceNotFound);
 
+        var trip = await _context.Trips.FindAsync(dto.TripId);
+        if (trip is null)
+            return Result.Failure<bool>(TripError.TripNotFound);
+
+        if (trip.Status != EntityStatusEnum.Active)
+            return Result.Failure<bool>(TripError.TripNotActive);
+
         service.Name = dto.Name;
-        service.OriginId = dto.OriginId;
-        service.DestinationId = dto.DestinationId;
+        service.TripId = dto.TripId;
         service.EstimatedDuration = dto.EstimatedDuration;
         service.VehicleId = dto.VehicleId;
 
         if (dto.Schedules?.Any() == true)
         {
-            _context.ServiceSchedules.RemoveRange(service.Schedules);
+            // Soft delete existing schedules (can't hard delete due to FK from Reserves)
+            foreach (var existingSchedule in service.Schedules)
+            {
+                existingSchedule.Status = EntityStatusEnum.Deleted;
+            }
 
             foreach (var scheduleDto in dto.Schedules)
             {
@@ -174,6 +202,21 @@ public class ServiceBusiness : IServiceBusiness
                 };
 
                 _context.ServiceSchedules.Add(newSchedule);
+            }
+        }
+
+        // Update allowed directions whitelist (replace all)
+        if (dto.AllowedDirectionIds is not null)
+        {
+            _context.ServiceDirections.RemoveRange(service.AllowedDirections);
+
+            foreach (var directionId in dto.AllowedDirectionIds.Distinct())
+            {
+                _context.ServiceDirections.Add(new ServiceDirection
+                {
+                    ServiceId = serviceId,
+                    DirectionId = directionId
+                });
             }
         }
 
@@ -222,15 +265,20 @@ public class ServiceBusiness : IServiceBusiness
         var endDate = today.AddDays(_reserveOption.ReserveGenerationDays);
 
         var services = await _context.Services
-            .Where(s => s.Status == EntityStatusEnum.Active && s.ReservePrices.Any())
-            .Include(p => p.Reserves.Where(p => p.Status != ReserveStatusEnum.Expired))
-            .Include(s => s.Schedules.Where(p => p.Status == EntityStatusEnum.Active))
-            .Include(s => s.Origin)
-            .Include(s => s.Destination)
+            .Where(s => s.Status == EntityStatusEnum.Active)
+            .Include(s => s.Trip)
+            .Include(s => s.Reserves.Where(r => r.Status != ReserveStatusEnum.Expired))
+            .Include(s => s.Schedules.Where(sc => sc.Status == EntityStatusEnum.Active))
+            .Include(s => s.Trip.OriginCity)
+            .Include(s => s.Trip.DestinationCity)
             .ToListAsync();
 
         foreach (var service in services)
         {
+            // Skip services with inactive trip
+            if (service.Trip.Status != EntityStatusEnum.Active)
+                continue;
+
             foreach (var schedule in service.Schedules)
             {
                 for (var date = today; date <= endDate; date = date.AddDays(1))
@@ -254,10 +302,12 @@ public class ServiceBusiness : IServiceBusiness
                         Status = ReserveStatusEnum.Confirmed,
                         ServiceScheduleId = schedule.ServiceScheduleId,
                         DepartureHour = schedule.DepartureHour,
+                        EstimatedDuration = service.EstimatedDuration,
                         IsHoliday = schedule.IsHoliday,
                         ServiceName = service.Name,
-                        OriginName = service.Origin.Name,
-                        DestinationName = service.Destination.Name,
+                        TripId = service.TripId,
+                        OriginName = service.Trip.OriginCity.Name,
+                        DestinationName = service.Trip.DestinationCity.Name,
                     };
 
                     _context.Reserves.Add(reserve);
@@ -291,83 +341,6 @@ public class ServiceBusiness : IServiceBusiness
     private bool IsHoliday(DateTime date)
     {
         return _context.Holidays.Any(h => h.HolidayDate == date.Date);
-    }
-
-    public async Task<Result<bool>> UpdatePricesByPercentageAsync(PriceMassiveUpdateRequestDto requestDto)
-    {
-        var services = await _context.Services
-            .Include(s => s.ReservePrices)
-            .Where(s => s.Status == EntityStatusEnum.Active && s.ReservePrices.Any())
-            .ToListAsync();
-
-        foreach (var service in services)
-        {
-            foreach (var priceUpdate in requestDto.PriceUpdates)
-            {
-                var matchingPrices = service.ReservePrices
-                    .Where(p => p.ReserveTypeId == (ReserveTypeIdEnum)priceUpdate.ReserveTypeId && p.Status == EntityStatusEnum.Active);
-
-                foreach (var price in matchingPrices)
-                {
-                    var originalPrice = price.Price;
-                    var increase = originalPrice * (priceUpdate.Percentage / 100m);
-                    price.Price = decimal.Round(originalPrice + increase, 2);
-                }
-            }
-
-            _context.Services.Update(service);
-        }
-
-        await _context.SaveChangesWithOutboxAsync();
-        return Result.Success(true);
-    }
-
-    public async Task<Result<bool>> AddPrice(int serviceId, ServicePriceAddDto requestDto)
-    {
-        var service = await _context.Services.Include(p => p.ReservePrices).SingleOrDefaultAsync(p => p.ServiceId == serviceId);
-
-        if (service is null)
-        {
-            return Result.Failure<bool>(ServiceError.ServiceNotFound);
-        }
-
-        if (service.ReservePrices.Any(p => p.ReserveTypeId == (ReserveTypeIdEnum)requestDto.ReserveTypeId))
-        {
-            return Result.Failure<bool>(ReservePriceError.ReservePriceAlreadyExists);
-        }
-
-        ReservePrice reservePrice = new ReservePrice
-        {
-            ServiceId = serviceId,
-            ReserveTypeId = (ReserveTypeIdEnum)requestDto.ReserveTypeId,
-            Price = requestDto.Price,
-            Status = EntityStatusEnum.Active
-        };
-
-        _context.ReservePrices.Add(reservePrice);
-        await _context.SaveChangesWithOutboxAsync();
-
-        return Result.Success(true);
-    }
-
-    public async Task<Result<bool>> UpdatePrice(int serviceId, ServicePriceUpdateDto requestDto)
-    {
-        var service = await _context.Services.Include(p => p.ReservePrices).SingleOrDefaultAsync(p => p.ServiceId == serviceId);
-
-        if (service is null)
-        {
-            return Result.Failure<bool>(ServiceError.ServiceNotFound);
-        }
-
-        ReservePrice reservePrice = service.ReservePrices
-            .FirstOrDefault(p => p.ReserveTypeId == (ReserveTypeIdEnum)requestDto.ReserveTypeId);
-
-        reservePrice.Price = requestDto.Price;
-
-        _context.ReservePrices.Update(reservePrice);
-        await _context.SaveChangesWithOutboxAsync();
-
-        return Result.Success(true);
     }
 
     public async Task<Result<List<ServiceSchedule>>> GetSchedulesByServiceId(int serviceId)

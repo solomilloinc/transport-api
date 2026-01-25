@@ -14,6 +14,7 @@ using Transport.Domain.Services;
 using Transport.Business.Authentication;
 using Transport.Domain.Directions;
 using Transport.Domain.Passengers;
+using Transport.Domain.Trips;
 
 namespace Transport.Infraestructure.Database;
 
@@ -35,13 +36,16 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<Service> Services { get; set; }
     public DbSet<RefreshToken> RefreshTokens { get; set; }
     public DbSet<Holiday> Holidays { get; set; }
-    public DbSet<ReservePrice> ReservePrices { get; set; }
+    public DbSet<Trip> Trips { get; set; }
+    public DbSet<TripPrice> TripPrices { get; set; }
     public DbSet<Passenger> Passengers { get; set; }
     public DbSet<ServiceSchedule> ServiceSchedules { get; set; }
     public DbSet<ReservePayment> ReservePayments { get; set; }
     public DbSet<ReserveSlotLock> ReserveSlotLocks { get; set; }
     public DbSet<CustomerAccountTransaction> CustomerAccountTransactions { get; set; }
     public DbSet<CashBox> CashBoxes { get; set; }
+    public DbSet<ServiceDirection> ServiceDirections { get; set; }
+    public DbSet<ReserveDirection> ReserveDirections { get; set; }
 
     private readonly IUserContext _userContext;
 

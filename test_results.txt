@@ -1,0 +1,58 @@
+  Determinando los proyectos que se van a restaurar...
+  Todos los proyectos están actualizados para la restauración.
+  Transport.SharedKernel -> C:\Users\x\Documents\GitHub\transport-api\transport.common\bin\Debug\net8.0\Transport.SharedKernel.dll
+  Transport.Domain -> C:\Users\x\Documents\GitHub\transport-api\transport.domain\bin\Debug\net8.0\Transport.Domain.dll
+  Transport.Business -> C:\Users\x\Documents\GitHub\transport-api\transport.application\bin\Debug\net8.0\Transport.Business.dll
+  Transport.Infraestructure -> C:\Users\x\Documents\GitHub\transport-api\transport.infraestructure\bin\Debug\net8.0\Transport.Infraestructure.dll
+  Transport.Tests -> C:\Users\x\Documents\GitHub\transport-api\Transport.Tests\bin\Debug\net8.0\Transport.Tests.dll
+Serie de pruebas para C:\Users\x\Documents\GitHub\transport-api\Transport.Tests\bin\Debug\net8.0\Transport.Tests.dll (.NETCoreApp,Version=v8.0)
+Versión 17.14.1 (x64) de VSTest
+
+Iniciando la ejecución de pruebas, espere...
+1 archivos de prueba en total coincidieron con el patrón especificado.
+  Con error Transport.Tests.ReserveReportBusinessTest.GetReserveReport_ShouldReturnOutboundAndReturnWithCorrectOriginDestination_AndPassengersFilter [280 ms]
+  Mensaje de error:
+   System.NullReferenceException : Object reference not set to an instance of an object.
+  Seguimiento de la pila:
+     at Transport.Business.ReserveBusiness.ReserveBusiness.<>c__DisplayClass20_0.<GetReserveReport>b__9(Reserve rp) in C:\Users\x\Documents\GitHub\transport-api\transport.application\ReserveBusiness\ReserveBusiness.cs:line 981
+   at System.Linq.Utilities.<>c__DisplayClass1_0`1.<CombinePredicates>b__0(TSource x)
+   at System.Linq.Enumerable.WhereSelectListIterator`2.ToList()
+   at Transport.Business.ReserveBusiness.ReserveBusiness.GetReserveReport(PagedReportRequestDto`1 requestDto) in C:\Users\x\Documents\GitHub\transport-api\transport.application\ReserveBusiness\ReserveBusiness.cs:line 979
+   at Transport.Tests.ReserveReportBusinessTest.GetReserveReport_ShouldReturnOutboundAndReturnWithCorrectOriginDestination_AndPassengersFilter() in C:\Users\x\Documents\GitHub\transport-api\Transport.Tests\ReserveReportBusinessTest.cs:line 443
+--- End of stack trace from previous location ---
+  Con error Transport.Tests.ServiceBusinessTests.ServiceBusinessTests.Create_ShouldFail_WhenOriginCityNotFound [19 ms]
+  Mensaje de error:
+   System.NullReferenceException : Object reference not set to an instance of an object.
+  Seguimiento de la pila:
+     at Transport.Business.ServiceBusiness.ServiceBusiness.Create(ServiceCreateRequestDto requestDto) in C:\Users\x\Documents\GitHub\transport-api\transport.application\ServiceBusiness\ServiceBusiness.cs:line 82
+   at Transport.Tests.ServiceBusinessTests.ServiceBusinessTests.Create_ShouldFail_WhenOriginCityNotFound() in C:\Users\x\Documents\GitHub\transport-api\Transport.Tests\ServiceBusinessTest.cs:line 145
+--- End of stack trace from previous location ---
+  Con error Transport.Tests.ReserveReportBusinessTest.GetAvailableReserves_ShouldFilterReturnTrips_CorrectlyConsideringCapacity [7 ms]
+  Mensaje de error:
+   System.NullReferenceException : Object reference not set to an instance of an object.
+  Seguimiento de la pila:
+     at Transport.Business.ReserveBusiness.ReserveBusiness.<>c__DisplayClass20_0.<GetReserveReport>b__9(Reserve rp) in C:\Users\x\Documents\GitHub\transport-api\transport.application\ReserveBusiness\ReserveBusiness.cs:line 981
+   at System.Linq.Utilities.<>c__DisplayClass1_0`1.<CombinePredicates>b__0(TSource x)
+   at System.Linq.Enumerable.WhereSelectListIterator`2.ToList()
+   at Transport.Business.ReserveBusiness.ReserveBusiness.GetReserveReport(PagedReportRequestDto`1 requestDto) in C:\Users\x\Documents\GitHub\transport-api\transport.application\ReserveBusiness\ReserveBusiness.cs:line 979
+   at Transport.Tests.ReserveReportBusinessTest.GetAvailableReserves_ShouldFilterReturnTrips_CorrectlyConsideringCapacity() in C:\Users\x\Documents\GitHub\transport-api\Transport.Tests\ReserveReportBusinessTest.cs:line 653
+--- End of stack trace from previous location ---
+  Con error Transport.Tests.ReserveReportBusinessTest.GetAvailableReserves_ShouldReturnEmpty_WhenNotEnoughCapacityForPassengers [9 ms]
+  Mensaje de error:
+   System.NullReferenceException : Object reference not set to an instance of an object.
+  Seguimiento de la pila:
+     at Transport.Business.ReserveBusiness.ReserveBusiness.<>c__DisplayClass20_0.<GetReserveReport>b__9(Reserve rp) in C:\Users\x\Documents\GitHub\transport-api\transport.application\ReserveBusiness\ReserveBusiness.cs:line 981
+   at System.Linq.Utilities.<>c__DisplayClass1_0`1.<CombinePredicates>b__0(TSource x)
+   at System.Linq.Enumerable.WhereSelectListIterator`2.ToList()
+   at Transport.Business.ReserveBusiness.ReserveBusiness.GetReserveReport(PagedReportRequestDto`1 requestDto) in C:\Users\x\Documents\GitHub\transport-api\transport.application\ReserveBusiness\ReserveBusiness.cs:line 979
+   at Transport.Tests.ReserveReportBusinessTest.GetAvailableReserves_ShouldReturnEmpty_WhenNotEnoughCapacityForPassengers() in C:\Users\x\Documents\GitHub\transport-api\Transport.Tests\ReserveReportBusinessTest.cs:line 543
+--- End of stack trace from previous location ---
+  Con error Transport.Tests.ServiceBusinessTests.ServiceBusinessTests.Create_ShouldFail_WhenDestinationCityNotFound [5 ms]
+  Mensaje de error:
+   System.NullReferenceException : Object reference not set to an instance of an object.
+  Seguimiento de la pila:
+     at Transport.Business.ServiceBusiness.ServiceBusiness.Create(ServiceCreateRequestDto requestDto) in C:\Users\x\Documents\GitHub\transport-api\transport.application\ServiceBusiness\ServiceBusiness.cs:line 82
+   at Transport.Tests.ServiceBusinessTests.ServiceBusinessTests.Create_ShouldFail_WhenDestinationCityNotFound() in C:\Users\x\Documents\GitHub\transport-api\Transport.Tests\ServiceBusinessTest.cs:line 177
+--- End of stack trace from previous location ---
+
+Con error! - Con error:     5, Superado:    15, Omitido:     0, Total:    20, Duración: 551 ms - Transport.Tests.dll (net8.0)

@@ -12,12 +12,9 @@ public class ServiceCreateRequestValidator : AbstractValidator<ServiceCreateRequ
             .WithMessage("Service name is required.")
             .MaximumLength(100)
             .WithMessage("Service name must not exceed 100 characters.");
-        RuleFor(x => x.OriginId)
+        RuleFor(x => x.TripId)
             .GreaterThan(0)
-            .WithMessage("Origin city ID must be greater than 0.");
-        RuleFor(x => x.DestinationId)
-            .GreaterThan(0)
-            .WithMessage("Destination city ID must be greater than 0.");
+            .WithMessage("Trip ID must be greater than 0.");
         RuleFor(x => x.EstimatedDuration)
             .NotEmpty()
             .WithMessage("Estimated duration is required.");

@@ -31,6 +31,27 @@ public class ReservesFunction : FunctionBase
         _reserveBusiness = reserveBusiness;
     }
 
+    [Function("CreateReserve")]
+    [Authorize("Admin")]
+    [OpenApiOperation(
+        operationId: "reserve-create",
+        tags: new[] { "Reserve" },
+        Summary = "Create Reserve",
+        Description = "Creates a new reserve without requiring a service. The reserve is created with the specified origin, destination, vehicle, and departure time.",
+        Visibility = OpenApiVisibilityType.Important)]
+    [OpenApiRequestBody("application/json", typeof(ReserveCreateDto), Required = true)]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(Result<int>), Summary = "Reserve created successfully, returns the reserve ID.")]
+    public async Task<HttpResponseData> CreateReserve(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "reserve-create")] HttpRequestData req)
+    {
+        var dto = await req.ReadFromJsonAsync<ReserveCreateDto>();
+
+        var result = await ValidateAndMatchAsync(req, dto, GetValidator<ReserveCreateDto>())
+                        .BindAsync(_reserveBusiness.CreateReserve);
+
+        return await MatchResultAsync(req, result);
+    }
+
     [Function("CreatePassengerReserves")]
     [Authorize("Admin")]
     [OpenApiOperation(
@@ -49,20 +70,6 @@ public class ReservesFunction : FunctionBase
         var result = await ValidateAndMatchAsync(req, dto, GetValidator<PassengerReserveCreateRequestWrapperDto>())
                         .BindAsync(_reserveBusiness.CreatePassengerReserves);
 
-        return await MatchResultAsync(req, result);
-    }
-
-
-    [Function("GetReservePriceReport")]
-    [Authorize("Admin")]
-    [OpenApiOperation(operationId: "reserve-price-report", tags: new[] { "ReservePrice" }, Summary = "Get Reserve Price Report", Description = "Returns paginated list of reserve prices", Visibility = OpenApiVisibilityType.Important)]
-    [OpenApiRequestBody("application/json", typeof(PagedReportRequestDto<ReservePriceReportFilterRequestDto>), Required = true)]
-    [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(PagedReportResponseDto<ReservePriceReportResponseDto>), Summary = "Reserve Price Report")]
-    public async Task<HttpResponseData> GetReservePriceReport(
-     [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "reserve-price-report")] HttpRequestData req)
-    {
-        var filter = await req.ReadFromJsonAsync<PagedReportRequestDto<ReservePriceReportFilterRequestDto>>();
-        var result = await _reserveBusiness.GetReservePriceReport(filter);
         return await MatchResultAsync(req, result);
     }
 

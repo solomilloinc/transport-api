@@ -6,10 +6,8 @@ namespace Transport.Domain.Reserves.Abstraction;
 
 public interface IReserveBusiness
 {
+    Task<Result<int>> CreateReserve(ReserveCreateDto dto);
     Task<Result<bool>> CreatePassengerReserves(PassengerReserveCreateRequestWrapperDto dto);
-
-    Task<Result<PagedReportResponseDto<ReservePriceReportResponseDto>>>
-     GetReservePriceReport(PagedReportRequestDto<ReservePriceReportFilterRequestDto> requestDto);
 
     Task<Result<PagedReportResponseDto<ReserveReportResponseDto>>>
     GetReserveReport(DateTime reserveDate, PagedReportRequestDto<ReserveReportFilterRequestDto> requestDto);

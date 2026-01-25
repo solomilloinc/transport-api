@@ -69,7 +69,7 @@ public class CityBusiness : ICityBusiness
             .AsNoTracking()
             .AsQueryable();
 
-        if (requestDto.Filters.WithDirections)
+        if (requestDto.Filters?.WithDirections == true)
         {
             query = query.Include(c => c.Directions.Any());
         }
@@ -80,7 +80,7 @@ public class CityBusiness : ICityBusiness
         if (!string.IsNullOrWhiteSpace(requestDto.Filters?.Name))
             query = query.Where(v => v.Name.Contains(requestDto.Filters.Name));
 
-        if (requestDto.Filters.Status is not null)
+        if (requestDto.Filters?.Status is not null)
             query = query.Where(v => v.Status == requestDto.Filters.Status);
 
         var sortMappings = new Dictionary<string, Expression<Func<City, object>>>

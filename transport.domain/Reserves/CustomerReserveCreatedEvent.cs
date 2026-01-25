@@ -1,8 +1,19 @@
-﻿using Transport.SharedKernel;
+using Transport.SharedKernel;
 
 namespace Transport.Domain.Reserves;
 
-public record CustomerReserveCreatedEvent(int ReserveId, int CustomerId) : IDomainEvent
+public record CustomerReserveCreatedEvent(
+    int ReserveId,
+    int? CustomerId,
+    string CustomerEmail,
+    string CustomerFullName,
+    string ServiceName,
+    string OriginName,
+    string DestinationName,
+    DateTime ReserveDate,
+    TimeSpan DepartureHour,
+    decimal TotalPrice
+) : IDomainEvent
 {
     public Guid EventId => Guid.NewGuid();
 

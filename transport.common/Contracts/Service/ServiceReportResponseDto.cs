@@ -3,6 +3,7 @@
 public record ServiceReportResponseDto(
     int ServiceId,
     string Name,
+    int TripId,
     int OriginId,
     string OriginName,
     int DestinationId,
@@ -12,5 +13,10 @@ public record ServiceReportResponseDto(
     DayOfWeek EndDay,
     ServiceVehicleResponseDto Vehicle,
     string Status,
-    List<ReservePriceReport> ReservePrices,
-    List<ServiceScheduleReportResponseDto> Schedulers);
+    List<ServiceScheduleReportResponseDto> Schedulers,
+    List<ServiceDirectionResponseDto> AllowedDirections);
+
+public record ServiceDirectionResponseDto(
+    int DirectionId,
+    string Name,
+    int CityId);

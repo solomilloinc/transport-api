@@ -1,5 +1,4 @@
 ﻿using Transport.Domain.Directions;
-using Transport.Domain.Services;
 using Transport.SharedKernel;
 
 namespace Transport.Domain.Cities;
@@ -15,8 +14,6 @@ public class City : Entity, IAuditable
     public DateTime CreatedDate { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedDate { get; set; }
 
-
     public ICollection<Direction> Directions { get; set; } = new List<Direction>();
-    public ICollection<Service> OriginServices { get; set; } = new List<Service>();
-    public ICollection<Service> DestinationServices { get; set; } = new List<Service>();
 }
+
