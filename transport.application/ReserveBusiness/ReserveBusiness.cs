@@ -939,27 +939,35 @@ public class ReserveBusiness : IReserveBusiness
         var idaDate = requestDto.Filters.DepartureDate.Date;
         var vueltaDate = requestDto.Filters.ReturnDate?.Date;
         var passengersRequested = requestDto.Filters.Passengers;
+        var tripId = requestDto.Filters.TripId;
 
-        var originId = requestDto.Filters.OriginId;
-        var destinationId = requestDto.Filters.DestinationId;
-
-        // Pre-fetch prices for ida and vuelta routes via Trip
+        // Fetch the ida trip with prices
         var idaTrip = await _context.Trips
-            .Where(t => t.OriginCityId == originId && t.DestinationCityId == destinationId
-                     && t.Status == EntityStatusEnum.Active)
+            .Where(t => t.TripId == tripId && t.Status == EntityStatusEnum.Active)
             .Include(t => t.Prices.Where(p => p.Status == EntityStatusEnum.Active))
             .FirstOrDefaultAsync();
 
-        var vueltaTrip = await _context.Trips
-            .Where(t => t.OriginCityId == destinationId && t.DestinationCityId == originId
-                     && t.Status == EntityStatusEnum.Active)
-            .Include(t => t.Prices.Where(p => p.Status == EntityStatusEnum.Active))
-            .FirstOrDefaultAsync();
+        if (idaTrip == null)
+            return Result.Failure<ReserveGroupedPagedReportResponseDto>(TripError.TripNotFound);
 
-        var idaPrice = idaTrip?.Prices
+        var originId = idaTrip.OriginCityId;
+        var destinationId = idaTrip.DestinationCityId;
+
+        // Fetch the return trip (inverse route) if needed
+        Trip? vueltaTrip = null;
+        if (vueltaDate.HasValue)
+        {
+            vueltaTrip = await _context.Trips
+                .Where(t => t.OriginCityId == destinationId && t.DestinationCityId == originId
+                         && t.Status == EntityStatusEnum.Active)
+                .Include(t => t.Prices.Where(p => p.Status == EntityStatusEnum.Active))
+                .FirstOrDefaultAsync();
+        }
+
+        var idaPrice = idaTrip.Prices
             .Where(p => p.ReserveTypeId == ReserveTypeIdEnum.Ida && p.CityId == destinationId && p.DirectionId == null)
             .Select(p => p.Price)
-            .FirstOrDefault() ?? 0;
+            .FirstOrDefault();
 
         var vueltaPrice = vueltaTrip?.Prices
             .Where(p => p.ReserveTypeId == ReserveTypeIdEnum.Ida && p.CityId == originId && p.DirectionId == null)
@@ -978,7 +986,7 @@ public class ReserveBusiness : IReserveBusiness
 
         var idaItems = items
             .Where(rp => rp.ReserveDate.Date == idaDate)
-            .Where(rp => rp.Trip.OriginCityId == originId && rp.Trip.DestinationCityId == destinationId)
+            .Where(rp => rp.TripId == tripId)
             .Where(rp =>
             {
                 int totalReserved = rp.Passengers
@@ -1008,10 +1016,10 @@ public class ReserveBusiness : IReserveBusiness
             })
             .ToList();
 
-        var vueltaItems = vueltaDate.HasValue
+        var vueltaItems = vueltaDate.HasValue && vueltaTrip != null
             ? items
                 .Where(rp => rp.ReserveDate.Date == vueltaDate.Value)
-                .Where(rp => rp.Trip.OriginCityId == destinationId && rp.Trip.DestinationCityId == originId)
+                .Where(rp => rp.TripId == vueltaTrip.TripId)
                 .Where(rp =>
                 {
                     int totalReserved = rp.Passengers

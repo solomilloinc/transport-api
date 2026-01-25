@@ -7,12 +7,8 @@ public class GetReserveReportValidator : AbstractValidator<ReserveReportFilterRe
 {
     public GetReserveReportValidator()
     {
-        RuleFor(x => x.OriginId)
-            .GreaterThan(0).WithMessage("OriginId must be greater than zero.");
-
-        RuleFor(x => x.DestinationId)
-            .GreaterThan(0).WithMessage("DestinationId must be greater than zero.")
-            .NotEqual(x => x.OriginId).WithMessage("DestinationId must be different from OriginId.");
+        RuleFor(x => x.TripId)
+            .GreaterThan(0).WithMessage("TripId must be greater than zero.");
 
         RuleFor(x => x.Passengers)
             .GreaterThan(0).WithMessage("Passengers must be greater than zero.");

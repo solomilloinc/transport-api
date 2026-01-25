@@ -425,8 +425,7 @@ public class ReserveReportBusinessTest : TestBase
         };
 
         var filter = new ReserveReportFilterRequestDto(
-            OriginId: 1,
-            DestinationId: 2,
+            TripId: 1,
             TripType: "IdaVuelta",
             Passengers: passengersRequested,
             DepartureDate: departureDate,
@@ -538,8 +537,7 @@ public class ReserveReportBusinessTest : TestBase
             PageNumber = 1,
             PageSize = 10,
             Filters = new ReserveReportFilterRequestDto(
-                OriginId: 1,
-                DestinationId: 2,
+                TripId: 1,
                 TripType: "Ida",
                 Passengers: passengersRequested,
                 DepartureDate: departureDate,
@@ -654,8 +652,7 @@ public class ReserveReportBusinessTest : TestBase
             PageNumber = 1,
             PageSize = 10,
             Filters = new ReserveReportFilterRequestDto(
-                OriginId: 1,
-                DestinationId: 2,
+                TripId: 1,
                 TripType: "IdaVuelta",
                 Passengers: passengersRequested,
                 DepartureDate: departureDate,

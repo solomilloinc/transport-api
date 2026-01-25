@@ -517,4 +517,47 @@ public class TripBusiness : ITripBusiness
 
         return Result.Failure<decimal>(TripError.TripPriceNotFound);
     }
+
+    /// <summary>
+    /// Gets active trips for public landing page display.
+    /// Returns basic trip info with optional minimum price.
+    /// </summary>
+    public async Task<Result<PagedReportResponseDto<PublicTripDto>>> GetPublicTrips(int pageNumber = 1, int pageSize = 100)
+    {
+        var query = _context.Trips
+            .AsNoTracking()
+            .Where(t => t.Status == EntityStatusEnum.Active)
+            .Include(t => t.OriginCity)
+            .Include(t => t.DestinationCity)
+            .Include(t => t.Prices.Where(p => p.Status == EntityStatusEnum.Active));
+
+        var totalRecords = await query.CountAsync();
+
+        var trips = await query
+            .OrderBy(t => t.OriginCity.Name)
+            .ThenBy(t => t.DestinationCity.Name)
+            .Skip((pageNumber - 1) * pageSize)
+            .Take(pageSize)
+            .Select(t => new PublicTripDto(
+                t.TripId,
+                t.Description,
+                t.OriginCityId,
+                t.OriginCity.Name,
+                t.DestinationCityId,
+                t.DestinationCity.Name,
+                t.Prices.Any() ? t.Prices.Min(p => p.Price) : null,
+                null // EstimatedDuration - could be added if available from Service
+            ))
+            .ToListAsync();
+
+        var result = new PagedReportResponseDto<PublicTripDto>
+        {
+            Items = trips,
+            PageNumber = pageNumber,
+            PageSize = pageSize,
+            TotalRecords = totalRecords
+        };
+
+        return Result.Success(result);
+    }
 }

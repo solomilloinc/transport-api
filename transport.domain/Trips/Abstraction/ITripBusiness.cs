@@ -20,4 +20,7 @@ public interface ITripBusiness
 
     // Price lookup for reservations
     Task<Result<decimal>> GetPriceForReservation(int tripId, int? dropoffCityId, int? dropoffDirectionId, int reserveTypeId);
+
+    // Public endpoint
+    Task<Result<PagedReportResponseDto<PublicTripDto>>> GetPublicTrips(int pageNumber = 1, int pageSize = 100);
 }
