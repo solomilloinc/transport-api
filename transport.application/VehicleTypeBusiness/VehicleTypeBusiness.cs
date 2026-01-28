@@ -69,6 +69,7 @@ public class VehicleTypeBusiness : IVehicleTypeBusiness
     public async Task<Result<PagedReportResponseDto<VehicleTypeReportResponseDto>>> GetVehicleTypeReport(PagedReportRequestDto<VehicleTypeReportFilterRequestDto> requestDto)
     {
         var query = _context.VehicleTypes
+            .Where(vt => vt.Status == EntityStatusEnum.Active)
             .AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(requestDto.Filters?.Name))
