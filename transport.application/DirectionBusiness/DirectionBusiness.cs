@@ -25,7 +25,8 @@ public class DirectionBusiness : IDirectionBusiness
             Name = dto.Name,
             Lat = dto.Lat,
             Lng = dto.Lng,
-            CityId = dto.CityId
+            CityId = dto.CityId,
+            Status = EntityStatusEnum.Active
         };
 
         _context.Directions.Add(direction);
@@ -64,6 +65,7 @@ public class DirectionBusiness : IDirectionBusiness
         var query = _context.Directions
              .AsNoTracking()
              .Include(d => d.City)
+             .Where(p => p.Status != EntityStatusEnum.Active)
              .AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(requestDto.Filters?.DirectionName))
