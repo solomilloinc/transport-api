@@ -129,6 +129,7 @@ public class VehicleBusiness : IVehicleBusiness
         var query = _context.Vehicles
             .AsNoTracking()
             .Include(v => v.VehicleType)
+            .Where(v => v.Status == EntityStatusEnum.Active)
             .AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(requestDto.Filters?.InternalNumber))
