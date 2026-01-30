@@ -1,8 +1,10 @@
-﻿namespace Transport.SharedKernel.Contracts.Customer;
+namespace Transport.SharedKernel.Contracts.Customer;
 
-public record CustomerCreateRequestDto(string FirstName,
+public record CustomerCreateRequestDto(
+    string FirstName,
     string LastName,
     string Email,
     string DocumentNumber,
     string Phone1,
-    string? Phone2);
+    string? Phone2,
+    List<int>? ServiceIds = null);

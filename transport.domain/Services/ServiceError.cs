@@ -28,4 +28,11 @@ public static class ServiceError
               $"Hay conflictos de días y horarios en el servicio para el día {startDay} y {endDay} a las {departureHour}.",
               ErrorType.Validation
           );
+
+    public static Error ServiceNotActive(int serviceId) =>
+          new Error(
+              "Service.ServiceNotActive",
+              $"El servicio con Id {serviceId} no existe o no está activo",
+              ErrorType.Validation
+          );
 }

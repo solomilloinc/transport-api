@@ -420,4 +420,15 @@ public class ServiceBusiness : IServiceBusiness
 
         return Result.Success(true);
     }
+
+    public async Task<Result<List<ServiceIdNameDto>>> GetActiveServicesListAsync()
+    {
+        var services = await _context.Services
+            .AsNoTracking()
+            .Where(s => s.Status == EntityStatusEnum.Active)
+            .Select(s => new ServiceIdNameDto(s.ServiceId, s.Name))
+            .ToListAsync();
+
+        return Result.Success(services);
+    }
 }

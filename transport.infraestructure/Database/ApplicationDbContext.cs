@@ -45,6 +45,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<CustomerAccountTransaction> CustomerAccountTransactions { get; set; }
     public DbSet<CashBox> CashBoxes { get; set; }
     public DbSet<ServiceDirection> ServiceDirections { get; set; }
+    public DbSet<ServiceCustomer> ServiceCustomers { get; set; }
     public DbSet<ReserveDirection> ReserveDirections { get; set; }
 
     private readonly IUserContext _userContext;

@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Transport.SharedKernel;
 using Transport.Business.Data;
 using Transport.Domain.Customers;
@@ -7,6 +7,7 @@ using Transport.SharedKernel.Contracts.Customer;
 using System.Linq.Expressions;
 using Transport.Domain.Reserves;
 using Transport.SharedKernel.Contracts.Reserve;
+using Transport.Domain.Services;
 
 namespace Transport.Business.CustomerBusiness;
 
@@ -29,6 +30,13 @@ public class CustomerBusiness : ICustomerBusiness
             return Result.Failure<int>(CustomerError.AlreadyExists);
         }
 
+        if (dto.ServiceIds?.Any() == true)
+        {
+            var validationResult = await ValidateServiceIdsAsync(dto.ServiceIds);
+            if (validationResult.IsFailure)
+                return Result.Failure<int>(validationResult.Error);
+        }
+
         customer = new Customer
         {
             FirstName = dto.FirstName,
@@ -41,6 +49,19 @@ public class CustomerBusiness : ICustomerBusiness
 
         _context.Customers.Add(customer);
         await _context.SaveChangesWithOutboxAsync();
+
+        if (dto.ServiceIds?.Any() == true)
+        {
+            foreach (var serviceId in dto.ServiceIds.Distinct())
+            {
+                _context.ServiceCustomers.Add(new ServiceCustomer
+                {
+                    CustomerId = customer.CustomerId,
+                    ServiceId = serviceId
+                });
+            }
+            await _context.SaveChangesWithOutboxAsync();
+        }
 
         return customer.CustomerId;
     }
@@ -100,6 +121,30 @@ public class CustomerBusiness : ICustomerBusiness
         if (customer is null)
         {
             return Result.Failure<bool>(CustomerError.NotFound);
+        }
+
+        if (dto.ServiceIds is not null)
+        {
+            if (dto.ServiceIds.Any())
+            {
+                var validationResult = await ValidateServiceIdsAsync(dto.ServiceIds);
+                if (validationResult.IsFailure)
+                    return Result.Failure<bool>(validationResult.Error);
+            }
+
+            var existingRelations = await _context.ServiceCustomers
+                .Where(sc => sc.CustomerId == customerId)
+                .ToListAsync();
+            _context.ServiceCustomers.RemoveRange(existingRelations);
+
+            foreach (var serviceId in dto.ServiceIds.Distinct())
+            {
+                _context.ServiceCustomers.Add(new ServiceCustomer
+                {
+                    CustomerId = customerId,
+                    ServiceId = serviceId
+                });
+            }
         }
 
         customer.FirstName = dto.FirstName;
@@ -178,4 +223,20 @@ public class CustomerBusiness : ICustomerBusiness
         return Result.Success(result);
     }
 
+    private async Task<Result<bool>> ValidateServiceIdsAsync(List<int> serviceIds)
+    {
+        var distinctIds = serviceIds.Distinct().ToList();
+        var activeServiceIds = await _context.Services
+            .Where(s => distinctIds.Contains(s.ServiceId) && s.Status == EntityStatusEnum.Active)
+            .Select(s => s.ServiceId)
+            .ToListAsync();
+
+        var invalidServiceId = distinctIds.FirstOrDefault(id => !activeServiceIds.Contains(id));
+        if (invalidServiceId != 0)
+        {
+            return Result.Failure<bool>(ServiceError.ServiceNotActive(invalidServiceId));
+        }
+
+        return Result.Success(true);
+    }
 }
