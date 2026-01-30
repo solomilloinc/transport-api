@@ -80,4 +80,15 @@ public sealed class ServicesFunction : FunctionBase
         var result = await _serviceBusiness.GetServiceReport(filter);
         return await MatchResultAsync(req, result);
     }
+
+    [Function("GetActiveServicesList")]
+    [Authorize("Admin")]
+    [OpenApiOperation(operationId: "services-list", tags: new[] { "Service" }, Summary = "Get Active Services List", Description = "Returns a list of active services (Id and Name) for dropdowns", Visibility = OpenApiVisibilityType.Important)]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(List<ServiceIdNameDto>), Summary = "Active Services List")]
+    public async Task<HttpResponseData> GetActiveServicesList(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "services-list")] HttpRequestData req)
+    {
+        var result = await _serviceBusiness.GetActiveServicesListAsync();
+        return await MatchResultAsync(req, result);
+    }
 }
