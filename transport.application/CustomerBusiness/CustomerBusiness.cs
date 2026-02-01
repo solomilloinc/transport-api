@@ -85,6 +85,8 @@ public class CustomerBusiness : ICustomerBusiness
     public async Task<Result<PagedReportResponseDto<CustomerReportResponseDto>>> GetCustomerReport(PagedReportRequestDto<CustomerReportFilterRequestDto> requestDto)
     {
         var query = _context.Customers
+            .Include(c => c.Services)
+                .ThenInclude(sc => sc.Service)
             .AsNoTracking()
             .AsQueryable();
 
@@ -107,7 +109,7 @@ public class CustomerBusiness : ICustomerBusiness
 
         var pagedResult = await query.ToPagedReportAsync<CustomerReportResponseDto, Customer, CustomerReportFilterRequestDto>(
             requestDto,
-            selector: c => new CustomerReportResponseDto(c.CustomerId, c.FirstName, c.LastName, c.Email, c.DocumentNumber, c.Phone1, c.Phone2, c.CreatedDate, c.CurrentBalance),
+            selector: c => new CustomerReportResponseDto(c.CustomerId, c.FirstName, c.LastName, c.Email, c.DocumentNumber, c.Phone1, c.Phone2, c.CreatedDate, c.CurrentBalance, c.Services.Select(s => new CustomerServiceDto(s.ServiceId, s.Service.Name)).ToList()),
             sortMappings: sortMappings
         );
 
