@@ -29,6 +29,8 @@ public interface IReserveBusiness
         int reserveId,
         PagedReportRequestDto<ReservePaymentSummaryFilterRequestDto> requestDto);
 
+    Task<Result<bool>> SettleCustomerDebtAsync(SettleCustomerDebtRequestDto request);
+
     // Métodos para bloqueo de cupos
     Task<Result<LockReserveSlotsResponseDto>> LockReserveSlots(LockReserveSlotsRequestDto request);
     Task<Result<CreateReserveExternalResult>> CreatePassengerReservesWithLock(CreateReserveWithLockRequestDto request);

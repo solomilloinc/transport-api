@@ -259,6 +259,28 @@ public class ReservesFunction : FunctionBase
         return await MatchResultAsync(req, result);
     }
 
+    [Function("SettleCustomerDebt")]
+    [Authorize("Admin")]
+    [OpenApiOperation(
+        operationId: "customer-debt-settle",
+        tags: new[] { "ReservePayments" },
+        Summary = "Settle Customer Debt",
+        Description = "Applies a payment to settle debt across multiple reserves for a customer.",
+        Visibility = OpenApiVisibilityType.Important)]
+    [OpenApiRequestBody("application/json", typeof(SettleCustomerDebtRequestDto), Required = true)]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(Result<bool>), Summary = "Debt settled successfully")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Summary = "Invalid request")]
+    public async Task<HttpResponseData> SettleCustomerDebt(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "customer-debt-settle")] HttpRequestData req)
+    {
+        var dto = await req.ReadFromJsonAsync<SettleCustomerDebtRequestDto>();
+
+        var result = await ValidateAndMatchAsync(req, dto, GetValidator<SettleCustomerDebtRequestDto>())
+                        .BindAsync(_reserveBusiness.SettleCustomerDebtAsync);
+
+        return await MatchResultAsync(req, result);
+    }
+
     [Function("GetReservePaymentSummary")]
     [Authorize("Admin")]
     [OpenApiOperation(
