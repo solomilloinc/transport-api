@@ -224,7 +224,7 @@ public class ReserveBusiness : IReserveBusiness
                     DropoffAddress = dropoffResult.Value?.Name,
                     HasTraveled = dto.HasTraveled,
                     Price = reservePrice.Value,
-                    Status = PassengerStatusEnum.Confirmed,
+                    Status = PassengerStatusEnum.PendingPayment,
                     CustomerId = payer.CustomerId,
                     DocumentNumber = payer.DocumentNumber,
                     FirstName = payer.FirstName,
@@ -265,9 +265,9 @@ public class ReserveBusiness : IReserveBusiness
 
             var totalProvidedAmount = passengerReserves.Payments.Sum(p => p.TransactionAmount);
 
-            // (Opcional) Enforce igualdad total vs pagos:
-            if (totalExpectedAmount != totalProvidedAmount)
-                return Result.Failure<bool>(ReserveError.InvalidPaymentAmount(totalExpectedAmount, totalProvidedAmount));
+            // Rechazar sobrepagos, permitir pagos parciales
+            if (totalProvidedAmount > totalExpectedAmount)
+                return Result.Failure<bool>(ReserveError.OverPaymentNotAllowed(totalExpectedAmount, totalProvidedAmount));
 
             // Obtener la caja abierta
             var cashBoxResult = await _cashBoxBusiness.GetOpenCashBoxEntity();
@@ -319,18 +319,37 @@ public class ReserveBusiness : IReserveBusiness
             }
 
             // Asiento de Payment (negativo) e impacto en saldo
+            var paymentDescription = totalProvidedAmount < totalExpectedAmount
+                ? $"Pago parcial aplicado a {description}"
+                : $"Pago aplicado a {description}";
             _context.CustomerAccountTransactions.Add(new CustomerAccountTransaction
             {
                 CustomerId = payer.CustomerId,
                 Date = DateTime.UtcNow,
                 Type = TransactionType.Payment,
                 Amount = -totalProvidedAmount,
-                Description = $"Pago aplicado a {description}",
+                Description = paymentDescription,
                 RelatedReserveId = mainReserveId,
                 ReservePaymentId = parentPayment.ReservePaymentId
             });
             payer.CurrentBalance -= totalProvidedAmount;
             _context.Customers.Update(payer);
+
+            // Si el pago cubre el total, confirmar todos los pasajeros
+            if (totalProvidedAmount >= totalExpectedAmount)
+            {
+                foreach (var reserve in reserveMap.Values)
+                {
+                    foreach (var p in reserve.Passengers)
+                    {
+                        if (p.Status == PassengerStatusEnum.PendingPayment)
+                        {
+                            p.Status = PassengerStatusEnum.Confirmed;
+                            _context.Passengers.Update(p);
+                        }
+                    }
+                }
+            }
 
             await _context.SaveChangesWithOutboxAsync();
             return Result.Success(true);
@@ -1362,12 +1381,24 @@ public class ReserveBusiness : IReserveBusiness
             }
 
             // Calcular el monto esperado basado en los pasajeros
-            var expectedAmount = reserve.Passengers.Sum(p => p.Price);
+            var totalPassengerPrice = reserve.Passengers.Sum(p => p.Price);
             var providedAmount = payments.Sum(p => p.TransactionAmount);
 
-            if (expectedAmount != providedAmount)
+            // Calcular pagos ya realizados (padres con status Paid)
+            var totalAlreadyPaid = await _context.ReservePayments
+                .Where(rp => rp.ReserveId == reserveId
+                    && rp.ParentReservePaymentId == null
+                    && rp.Status == StatusPaymentEnum.Paid)
+                .SumAsync(rp => rp.Amount);
+
+            var remainingAmount = totalPassengerPrice - totalAlreadyPaid;
+
+            if (remainingAmount <= 0)
+                return Result.Failure<bool>(ReserveError.AlreadyFullyPaid(reserveId));
+
+            if (providedAmount > remainingAmount)
                 return Result.Failure<bool>(
-                    ReserveError.InvalidPaymentAmount(expectedAmount, providedAmount));
+                    ReserveError.OverPaymentNotAllowed(remainingAmount, providedAmount));
 
             Customer payer = await _context.Customers.FindAsync(customerId);
             if (payer == null)
@@ -1420,13 +1451,16 @@ public class ReserveBusiness : IReserveBusiness
                 }
             }
 
-            // Actualizar estado de los pasajeros a confirmado
-            foreach (var passenger in reserve.Passengers)
+            // Solo confirmar pasajeros si la deuda queda completamente saldada
+            if (totalAlreadyPaid + providedAmount >= totalPassengerPrice)
             {
-                if (passenger.Status == PassengerStatusEnum.PendingPayment)
+                foreach (var passenger in reserve.Passengers)
                 {
-                    passenger.Status = PassengerStatusEnum.Confirmed;
-                    _context.Passengers.Update(passenger);
+                    if (passenger.Status == PassengerStatusEnum.PendingPayment)
+                    {
+                        passenger.Status = PassengerStatusEnum.Confirmed;
+                        _context.Passengers.Update(passenger);
+                    }
                 }
             }
 
@@ -1445,6 +1479,173 @@ public class ReserveBusiness : IReserveBusiness
 
             payer.CurrentBalance -= providedAmount;
             _context.Customers.Update(payer);
+
+            await _context.SaveChangesWithOutboxAsync();
+            return Result.Success(true);
+        });
+    }
+
+    public async Task<Result<bool>> SettleCustomerDebtAsync(SettleCustomerDebtRequestDto request)
+    {
+        return await _unitOfWork.ExecuteInTransactionAsync(async () =>
+        {
+            // 1. Validar customer existe
+            var customer = await _context.Customers.FindAsync(request.CustomerId);
+            if (customer is null)
+                return Result.Failure<bool>(CustomerError.NotFound);
+
+            // 2. Validar pagos (montos > 0, sin metodos duplicados)
+            var invalidAmounts = request.Payments
+                .Select((p, i) => new { Index = i + 1, Amount = p.TransactionAmount })
+                .Where(p => p.Amount <= 0)
+                .ToList();
+
+            if (invalidAmounts.Any())
+            {
+                var errorMsg = string.Join(", ",
+                    invalidAmounts.Select(p => $"Pago #{p.Index} tiene monto inválido: {p.Amount}"));
+                return Result.Failure<bool>(Error.Validation("Payments.InvalidAmount", errorMsg));
+            }
+
+            var duplicatedMethods = request.Payments
+                .GroupBy(p => p.PaymentMethod)
+                .Where(g => g.Count() > 1)
+                .Select(g => g.Key)
+                .ToList();
+
+            if (duplicatedMethods.Any())
+            {
+                var duplicatedList = string.Join(", ", duplicatedMethods);
+                return Result.Failure<bool>(Error.Validation("Payments.DuplicatedMethod",
+                    $"Los métodos de pago no deben repetirse. Duplicados: {duplicatedList}"));
+            }
+
+            // 3. Cargar reservas con pasajeros del customer
+            var reserves = await _context.Reserves
+                .Include(r => r.Passengers)
+                .Where(r => request.ReserveIds.Contains(r.ReserveId))
+                .ToListAsync();
+
+            if (!reserves.Any())
+                return Result.Failure<bool>(ReserveError.NotFound);
+
+            // 4. Para cada reserva: calcular deuda pendiente
+            var reserveDebts = new List<(Reserve Reserve, decimal Debt)>();
+            foreach (var reserve in reserves)
+            {
+                var customerPassengerPrice = reserve.Passengers
+                    .Where(p => p.CustomerId == request.CustomerId)
+                    .Sum(p => p.Price);
+
+                var paidAmount = await _context.ReservePayments
+                    .Where(rp => rp.ReserveId == reserve.ReserveId
+                        && rp.CustomerId == request.CustomerId
+                        && rp.ParentReservePaymentId == null
+                        && rp.Status == StatusPaymentEnum.Paid)
+                    .SumAsync(rp => rp.Amount);
+
+                var debt = customerPassengerPrice - paidAmount;
+                if (debt > 0)
+                    reserveDebts.Add((reserve, debt));
+            }
+
+            // 5. Si todas estan pagadas -> error
+            if (!reserveDebts.Any())
+                return Result.Failure<bool>(ReserveError.NoDebtToSettle);
+
+            // 6. Validar totalPayment <= totalDebtAcrossReserves
+            var totalPayment = request.Payments.Sum(p => p.TransactionAmount);
+            var totalDebt = reserveDebts.Sum(rd => rd.Debt);
+
+            if (totalPayment > totalDebt)
+                return Result.Failure<bool>(ReserveError.OverPaymentNotAllowed(totalDebt, totalPayment));
+
+            // 7. Obtener CashBox abierta
+            var cashBoxResult = await _cashBoxBusiness.GetOpenCashBoxEntity();
+            if (cashBoxResult.IsFailure)
+                return Result.Failure<bool>(cashBoxResult.Error);
+
+            var cashBox = cashBoxResult.Value;
+            var mainReserveId = reserveDebts.First().Reserve.ReserveId;
+            var primaryMethod = (PaymentMethodEnum)request.Payments.First().PaymentMethod;
+
+            // 8. Crear ReservePayment padre
+            var parentPayment = new ReservePayment
+            {
+                ReserveId = mainReserveId,
+                CustomerId = customer.CustomerId,
+                PayerDocumentNumber = customer.DocumentNumber,
+                PayerName = $"{customer.FirstName} {customer.LastName}",
+                PayerEmail = customer.Email,
+                Amount = totalPayment,
+                Method = primaryMethod,
+                Status = StatusPaymentEnum.Paid,
+                StatusDetail = "debt_settlement",
+                CashBoxId = cashBox.CashBoxId
+            };
+            _context.ReservePayments.Add(parentPayment);
+            await _context.SaveChangesWithOutboxAsync();
+
+            // 9. Si multi-metodo, crear hijos de desglose
+            if (request.Payments.Count > 1)
+            {
+                foreach (var p in request.Payments)
+                {
+                    var breakdownChild = new ReservePayment
+                    {
+                        ReserveId = mainReserveId,
+                        CustomerId = customer.CustomerId,
+                        PayerDocumentNumber = customer.DocumentNumber,
+                        PayerName = $"{customer.FirstName} {customer.LastName}",
+                        PayerEmail = customer.Email,
+                        Amount = p.TransactionAmount,
+                        Method = (PaymentMethodEnum)p.PaymentMethod,
+                        Status = StatusPaymentEnum.Paid,
+                        ParentReservePaymentId = parentPayment.ReservePaymentId,
+                        CashBoxId = cashBox.CashBoxId
+                    };
+                    _context.ReservePayments.Add(breakdownChild);
+                }
+            }
+
+            // 10. Crear transaccion Payment
+            _context.CustomerAccountTransactions.Add(new CustomerAccountTransaction
+            {
+                CustomerId = customer.CustomerId,
+                Date = DateTime.UtcNow,
+                Type = TransactionType.Payment,
+                Amount = -totalPayment,
+                Description = $"Saldo de deuda aplicado a reserva(s) #{string.Join(", #", reserveDebts.Select(rd => rd.Reserve.ReserveId))}",
+                RelatedReserveId = mainReserveId,
+                ReservePaymentId = parentPayment.ReservePaymentId
+            });
+
+            // 11. Actualizar Customer.CurrentBalance
+            customer.CurrentBalance -= totalPayment;
+            _context.Customers.Update(customer);
+
+            // 12. Distribuir pago secuencialmente por reservas
+            var remainingPayment = totalPayment;
+            foreach (var (reserve, debt) in reserveDebts)
+            {
+                if (remainingPayment <= 0) break;
+
+                var appliedToReserve = Math.Min(remainingPayment, debt);
+                remainingPayment -= appliedToReserve;
+
+                // Si esta reserva queda saldada, confirmar pasajeros
+                if (appliedToReserve >= debt)
+                {
+                    foreach (var passenger in reserve.Passengers.Where(p => p.CustomerId == request.CustomerId))
+                    {
+                        if (passenger.Status == PassengerStatusEnum.PendingPayment)
+                        {
+                            passenger.Status = PassengerStatusEnum.Confirmed;
+                            _context.Passengers.Update(passenger);
+                        }
+                    }
+                }
+            }
 
             await _context.SaveChangesWithOutboxAsync();
             return Result.Success(true);

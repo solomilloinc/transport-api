@@ -38,4 +38,20 @@ public static class ReserveError
             "Reserve.InvalidReserveCombination",
             description
         );
+
+    public static Error OverPaymentNotAllowed(decimal expected, decimal provided) =>
+        Error.Validation(
+            "Reserve.OverPaymentNotAllowed",
+            $"El monto pagado (${provided}) supera el monto pendiente (${expected})."
+        );
+
+    public static Error AlreadyFullyPaid(int reserveId) =>
+        Error.Validation(
+            "Reserve.AlreadyFullyPaid",
+            $"La reserva #{reserveId} ya está completamente pagada."
+        );
+
+    public static readonly Error NoDebtToSettle = Error.Validation(
+        "Reserve.NoDebtToSettle",
+        "No hay deuda pendiente en las reservas seleccionadas.");
 }
