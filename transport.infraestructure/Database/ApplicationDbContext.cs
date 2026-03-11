@@ -47,6 +47,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<ServiceDirection> ServiceDirections { get; set; }
     public DbSet<ServiceCustomer> ServiceCustomers { get; set; }
     public DbSet<ReserveDirection> ReserveDirections { get; set; }
+    public DbSet<TripDirection> TripDirections { get; set; }
 
     private readonly IUserContext _userContext;
 

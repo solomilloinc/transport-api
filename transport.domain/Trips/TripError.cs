@@ -27,4 +27,12 @@ public static class TripError
     public static readonly Error TripNotActive = Error.Validation(
         "Trip.NotActive",
         "The trip is not active");
+
+    public static readonly Error TripDirectionNotFound = Error.NotFound(
+        "TripDirection.NotFound",
+        "Trip direction not found");
+
+    public static readonly Error TripDirectionAlreadyExists = Error.Conflict(
+        "TripDirection.AlreadyExists",
+        "A direction for this trip already exists");
 }

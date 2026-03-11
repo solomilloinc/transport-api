@@ -167,4 +167,50 @@ public sealed class TripsFunction : FunctionBase
 
         return await MatchResultAsync(req, result);
     }
+
+    // Direction management operations
+
+    [Function("AddTripDirection")]
+    [Authorize("Admin")]
+    [OpenApiOperation(operationId: "trip-direction-create", tags: new[] { "Trip" }, Summary = "Add Trip Direction", Description = "Adds a direction (stop) to a trip with pickup time offset", Visibility = OpenApiVisibilityType.Important)]
+    [OpenApiRequestBody("application/json", typeof(TripDirectionCreateDto), Required = true)]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(int), Summary = "Trip Direction Added")]
+    public async Task<HttpResponseData> AddTripDirection(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "trip-direction-create")] HttpRequestData req)
+    {
+        var dto = await req.ReadFromJsonAsync<TripDirectionCreateDto>();
+        var result = await ValidateAndMatchAsync(req, dto, GetValidator<TripDirectionCreateDto>())
+                          .BindAsync(_tripBusiness.AddDirection);
+
+        return await MatchResultAsync(req, result);
+    }
+
+    [Function("UpdateTripDirection")]
+    [Authorize("Admin")]
+    [OpenApiOperation(operationId: "trip-direction-update", tags: new[] { "Trip" }, Summary = "Update Trip Direction", Description = "Updates an existing trip direction", Visibility = OpenApiVisibilityType.Important)]
+    [OpenApiParameter("tripDirectionId", In = ParameterLocation.Path, Required = true, Type = typeof(int), Description = "Trip Direction ID")]
+    [OpenApiRequestBody("application/json", typeof(TripDirectionUpdateDto), Required = true)]
+    [OpenApiResponseWithoutBody(HttpStatusCode.OK, Summary = "Trip Direction Updated")]
+    public async Task<HttpResponseData> UpdateTripDirection(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "trip-direction-update/{tripDirectionId:int}")] HttpRequestData req,
+        int tripDirectionId)
+    {
+        var dto = await req.ReadFromJsonAsync<TripDirectionUpdateDto>();
+        var result = await _tripBusiness.UpdateDirection(tripDirectionId, dto);
+
+        return await MatchResultAsync(req, result);
+    }
+
+    [Function("DeleteTripDirection")]
+    [Authorize("Admin")]
+    [OpenApiOperation(operationId: "trip-direction-delete", tags: new[] { "Trip" }, Summary = "Delete Trip Direction", Description = "Deletes an existing trip direction", Visibility = OpenApiVisibilityType.Important)]
+    [OpenApiParameter("tripDirectionId", In = ParameterLocation.Path, Required = true, Type = typeof(int), Description = "Trip Direction ID")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.OK, Summary = "Trip Direction Deleted")]
+    public async Task<HttpResponseData> DeleteTripDirection(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "delete", Route = "trip-direction-delete/{tripDirectionId:int}")] HttpRequestData req,
+        int tripDirectionId)
+    {
+        var result = await _tripBusiness.DeleteDirection(tripDirectionId);
+        return await MatchResultAsync(req, result);
+    }
 }

@@ -20,4 +20,5 @@ public class Trip : IAuditable
     public City OriginCity { get; set; } = null!;
     public City DestinationCity { get; set; } = null!;
     public ICollection<TripPrice> Prices { get; set; } = new List<TripPrice>();
+    public ICollection<TripDirection> Directions { get; set; } = new List<TripDirection>();
 }

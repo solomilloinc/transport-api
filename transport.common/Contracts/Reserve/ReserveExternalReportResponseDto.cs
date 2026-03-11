@@ -10,4 +10,11 @@ public record ReserveExternalReportResponseDto(int ReserveId,
     decimal Price,
     int AvailableQuantity,
     string VehicleName,
-    int TripId);
+    int TripId,
+    List<ReserveStopScheduleDto>? StopSchedules = null);
+
+public record ReserveStopScheduleDto(
+    int DirectionId,
+    string DirectionName,
+    int Order,
+    string PickupTime);

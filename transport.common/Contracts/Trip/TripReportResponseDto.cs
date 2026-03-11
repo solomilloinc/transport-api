@@ -16,7 +16,8 @@ public record TripReportResponseDto(
     // Frontend-ready options
     List<PickupOptionDto> PickupOptions,
     List<DropoffOptionDto> DropoffOptionsIda,
-    List<DropoffOptionDto> DropoffOptionsIdaVuelta);
+    List<DropoffOptionDto> DropoffOptionsIdaVuelta,
+    List<TripDirectionReportDto>? StopSchedules = null);
 
 public record TripPriceReportDto(
     int TripPriceId,
@@ -37,7 +38,8 @@ public record TripPriceReportDto(
 /// </summary>
 public record PickupOptionDto(
     int DirectionId,
-    string DisplayName);
+    string DisplayName,
+    TimeSpan? PickupTimeOffset = null);
 
 /// <summary>
 /// Dropoff option grouped by city - contains price and all directions for that city
