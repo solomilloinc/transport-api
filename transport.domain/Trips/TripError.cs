@@ -27,4 +27,12 @@ public static class TripError
     public static readonly Error TripNotActive = Error.Validation(
         "Trip.NotActive",
         "The trip is not active");
+
+    public static readonly Error TripPickupStopNotFound = Error.NotFound(
+        "TripPickupStop.NotFound",
+        "Trip pickup stop not found");
+
+    public static readonly Error TripPickupStopAlreadyExists = Error.Conflict(
+        "TripPickupStop.AlreadyExists",
+        "A pickup stop for this trip already exists");
 }

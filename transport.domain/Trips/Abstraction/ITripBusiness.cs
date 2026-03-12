@@ -21,6 +21,11 @@ public interface ITripBusiness
     // Price lookup for reservations
     Task<Result<decimal>> GetPriceForReservation(int tripId, int? dropoffCityId, int? dropoffDirectionId, int reserveTypeId);
 
+    // Pickup stop management
+    Task<Result<int>> AddDirection(TripPickupStopCreateDto dto);
+    Task<Result<bool>> UpdateDirection(int tripPickupStopId, TripPickupStopUpdateDto dto);
+    Task<Result<bool>> DeleteDirection(int tripPickupStopId);
+
     // Public endpoint
     Task<Result<PagedReportResponseDto<PublicTripDto>>> GetPublicTrips(int pageNumber = 1, int pageSize = 100);
 }

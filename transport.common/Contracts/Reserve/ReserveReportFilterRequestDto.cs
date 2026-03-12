@@ -2,7 +2,8 @@
 
 public record ReserveReportFilterRequestDto(
     int TripId,
-    string TripType, 
+    string TripType,
     int Passengers,
     DateTime DepartureDate,
-    DateTime? ReturnDate);
+    DateTime? ReturnDate,
+    int? PickupDirectionId = null);

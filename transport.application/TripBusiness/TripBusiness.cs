@@ -183,7 +183,8 @@ public class TripBusiness : ITripBusiness
                 new List<CityDirectionsDto>(),
                 new List<PickupOptionDto>(),
                 new List<DropoffOptionDto>(),
-                new List<DropoffOptionDto>()
+                new List<DropoffOptionDto>(),
+                null
             ),
             sortMappings: sortMappings
         );
@@ -201,6 +202,9 @@ public class TripBusiness : ITripBusiness
                 .ThenInclude(p => p.City)
             .Include(t => t.Prices.Where(p => p.Status == EntityStatusEnum.Active))
                 .ThenInclude(p => p.Direction)
+            .Include(t => t.PickupStops.Where(d => d.Status == EntityStatusEnum.Active))
+                .ThenInclude(td => td.Direction)
+                    .ThenInclude(d => d.City)
             .FirstOrDefaultAsync(t => t.TripId == tripId);
 
         if (trip is null)
@@ -271,8 +275,14 @@ public class TripBusiness : ITripBusiness
         if (allowedDirectionIds is not null)
             originDirections = originDirections.Where(d => allowedDirectionIds.Contains(d.DirectionId)).ToList();
 
+        var pickupStopOffsets = trip.PickupStops
+            .ToDictionary(td => td.DirectionId, td => td.PickupTimeOffset);
+
         var pickupOptions = originDirections
-            .Select(d => new PickupOptionDto(d.DirectionId, d.Name))
+            .Select(d => new PickupOptionDto(
+                d.DirectionId,
+                d.Name,
+                pickupStopOffsets.TryGetValue(d.DirectionId, out var offset) ? offset : null))
             .ToList();
 
         // Helper to build dropoff options grouped by city
@@ -312,6 +322,18 @@ public class TripBusiness : ITripBusiness
         // IdaVuelta: SOLO puede bajarse en DestinationCityId
         var dropoffOptionsIdaVuelta = BuildDropoffOptions(ReserveTypeIdEnum.IdaVuelta, onlyDestination: true);
 
+        var stopSchedules = trip.PickupStops
+            .OrderBy(td => td.Order)
+            .Select(td => new TripPickupStopReportDto(
+                td.TripPickupStopId,
+                td.DirectionId,
+                td.Direction.Name,
+                td.Direction.CityId,
+                td.Direction.City.Name,
+                td.Order,
+                td.PickupTimeOffset
+            )).ToList();
+
         var dto = new TripReportResponseDto(
             trip.TripId,
             trip.Description,
@@ -339,7 +361,8 @@ public class TripBusiness : ITripBusiness
             relevantCitiesDto,
             pickupOptions,
             dropoffOptionsIda,
-            dropoffOptionsIdaVuelta
+            dropoffOptionsIdaVuelta,
+            stopSchedules
         );
 
         return Result.Success(dto);
@@ -440,6 +463,83 @@ public class TripBusiness : ITripBusiness
         tripPrice.Status = EntityStatusEnum.Deleted;
 
         _context.TripPrices.Update(tripPrice);
+        await _context.SaveChangesWithOutboxAsync();
+
+        return Result.Success(true);
+    }
+
+    public async Task<Result<int>> AddDirection(TripPickupStopCreateDto dto)
+    {
+        var trip = await _context.Trips.FindAsync(dto.TripId);
+        if (trip is null)
+            return Result.Failure<int>(TripError.TripNotFound);
+
+        var direction = await _context.Directions.FindAsync(dto.DirectionId);
+        if (direction is null)
+            return Result.Failure<int>(TripError.TripPickupStopNotFound);
+
+        var existingDirection = await _context.TripPickupStops
+            .AnyAsync(td => td.TripId == dto.TripId
+                         && td.DirectionId == dto.DirectionId
+                         && td.Status == EntityStatusEnum.Active);
+
+        if (existingDirection)
+            return Result.Failure<int>(TripError.TripPickupStopAlreadyExists);
+
+        var tripPickupStop = new TripPickupStop
+        {
+            TripId = dto.TripId,
+            DirectionId = dto.DirectionId,
+            Order = dto.Order,
+            PickupTimeOffset = dto.PickupTimeOffset,
+            Status = EntityStatusEnum.Active
+        };
+
+        _context.TripPickupStops.Add(tripPickupStop);
+        await _context.SaveChangesWithOutboxAsync();
+
+        return Result.Success(tripPickupStop.TripPickupStopId);
+    }
+
+    public async Task<Result<bool>> UpdateDirection(int tripPickupStopId, TripPickupStopUpdateDto dto)
+    {
+        var tripPickupStop = await _context.TripPickupStops.FindAsync(tripPickupStopId);
+        if (tripPickupStop is null)
+            return Result.Failure<bool>(TripError.TripPickupStopNotFound);
+
+        var direction = await _context.Directions.FindAsync(dto.DirectionId);
+        if (direction is null)
+            return Result.Failure<bool>(TripError.TripPickupStopNotFound);
+
+        // Check for duplicate (excluding current)
+        var existingDirection = await _context.TripPickupStops
+            .AnyAsync(td => td.TripId == tripPickupStop.TripId
+                         && td.DirectionId == dto.DirectionId
+                         && td.Status == EntityStatusEnum.Active
+                         && td.TripPickupStopId != tripPickupStopId);
+
+        if (existingDirection)
+            return Result.Failure<bool>(TripError.TripPickupStopAlreadyExists);
+
+        tripPickupStop.DirectionId = dto.DirectionId;
+        tripPickupStop.Order = dto.Order;
+        tripPickupStop.PickupTimeOffset = dto.PickupTimeOffset;
+
+        _context.TripPickupStops.Update(tripPickupStop);
+        await _context.SaveChangesWithOutboxAsync();
+
+        return Result.Success(true);
+    }
+
+    public async Task<Result<bool>> DeleteDirection(int tripPickupStopId)
+    {
+        var tripPickupStop = await _context.TripPickupStops.FindAsync(tripPickupStopId);
+        if (tripPickupStop is null)
+            return Result.Failure<bool>(TripError.TripPickupStopNotFound);
+
+        tripPickupStop.Status = EntityStatusEnum.Deleted;
+
+        _context.TripPickupStops.Update(tripPickupStop);
         await _context.SaveChangesWithOutboxAsync();
 
         return Result.Success(true);

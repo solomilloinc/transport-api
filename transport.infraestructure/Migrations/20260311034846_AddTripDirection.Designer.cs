@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Transport.Infraestructure.Database;
 
@@ -11,9 +12,11 @@ using Transport.Infraestructure.Database;
 namespace transport.infraestructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260311034846_AddTripDirection")]
+    partial class AddTripDirection
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1043,13 +1046,13 @@ namespace transport.infraestructure.Migrations
                     b.ToTable("Trip", (string)null);
                 });
 
-            modelBuilder.Entity("Transport.Domain.Trips.TripPickupStop", b =>
+            modelBuilder.Entity("Transport.Domain.Trips.TripDirection", b =>
                 {
-                    b.Property<int>("TripPickupStopId")
+                    b.Property<int>("TripDirectionId")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("TripPickupStopId"));
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("TripDirectionId"));
 
                     b.Property<string>("CreatedBy")
                         .IsRequired()
@@ -1086,7 +1089,7 @@ namespace transport.infraestructure.Migrations
                     b.Property<DateTime?>("UpdatedDate")
                         .HasColumnType("datetime2");
 
-                    b.HasKey("TripPickupStopId");
+                    b.HasKey("TripDirectionId");
 
                     b.HasIndex("DirectionId");
 
@@ -1094,7 +1097,7 @@ namespace transport.infraestructure.Migrations
                         .IsUnique()
                         .HasFilter("[Status] = 'Active'");
 
-                    b.ToTable("TripPickupStop", (string)null);
+                    b.ToTable("TripDirection", (string)null);
                 });
 
             modelBuilder.Entity("Transport.Domain.Trips.TripPrice", b =>
@@ -1262,14 +1265,14 @@ namespace transport.infraestructure.Migrations
                         {
                             RoleId = 1,
                             CreatedBy = "System",
-                            CreatedDate = new DateTime(2026, 3, 12, 3, 48, 34, 367, DateTimeKind.Utc).AddTicks(4617),
+                            CreatedDate = new DateTime(2026, 3, 11, 3, 48, 45, 958, DateTimeKind.Utc).AddTicks(2998),
                             Name = "Administrador"
                         },
                         new
                         {
                             RoleId = 2,
                             CreatedBy = "System",
-                            CreatedDate = new DateTime(2026, 3, 12, 3, 48, 34, 367, DateTimeKind.Utc).AddTicks(4619),
+                            CreatedDate = new DateTime(2026, 3, 11, 3, 48, 45, 958, DateTimeKind.Utc).AddTicks(3000),
                             Name = "Cliente"
                         });
                 });
@@ -1747,7 +1750,7 @@ namespace transport.infraestructure.Migrations
                     b.Navigation("OriginCity");
                 });
 
-            modelBuilder.Entity("Transport.Domain.Trips.TripPickupStop", b =>
+            modelBuilder.Entity("Transport.Domain.Trips.TripDirection", b =>
                 {
                     b.HasOne("Transport.Domain.Directions.Direction", "Direction")
                         .WithMany()
@@ -1756,7 +1759,7 @@ namespace transport.infraestructure.Migrations
                         .IsRequired();
 
                     b.HasOne("Transport.Domain.Trips.Trip", "Trip")
-                        .WithMany("PickupStops")
+                        .WithMany("Directions")
                         .HasForeignKey("TripId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -1889,7 +1892,7 @@ namespace transport.infraestructure.Migrations
 
             modelBuilder.Entity("Transport.Domain.Trips.Trip", b =>
                 {
-                    b.Navigation("PickupStops");
+                    b.Navigation("Directions");
 
                     b.Navigation("Prices");
                 });

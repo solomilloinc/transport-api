@@ -167,4 +167,50 @@ public sealed class TripsFunction : FunctionBase
 
         return await MatchResultAsync(req, result);
     }
+
+    // Pickup stop management operations
+
+    [Function("AddTripPickupStop")]
+    [Authorize("Admin")]
+    [OpenApiOperation(operationId: "trip-pickup-stop-create", tags: new[] { "Trip" }, Summary = "Add Trip Pickup Stop", Description = "Adds a pickup stop to a trip with pickup time offset", Visibility = OpenApiVisibilityType.Important)]
+    [OpenApiRequestBody("application/json", typeof(TripPickupStopCreateDto), Required = true)]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(int), Summary = "Trip Pickup Stop Added")]
+    public async Task<HttpResponseData> AddTripPickupStop(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "trip-pickup-stop-create")] HttpRequestData req)
+    {
+        var dto = await req.ReadFromJsonAsync<TripPickupStopCreateDto>();
+        var result = await ValidateAndMatchAsync(req, dto, GetValidator<TripPickupStopCreateDto>())
+                          .BindAsync(_tripBusiness.AddDirection);
+
+        return await MatchResultAsync(req, result);
+    }
+
+    [Function("UpdateTripPickupStop")]
+    [Authorize("Admin")]
+    [OpenApiOperation(operationId: "trip-pickup-stop-update", tags: new[] { "Trip" }, Summary = "Update Trip Pickup Stop", Description = "Updates an existing trip pickup stop", Visibility = OpenApiVisibilityType.Important)]
+    [OpenApiParameter("tripPickupStopId", In = ParameterLocation.Path, Required = true, Type = typeof(int), Description = "Trip Pickup Stop ID")]
+    [OpenApiRequestBody("application/json", typeof(TripPickupStopUpdateDto), Required = true)]
+    [OpenApiResponseWithoutBody(HttpStatusCode.OK, Summary = "Trip Pickup Stop Updated")]
+    public async Task<HttpResponseData> UpdateTripPickupStop(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "trip-pickup-stop-update/{tripPickupStopId:int}")] HttpRequestData req,
+        int tripPickupStopId)
+    {
+        var dto = await req.ReadFromJsonAsync<TripPickupStopUpdateDto>();
+        var result = await _tripBusiness.UpdateDirection(tripPickupStopId, dto);
+
+        return await MatchResultAsync(req, result);
+    }
+
+    [Function("DeleteTripPickupStop")]
+    [Authorize("Admin")]
+    [OpenApiOperation(operationId: "trip-pickup-stop-delete", tags: new[] { "Trip" }, Summary = "Delete Trip Pickup Stop", Description = "Deletes an existing trip pickup stop", Visibility = OpenApiVisibilityType.Important)]
+    [OpenApiParameter("tripPickupStopId", In = ParameterLocation.Path, Required = true, Type = typeof(int), Description = "Trip Pickup Stop ID")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.OK, Summary = "Trip Pickup Stop Deleted")]
+    public async Task<HttpResponseData> DeleteTripPickupStop(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "delete", Route = "trip-pickup-stop-delete/{tripPickupStopId:int}")] HttpRequestData req,
+        int tripPickupStopId)
+    {
+        var result = await _tripBusiness.DeleteDirection(tripPickupStopId);
+        return await MatchResultAsync(req, result);
+    }
 }

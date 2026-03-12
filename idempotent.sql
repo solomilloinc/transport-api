@@ -1424,3 +1424,179 @@ GO
 COMMIT;
 GO
 
+BEGIN TRANSACTION;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260311034846_AddTripDirection'
+)
+BEGIN
+    CREATE TABLE [TripDirection] (
+        [TripDirectionId] int NOT NULL IDENTITY,
+        [TripId] int NOT NULL,
+        [DirectionId] int NOT NULL,
+        [Order] int NOT NULL,
+        [PickupTimeOffset] time NOT NULL,
+        [Status] nvarchar(max) NOT NULL,
+        [CreatedBy] VARCHAR(256) NOT NULL DEFAULT 'System',
+        [UpdatedBy] VARCHAR(256) NULL,
+        [CreatedDate] datetime2 NOT NULL DEFAULT (GETDATE()),
+        [UpdatedDate] datetime2 NULL,
+        CONSTRAINT [PK_TripDirection] PRIMARY KEY ([TripDirectionId]),
+        CONSTRAINT [FK_TripDirection_Direction_DirectionId] FOREIGN KEY ([DirectionId]) REFERENCES [Direction] ([DirectionId]) ON DELETE NO ACTION,
+        CONSTRAINT [FK_TripDirection_Trip_TripId] FOREIGN KEY ([TripId]) REFERENCES [Trip] ([TripId]) ON DELETE CASCADE
+    );
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260311034846_AddTripDirection'
+)
+BEGIN
+    EXEC(N'UPDATE [Role] SET [CreatedDate] = ''2026-03-11T03:48:45.9582998Z''
+    WHERE [RoleId] = 1;
+    SELECT @@ROWCOUNT');
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260311034846_AddTripDirection'
+)
+BEGIN
+    EXEC(N'UPDATE [Role] SET [CreatedDate] = ''2026-03-11T03:48:45.9583000Z''
+    WHERE [RoleId] = 2;
+    SELECT @@ROWCOUNT');
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260311034846_AddTripDirection'
+)
+BEGIN
+    CREATE INDEX [IX_TripDirection_DirectionId] ON [TripDirection] ([DirectionId]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260311034846_AddTripDirection'
+)
+BEGIN
+    EXEC(N'CREATE UNIQUE INDEX [IX_TripDirection_TripId_DirectionId] ON [TripDirection] ([TripId], [DirectionId]) WHERE [Status] = ''Active''');
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260311034846_AddTripDirection'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20260311034846_AddTripDirection', N'8.0.14');
+END;
+GO
+
+COMMIT;
+GO
+
+BEGIN TRANSACTION;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260312034834_RenameTripDirectionToTripPickupStop'
+)
+BEGIN
+    EXEC sp_rename N'[TripDirection]', N'TripPickupStop';
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260312034834_RenameTripDirectionToTripPickupStop'
+)
+BEGIN
+    EXEC sp_rename N'[TripPickupStop].[TripDirectionId]', N'TripPickupStopId', N'COLUMN';
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260312034834_RenameTripDirectionToTripPickupStop'
+)
+BEGIN
+    EXEC sp_rename N'[TripPickupStop].[IX_TripDirection_DirectionId]', N'IX_TripPickupStop_DirectionId', N'INDEX';
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260312034834_RenameTripDirectionToTripPickupStop'
+)
+BEGIN
+    EXEC sp_rename N'[TripPickupStop].[IX_TripDirection_TripId_DirectionId]', N'IX_TripPickupStop_TripId_DirectionId', N'INDEX';
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260312034834_RenameTripDirectionToTripPickupStop'
+)
+BEGIN
+    ALTER TABLE [TripPickupStop] DROP CONSTRAINT [FK_TripDirection_Direction_DirectionId];
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260312034834_RenameTripDirectionToTripPickupStop'
+)
+BEGIN
+    ALTER TABLE [TripPickupStop] DROP CONSTRAINT [FK_TripDirection_Trip_TripId];
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260312034834_RenameTripDirectionToTripPickupStop'
+)
+BEGIN
+    ALTER TABLE [TripPickupStop] ADD CONSTRAINT [FK_TripPickupStop_Direction_DirectionId] FOREIGN KEY ([DirectionId]) REFERENCES [Direction] ([DirectionId]) ON DELETE NO ACTION;
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260312034834_RenameTripDirectionToTripPickupStop'
+)
+BEGIN
+    ALTER TABLE [TripPickupStop] ADD CONSTRAINT [FK_TripPickupStop_Trip_TripId] FOREIGN KEY ([TripId]) REFERENCES [Trip] ([TripId]) ON DELETE CASCADE;
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260312034834_RenameTripDirectionToTripPickupStop'
+)
+BEGIN
+    EXEC sp_rename N'PK_TripDirection', N'PK_TripPickupStop', N'OBJECT'
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260312034834_RenameTripDirectionToTripPickupStop'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20260312034834_RenameTripDirectionToTripPickupStop', N'8.0.14');
+END;
+GO
+
+COMMIT;
+GO
+

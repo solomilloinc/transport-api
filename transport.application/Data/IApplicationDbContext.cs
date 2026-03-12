@@ -40,6 +40,7 @@ public interface IApplicationDbContext
     DbSet<ServiceDirection> ServiceDirections { get; }
     DbSet<ServiceCustomer> ServiceCustomers { get; }
     DbSet<ReserveDirection> ReserveDirections { get; }
+    DbSet<TripPickupStop> TripPickupStops { get; }
     DbSet<OutboxMessage> OutboxMessages { get; }
     EntityEntry<TEntity> Entry<TEntity>(TEntity entity) where TEntity : class;
     Task<int> SaveChangesWithOutboxAsync(CancellationToken cancellationToken = default);
