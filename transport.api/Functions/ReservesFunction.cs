@@ -259,6 +259,24 @@ public class ReservesFunction : FunctionBase
         return await MatchResultAsync(req, result);
     }
 
+    [Function("GetCustomerPendingReserves")]
+    [Authorize("Admin")]
+    [OpenApiOperation(
+        operationId: "customer-pending-reserves",
+        tags: new[] { "ReservePayments" },
+        Summary = "Get Customer Pending Reserves",
+        Description = "Returns a list of reserves with pending debt for a specific customer.",
+        Visibility = OpenApiVisibilityType.Important)]
+    [OpenApiParameter(name: "customerId", In = ParameterLocation.Path, Required = true, Type = typeof(int), Summary = "The ID of the customer")]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(Result<List<CustomerPendingReserveDto>>), Summary = "List of reserves with pending debt")]
+    public async Task<HttpResponseData> GetCustomerPendingReserves(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "customer-pending-reserves/{customerId:int}")] HttpRequestData req,
+        int customerId)
+    {
+        var result = await _reserveBusiness.GetCustomerPendingReservesAsync(customerId);
+        return await MatchResultAsync(req, result);
+    }
+
     [Function("SettleCustomerDebt")]
     [Authorize("Admin")]
     [OpenApiOperation(

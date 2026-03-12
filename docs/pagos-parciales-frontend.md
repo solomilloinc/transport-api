@@ -127,7 +127,85 @@ deudaRestante = sumaPreciosPasajeros - sumaPagosPadresPrevios(status=Paid)
 
 ---
 
-## 4. Nuevo endpoint: `POST /api/customer-debt-settle`
+## 4. Nuevo endpoint: `GET /api/customer-pending-reserves/{customerId}`
+
+Retorna la lista de reservas con deuda pendiente para un cliente. Usar este endpoint para armar el dialog de saldado de deuda.
+
+### Request
+```
+GET /api/customer-pending-reserves/5
+```
+No requiere body.
+
+### Response
+```json
+{
+  "isSuccess": true,
+  "value": [
+    {
+      "reserveId": 10,
+      "reserveDate": "2026-03-15T08:00:00",
+      "originName": "Córdoba",
+      "destinationName": "Rosario",
+      "departureHour": "08:00",
+      "totalPrice": 100.00,
+      "totalPaid": 60.00,
+      "pendingDebt": 40.00,
+      "passengers": [
+        {
+          "passengerId": 1,
+          "fullName": "Juan Pérez",
+          "price": 100.00,
+          "status": 1
+        }
+      ]
+    },
+    {
+      "reserveId": 15,
+      "reserveDate": "2026-03-16T10:00:00",
+      "originName": "Rosario",
+      "destinationName": "Córdoba",
+      "departureHour": "10:00",
+      "totalPrice": 80.00,
+      "totalPaid": 0.00,
+      "pendingDebt": 80.00,
+      "passengers": [
+        {
+          "passengerId": 2,
+          "fullName": "Juan Pérez",
+          "price": 80.00,
+          "status": 1
+        }
+      ]
+    }
+  ]
+}
+```
+
+| Campo | Tipo | Descripción |
+|---|---|---|
+| `reserveId` | `int` | ID de la reserva |
+| `reserveDate` | `datetime` | Fecha de la reserva |
+| `originName` | `string` | Ciudad de origen |
+| `destinationName` | `string` | Ciudad de destino |
+| `departureHour` | `string` | Hora de salida (formato `HH:mm`) |
+| `totalPrice` | `decimal` | Precio total de los pasajeros del cliente en esta reserva |
+| `totalPaid` | `decimal` | Total ya pagado |
+| `pendingDebt` | `decimal` | Deuda pendiente (`totalPrice - totalPaid`) |
+| `passengers` | `array` | Lista de pasajeros del cliente en esta reserva |
+| `passengers[].status` | `int` | 1=PendingPayment, 2=Confirmed |
+
+### Notas
+- Solo retorna reservas que tengan al menos un pasajero del cliente en estado `PendingPayment`
+- Si el cliente no tiene deuda, retorna lista vacía `[]`
+- Si el cliente no existe, retorna error `Customer.NotFound`
+
+### Autorización
+- Requiere rol **Admin**
+
+---
+
+## 5. Nuevo endpoint: `POST /api/customer-debt-settle`
 
 Permite al admin seleccionar N reservas de un cliente y aplicar un pago que las salda total o parcialmente.
 
@@ -187,7 +265,7 @@ Ejemplo: reserveIds = [10, 15], deudas = [$100, $80], pago total = $150
 
 ---
 
-## 5. Sugerencias de implementación para UI
+## 6. Sugerencias de implementación para UI
 
 ### Vista de pasajeros de una reserva
 - Mostrar badge de estado diferenciado para `PendingPayment` vs `Confirmed`
@@ -200,17 +278,17 @@ Ejemplo: reserveIds = [10, 15], deudas = [$100, $80], pago total = $150
 - Validar en frontend que `sum(payments) <= precio total` antes de enviar
 
 ### Vista de saldado de deuda (nueva)
-- Pantalla donde el admin selecciona un cliente
-- Listar reservas del cliente que tengan deuda pendiente (pasajeros en `PendingPayment`)
-- Mostrar deuda por reserva y deuda total
-- Permitir seleccionar N reservas y especificar montos de pago
-- Validar que `sum(payments) <= deuda total seleccionada`
-- Llamar a `POST /api/customer-debt-settle`
-- Refrescar la vista para mostrar qué reservas quedaron saldadas (`Confirmed`) y cuáles siguen pendientes
+1. Admin selecciona un cliente
+2. Llamar a `GET /api/customer-pending-reserves/{customerId}` para obtener las reservas con deuda
+3. Mostrar lista con deuda por reserva y deuda total
+4. Permitir seleccionar N reservas y especificar montos de pago
+5. Validar que `sum(payments) <= deuda total seleccionada`
+6. Llamar a `POST /api/customer-debt-settle`
+7. Refrescar llamando nuevamente a `GET /api/customer-pending-reserves/{customerId}` para mostrar el estado actualizado
 
 ---
 
-## 6. Métodos de pago (referencia)
+## 7. Métodos de pago (referencia)
 
 ```
 Cash       = 1

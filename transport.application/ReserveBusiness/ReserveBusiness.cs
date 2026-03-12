@@ -1691,6 +1691,65 @@ public class ReserveBusiness : IReserveBusiness
         });
     }
 
+    public async Task<Result<List<CustomerPendingReserveDto>>> GetCustomerPendingReservesAsync(int customerId)
+    {
+        var customer = await _context.Customers.FindAsync(customerId);
+        if (customer is null)
+            return Result.Failure<List<CustomerPendingReserveDto>>(CustomerError.NotFound);
+
+        // Obtener todas las reservas donde el cliente tiene pasajeros con deuda
+        var reserves = await _context.Reserves
+            .AsNoTracking()
+            .Include(r => r.Passengers)
+            .Where(r => r.Passengers.Any(p => p.CustomerId == customerId
+                && p.Status == PassengerStatusEnum.PendingPayment))
+            .ToListAsync();
+
+        if (!reserves.Any())
+            return Result.Success(new List<CustomerPendingReserveDto>());
+
+        var result = new List<CustomerPendingReserveDto>();
+
+        foreach (var reserve in reserves)
+        {
+            var customerPassengers = reserve.Passengers
+                .Where(p => p.CustomerId == customerId)
+                .ToList();
+
+            var totalPrice = customerPassengers.Sum(p => p.Price);
+
+            var totalPaid = await _context.ReservePayments
+                .AsNoTracking()
+                .Where(rp => rp.ReserveId == reserve.ReserveId
+                    && rp.CustomerId == customerId
+                    && rp.ParentReservePaymentId == null
+                    && rp.Status == StatusPaymentEnum.Paid)
+                .SumAsync(rp => rp.Amount);
+
+            var pendingDebt = totalPrice - totalPaid;
+            if (pendingDebt <= 0) continue;
+
+            result.Add(new CustomerPendingReserveDto(
+                reserve.ReserveId,
+                reserve.ReserveDate,
+                reserve.OriginName,
+                reserve.DestinationName,
+                reserve.DepartureHour.ToString(@"hh\:mm"),
+                totalPrice,
+                totalPaid,
+                pendingDebt,
+                customerPassengers.Select(p => new CustomerPendingPassengerDto(
+                    p.PassengerId,
+                    $"{p.FirstName} {p.LastName}",
+                    p.Price,
+                    (int)p.Status
+                )).ToList()
+            ));
+        }
+
+        return Result.Success(result);
+    }
+
     public async Task<Result<LockReserveSlotsResponseDto>> LockReserveSlots(LockReserveSlotsRequestDto request)
     {
         const int maxRetries = 3;
