@@ -1285,7 +1285,8 @@ public class ReserveBusiness : IReserveBusiness
                 paymentInfo.Methods,
                 paidAmount,
                 isPayment,
-                p.HasTraveled);
+                p.HasTraveled,
+                (int)p.Status);
         }).ToList();
 
         var pagedResult = PagedReportResponseDto<PassengerReserveReportResponseDto>.Create(

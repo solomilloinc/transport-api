@@ -17,4 +17,5 @@ public record PassengerReserveReportResponseDto(
     string? PaymentMethods,
     decimal PaidAmount,
     bool IsPayment,
-    bool HasTraveled);
+    bool HasTraveled,
+    int Status);
