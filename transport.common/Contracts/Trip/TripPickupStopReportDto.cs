@@ -1,7 +1,7 @@
 namespace Transport.SharedKernel.Contracts.Trip;
 
-public record TripDirectionReportDto(
-    int TripDirectionId,
+public record TripPickupStopReportDto(
+    int TripPickupStopId,
     int DirectionId,
     string DirectionName,
     int CityId,

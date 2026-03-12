@@ -972,24 +972,24 @@ public class ReserveBusiness : IReserveBusiness
         var originId = idaTrip.OriginCityId;
         var destinationId = idaTrip.DestinationCityId;
 
-        // Load TripDirections for pickup time calculation
+        // Load TripPickupStops for pickup time calculation
         var pickupDirectionId = requestDto.Filters.PickupDirectionId;
-        List<TripDirection>? idaTripDirections = null;
+        List<TripPickupStop>? idaTripPickupStops = null;
         if (pickupDirectionId.HasValue)
         {
-            idaTripDirections = await _context.TripDirections
+            idaTripPickupStops = await _context.TripPickupStops
                 .Where(td => td.TripId == tripId && td.Status == EntityStatusEnum.Active)
                 .Include(td => td.Direction)
                 .OrderBy(td => td.Order)
                 .ToListAsync();
 
-            if (!idaTripDirections.Any(td => td.DirectionId == pickupDirectionId.Value))
-                return Result.Failure<ReserveGroupedPagedReportResponseDto>(TripError.TripDirectionNotFound);
+            if (!idaTripPickupStops.Any(td => td.DirectionId == pickupDirectionId.Value))
+                return Result.Failure<ReserveGroupedPagedReportResponseDto>(TripError.TripPickupStopNotFound);
         }
 
         // Fetch the return trip (inverse route) if needed
         Trip? vueltaTrip = null;
-        List<TripDirection>? vueltaTripDirections = null;
+        List<TripPickupStop>? vueltaTripPickupStops = null;
         if (vueltaDate.HasValue)
         {
             vueltaTrip = await _context.Trips
@@ -1000,7 +1000,7 @@ public class ReserveBusiness : IReserveBusiness
 
             if (vueltaTrip != null && pickupDirectionId.HasValue)
             {
-                vueltaTripDirections = await _context.TripDirections
+                vueltaTripPickupStops = await _context.TripPickupStops
                     .Where(td => td.TripId == vueltaTrip.TripId && td.Status == EntityStatusEnum.Active)
                     .Include(td => td.Direction)
                     .OrderBy(td => td.Order)
@@ -1045,7 +1045,7 @@ public class ReserveBusiness : IReserveBusiness
                     .Count(p => p.Status == PassengerStatusEnum.Confirmed
                              || p.Status == PassengerStatusEnum.PendingPayment);
                 var arrivalTime = rp.DepartureHour.Add(rp.EstimatedDuration);
-                var stopSchedules = idaTripDirections?.Select(td => new ReserveStopScheduleDto(
+                var stopSchedules = idaTripPickupStops?.Select(td => new ReserveStopScheduleDto(
                     td.DirectionId,
                     td.Direction.Name,
                     td.Order,
@@ -1086,7 +1086,7 @@ public class ReserveBusiness : IReserveBusiness
                         .Count(p => p.Status == PassengerStatusEnum.Confirmed
                                  || p.Status == PassengerStatusEnum.PendingPayment);
                     var arrivalTime = rp.DepartureHour.Add(rp.EstimatedDuration);
-                    var vueltaStopSchedules = vueltaTripDirections?.Select(td => new ReserveStopScheduleDto(
+                    var vueltaStopSchedules = vueltaTripPickupStops?.Select(td => new ReserveStopScheduleDto(
                         td.DirectionId,
                         td.Direction.Name,
                         td.Order,

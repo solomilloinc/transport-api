@@ -65,7 +65,7 @@ public class DirectionBusiness : IDirectionBusiness
         var query = _context.Directions
              .AsNoTracking()
              .Include(d => d.City)
-             .Where(p => p.Status != EntityStatusEnum.Active)
+             .Where(p => p.Status == EntityStatusEnum.Active)
              .AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(requestDto.Filters?.DirectionName))

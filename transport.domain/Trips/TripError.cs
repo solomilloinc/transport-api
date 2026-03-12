@@ -28,11 +28,11 @@ public static class TripError
         "Trip.NotActive",
         "The trip is not active");
 
-    public static readonly Error TripDirectionNotFound = Error.NotFound(
-        "TripDirection.NotFound",
-        "Trip direction not found");
+    public static readonly Error TripPickupStopNotFound = Error.NotFound(
+        "TripPickupStop.NotFound",
+        "Trip pickup stop not found");
 
-    public static readonly Error TripDirectionAlreadyExists = Error.Conflict(
-        "TripDirection.AlreadyExists",
-        "A direction for this trip already exists");
+    public static readonly Error TripPickupStopAlreadyExists = Error.Conflict(
+        "TripPickupStop.AlreadyExists",
+        "A pickup stop for this trip already exists");
 }

@@ -3,9 +3,9 @@ using Transport.SharedKernel;
 
 namespace Transport.Domain.Trips;
 
-public class TripDirection : IAuditable
+public class TripPickupStop : IAuditable
 {
-    public int TripDirectionId { get; set; }
+    public int TripPickupStopId { get; set; }
     public int TripId { get; set; }
     public int DirectionId { get; set; }
     public int Order { get; set; }

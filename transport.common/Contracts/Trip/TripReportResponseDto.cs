@@ -17,7 +17,7 @@ public record TripReportResponseDto(
     List<PickupOptionDto> PickupOptions,
     List<DropoffOptionDto> DropoffOptionsIda,
     List<DropoffOptionDto> DropoffOptionsIdaVuelta,
-    List<TripDirectionReportDto>? StopSchedules = null);
+    List<TripPickupStopReportDto>? StopSchedules = null);
 
 public record TripPriceReportDto(
     int TripPriceId,

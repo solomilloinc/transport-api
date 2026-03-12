@@ -4,13 +4,13 @@ using Transport.Domain.Trips;
 
 namespace Transport.Infraestructure.Database.EntityTypesConfigurations;
 
-public class TripDirectionConfiguration : IEntityTypeConfiguration<TripDirection>
+public class TripPickupStopConfiguration : IEntityTypeConfiguration<TripPickupStop>
 {
-    public void Configure(EntityTypeBuilder<TripDirection> builder)
+    public void Configure(EntityTypeBuilder<TripPickupStop> builder)
     {
-        builder.ToTable("TripDirection");
+        builder.ToTable("TripPickupStop");
 
-        builder.HasKey(td => td.TripDirectionId);
+        builder.HasKey(td => td.TripPickupStopId);
 
         builder.Property(td => td.Order)
             .IsRequired();
@@ -31,7 +31,7 @@ public class TripDirectionConfiguration : IEntityTypeConfiguration<TripDirection
 
         // Relación con Trip
         builder.HasOne(td => td.Trip)
-            .WithMany(t => t.Directions)
+            .WithMany(t => t.PickupStops)
             .HasForeignKey(td => td.TripId)
             .OnDelete(DeleteBehavior.Cascade);
 

@@ -3,9 +3,9 @@ using Transport.SharedKernel.Contracts.Trip;
 
 namespace Transport.Business.TripBusiness.Validation;
 
-internal class TripDirectionCreateDtoValidator : AbstractValidator<TripDirectionCreateDto>
+internal class TripPickupStopCreateDtoValidator : AbstractValidator<TripPickupStopCreateDto>
 {
-    public TripDirectionCreateDtoValidator()
+    public TripPickupStopCreateDtoValidator()
     {
         RuleFor(x => x.TripId)
             .GreaterThan(0)
