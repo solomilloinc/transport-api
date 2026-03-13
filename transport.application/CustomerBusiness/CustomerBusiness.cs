@@ -209,6 +209,13 @@ public class CustomerBusiness : ICustomerBusiness
             ["transactiontype"] = t => t.Type
         };
 
+        // Orden por defecto: fecha descendente (más recientes primero)
+        if (string.IsNullOrWhiteSpace(requestDto.SortBy))
+        {
+            requestDto.SortBy = "date";
+            requestDto.SortDescending = true;
+        }
+
         var pagedResult = await query.ToPagedReportAsync<CustomerTransactionDto, CustomerAccountTransaction, CustomerTransactionReportFilterRequestDto>(
             requestDto,
             selector: t => new CustomerTransactionDto(t.CustomerAccountTransactionId, t.CustomerId, t.Description, t.Type.ToString(), t.Amount, t.Date),
