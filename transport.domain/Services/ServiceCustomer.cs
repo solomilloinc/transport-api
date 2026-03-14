@@ -3,9 +3,10 @@ using Transport.SharedKernel;
 
 namespace Transport.Domain.Services;
 
-public class ServiceCustomer: IAuditable
+public class ServiceCustomer: IAuditable, ITenantScoped
 {
     public int ServiceCustomerId { get; set; }
+    public int TenantId { get; set; }
     public int ServiceId { get; set; }
     public int CustomerId { get; set; }
 

@@ -22,5 +22,11 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
                .WithMany(r => r.Users)
                .HasForeignKey(u => u.RoleId)
                .IsRequired();
+
+        builder.HasOne(u => u.Tenant)
+               .WithMany()
+               .HasForeignKey(u => u.TenantId)
+               .IsRequired()
+               .OnDelete(DeleteBehavior.Restrict);
     }
 }

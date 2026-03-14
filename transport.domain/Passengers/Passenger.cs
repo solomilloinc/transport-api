@@ -10,9 +10,10 @@ using Transport.SharedKernel;
 
 namespace Transport.Domain.Passengers;
 
-public class Passenger : Entity, IAuditable
+public class Passenger : Entity, IAuditable, ITenantScoped
 {
     public int PassengerId { get; set; }
+    public int TenantId { get; set; }
     public int ReserveId { get; set; }
 
     /// <summary>

@@ -78,6 +78,20 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
                 entity.Property("UpdatedBy").HasColumnType("VARCHAR(256)");
                 entity.Property("UpdatedDate");
             }
+
+            // Configure TenantId FK for all ITenantScoped entities
+            if (typeof(ITenantScoped).IsAssignableFrom(entityType.ClrType))
+            {
+                var entity = modelBuilder.Entity(entityType.ClrType);
+                entity.Property("TenantId").IsRequired().HasDefaultValue(1);
+                entity.HasIndex("TenantId");
+
+                entity.HasOne(typeof(Tenant))
+                    .WithMany()
+                    .HasForeignKey("TenantId")
+                    .OnDelete(DeleteBehavior.Restrict)
+                    .IsRequired();
+            }
         }
 
         base.OnModelCreating(modelBuilder);

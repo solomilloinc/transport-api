@@ -13,9 +13,9 @@ public class CustomerConfiguration : IEntityTypeConfiguration<Customer>
         builder.Property(c => c.FirstName).HasMaxLength(100).IsRequired();
         builder.Property(c => c.LastName).HasMaxLength(100).IsRequired();
         builder.Property(c => c.Email).HasMaxLength(150).IsRequired();
-        builder.HasIndex(c => c.Email).IsUnique();
+        builder.HasIndex(c => new { c.TenantId, c.Email }).IsUnique();
         builder.Property(c => c.DocumentNumber).HasMaxLength(50).IsRequired();
-        builder.HasIndex(c => c.DocumentNumber).IsUnique();
+        builder.HasIndex(c => new { c.TenantId, c.DocumentNumber }).IsUnique();
         builder.Property(c => c.Phone1).HasMaxLength(20).IsRequired();
         builder.Property(c => c.Phone2).HasMaxLength(20);
         builder.Property(r => r.Status).IsRequired();

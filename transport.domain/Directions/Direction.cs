@@ -5,9 +5,10 @@ using Transport.SharedKernel;
 
 namespace Transport.Domain.Directions;
 
-public class Direction: IAuditable
+public class Direction: IAuditable, ITenantScoped
 {
     public int DirectionId { get; set; }
+    public int TenantId { get; set; }
     public string Name { get; set; } = null!;
     public double? Lat { get; set; }
     public double? Lng { get; set; }

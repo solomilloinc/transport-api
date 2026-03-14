@@ -3,9 +3,10 @@ using Transport.SharedKernel;
 
 namespace Transport.Domain.Reserves;
 
-public class ReserveSlotLock : Entity, IAuditable
+public class ReserveSlotLock : Entity, IAuditable, ITenantScoped
 {
     public int ReserveSlotLockId { get; set; }
+    public int TenantId { get; set; }
     public string LockToken { get; set; } = null!; // GUID único para el frontend
 
     // Referencias a reservas (ida y vuelta si aplica)

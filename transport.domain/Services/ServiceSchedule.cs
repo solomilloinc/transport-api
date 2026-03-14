@@ -2,9 +2,10 @@
 
 namespace Transport.Domain.Services;
 
-public class ServiceSchedule : Entity, IAuditable
+public class ServiceSchedule : Entity, IAuditable, ITenantScoped
 {
     public int ServiceScheduleId { get; set; }
+    public int TenantId { get; set; }
     public int ServiceId { get; set; }
     public TimeSpan DepartureHour { get; set; }
     public bool IsHoliday { get; set; }

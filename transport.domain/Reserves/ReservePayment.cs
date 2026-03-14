@@ -4,9 +4,10 @@ using Transport.SharedKernel;
 
 namespace Transport.Domain.Reserves;
 
-public class ReservePayment : Entity, IAuditable
+public class ReservePayment : Entity, IAuditable, ITenantScoped
 {
     public int ReservePaymentId { get; set; }
+    public int TenantId { get; set; }
     public int ReserveId { get; set; }
     public PaymentMethodEnum Method { get; set; }
     public StatusPaymentEnum Status { get; set; }

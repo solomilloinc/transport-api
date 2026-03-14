@@ -40,7 +40,7 @@ public class TripConfiguration : IEntityTypeConfiguration<Trip>
             .OnDelete(DeleteBehavior.Restrict);
 
         // Índice único para evitar trips duplicados
-        builder.HasIndex(t => new { t.OriginCityId, t.DestinationCityId })
+        builder.HasIndex(t => new { t.TenantId, t.OriginCityId, t.DestinationCityId })
             .HasFilter("[Status] = 'Active'")
             .IsUnique();
     }

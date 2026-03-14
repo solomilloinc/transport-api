@@ -7,9 +7,10 @@ namespace Transport.Domain.Services;
 /// Whitelist of allowed directions for a service.
 /// Used to filter available pickup/dropoff options for reserves created from this service.
 /// </summary>
-public class ServiceDirection : Entity, IAuditable
+public class ServiceDirection : Entity, IAuditable, ITenantScoped
 {
     public int ServiceDirectionId { get; set; }
+    public int TenantId { get; set; }
     public int ServiceId { get; set; }
     public int DirectionId { get; set; }
 

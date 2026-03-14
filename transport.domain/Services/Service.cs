@@ -5,9 +5,10 @@ using Transport.Domain.Vehicles;
 using Transport.SharedKernel;
 
 namespace Transport.Domain.Services;
-public class Service : Entity, IAuditable
+public class Service : Entity, IAuditable, ITenantScoped
 {
     public int ServiceId { get; set; }
+    public int TenantId { get; set; }
     public string Name { get; set; } = null!;
     public int TripId { get; set; }
     public TimeSpan EstimatedDuration { get; set; }
