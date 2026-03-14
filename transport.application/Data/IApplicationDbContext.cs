@@ -12,6 +12,7 @@ using Transport.Domain.Services;
 using Transport.Domain.Directions;
 using Transport.SharedKernel;
 using Transport.Domain.Passengers;
+using Transport.Domain.Tenants;
 using Transport.Domain.Trips;
 
 namespace Transport.Business.Data;
@@ -41,6 +42,9 @@ public interface IApplicationDbContext
     DbSet<ServiceCustomer> ServiceCustomers { get; }
     DbSet<ReserveDirection> ReserveDirections { get; }
     DbSet<TripPickupStop> TripPickupStops { get; }
+    DbSet<Tenant> Tenants { get; }
+    DbSet<TenantConfig> TenantConfigs { get; }
+    DbSet<TenantPaymentConfig> TenantPaymentConfigs { get; }
     DbSet<OutboxMessage> OutboxMessages { get; }
     EntityEntry<TEntity> Entry<TEntity>(TEntity entity) where TEntity : class;
     Task<int> SaveChangesWithOutboxAsync(CancellationToken cancellationToken = default);

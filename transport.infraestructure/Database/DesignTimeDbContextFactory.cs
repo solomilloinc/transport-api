@@ -21,14 +21,21 @@ namespace Transport.Infraestructure.Database
             optionsBuilder.UseSqlServer(connectionString);
 
             var fakeUserContext = new FakeUserContext();
+            var fakeTenantContext = new FakeTenantContext();
 
-            return new ApplicationDbContext(optionsBuilder.Options, fakeUserContext);
+            return new ApplicationDbContext(optionsBuilder.Options, fakeUserContext, fakeTenantContext);
         }
 
         private class FakeUserContext : IUserContext
         {
-            public int UserId => 0;  
+            public int UserId => 0;
             public string Email => "design@time";
+        }
+
+        private class FakeTenantContext : ITenantContext
+        {
+            public int TenantId => 1;
+            public string? TenantCode => "default";
         }
     }
 }
