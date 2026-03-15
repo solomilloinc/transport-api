@@ -24,7 +24,7 @@ public class DirectionBusinessTests : TestBase
     public async Task CreateAsync_ShouldSucceed_WhenValid()
     {
         var directions = new List<Direction>();
-        _contextMock.Setup(x => x.Directions).Returns(GetMockDbSetWithIdentity(directions).Object);
+        _contextMock.Setup(x => x.Directions).Returns(GetMockDbSetWithIdentity(directions));
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
         var dto = new DirectionCreateDto("Calle 123", -34.60, -58.38, 1);
@@ -38,8 +38,7 @@ public class DirectionBusinessTests : TestBase
     [Fact]
     public async Task UpdateAsync_ShouldFail_WhenDirectionNotFound()
     {
-        _contextMock.Setup(x => x.Directions.FindAsync(It.IsAny<object[]>()))
-            .ReturnsAsync((Direction?)null);
+        _contextMock.Setup(x => x.Directions).Returns(GetQueryableMockDbSet(new List<Direction>()));
 
         var dto = new DirectionUpdateDto("Calle Nueva", -34.60, -58.38, 2);
         var result = await _directionBusiness.UpdateAsync(1, dto);
@@ -52,7 +51,7 @@ public class DirectionBusinessTests : TestBase
     public async Task UpdateAsync_ShouldSucceed_WhenDirectionExists()
     {
         var direction = new Direction { DirectionId = 1, Name = "Vieja", Lat = 0, Lng = 0, CityId = 1 };
-        _contextMock.Setup(x => x.Directions.FindAsync(1)).ReturnsAsync(direction);
+        _contextMock.Setup(x => x.Directions).Returns(GetQueryableMockDbSet(new List<Direction> { direction }));
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
         var dto = new DirectionUpdateDto("Nueva", -34.61, -58.39, 2);
@@ -68,8 +67,7 @@ public class DirectionBusinessTests : TestBase
     [Fact]
     public async Task DeleteAsync_ShouldFail_WhenDirectionNotFound()
     {
-        _contextMock.Setup(x => x.Directions.FindAsync(It.IsAny<object[]>()))
-            .ReturnsAsync((Direction?)null);
+        _contextMock.Setup(x => x.Directions).Returns(GetQueryableMockDbSet(new List<Direction>()));
 
         var result = await _directionBusiness.DeleteAsync(1);
 
@@ -81,7 +79,7 @@ public class DirectionBusinessTests : TestBase
     public async Task DeleteAsync_ShouldSucceed_WhenDirectionExists()
     {
         var direction = new Direction { DirectionId = 1, Status = EntityStatusEnum.Active };
-        _contextMock.Setup(x => x.Directions.FindAsync(1)).ReturnsAsync(direction);
+        _contextMock.Setup(x => x.Directions).Returns(GetQueryableMockDbSet(new List<Direction> { direction }));
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
         var result = await _directionBusiness.DeleteAsync(1);

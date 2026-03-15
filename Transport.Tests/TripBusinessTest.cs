@@ -35,9 +35,9 @@ public class TripBusinessTest : TestBase
         };
         var tripPickupStops = new List<TripPickupStop>();
 
-        _contextMock.Setup(x => x.Trips).Returns(GetQueryableMockDbSet(trips).Object);
-        _contextMock.Setup(x => x.Directions).Returns(GetQueryableMockDbSet(directions).Object);
-        _contextMock.Setup(x => x.TripPickupStops).Returns(GetMockDbSetWithIdentity(tripPickupStops).Object);
+        _contextMock.Setup(x => x.Trips).Returns(GetQueryableMockDbSet(trips));
+        _contextMock.Setup(x => x.Directions).Returns(GetQueryableMockDbSet(directions));
+        _contextMock.Setup(x => x.TripPickupStops).Returns(GetMockDbSetWithIdentity(tripPickupStops));
 
         var dto = new TripPickupStopCreateDto(
             TripId: 1,
@@ -67,9 +67,9 @@ public class TripBusinessTest : TestBase
         };
         var tripPickupStops = new List<TripPickupStop>();
 
-        _contextMock.Setup(x => x.Trips).Returns(GetQueryableMockDbSet(trips).Object);
-        _contextMock.Setup(x => x.Directions).Returns(GetQueryableMockDbSet(directions).Object);
-        _contextMock.Setup(x => x.TripPickupStops).Returns(GetQueryableMockDbSet(tripPickupStops).Object);
+        _contextMock.Setup(x => x.Trips).Returns(GetQueryableMockDbSet(trips));
+        _contextMock.Setup(x => x.Directions).Returns(GetQueryableMockDbSet(directions));
+        _contextMock.Setup(x => x.TripPickupStops).Returns(GetQueryableMockDbSet(tripPickupStops));
 
         var dto = new TripPickupStopCreateDto(TripId: 99, DirectionId: 10, Order: 0, PickupTimeOffset: TimeSpan.Zero);
 
@@ -98,9 +98,9 @@ public class TripBusinessTest : TestBase
             new TripPickupStop { TripPickupStopId = 1, TripId = 1, DirectionId = 10, Order = 0, PickupTimeOffset = TimeSpan.Zero, Status = EntityStatusEnum.Active }
         };
 
-        _contextMock.Setup(x => x.Trips).Returns(GetQueryableMockDbSet(trips).Object);
-        _contextMock.Setup(x => x.Directions).Returns(GetQueryableMockDbSet(directions).Object);
-        _contextMock.Setup(x => x.TripPickupStops).Returns(GetQueryableMockDbSet(tripPickupStops).Object);
+        _contextMock.Setup(x => x.Trips).Returns(GetQueryableMockDbSet(trips));
+        _contextMock.Setup(x => x.Directions).Returns(GetQueryableMockDbSet(directions));
+        _contextMock.Setup(x => x.TripPickupStops).Returns(GetQueryableMockDbSet(tripPickupStops));
 
         var dto = new TripPickupStopCreateDto(TripId: 1, DirectionId: 10, Order: 1, PickupTimeOffset: TimeSpan.FromMinutes(15));
 
@@ -126,8 +126,8 @@ public class TripBusinessTest : TestBase
             new Direction { DirectionId = 20, Name = "Parada Norte", CityId = 1, Status = EntityStatusEnum.Active }
         };
 
-        _contextMock.Setup(x => x.TripPickupStops).Returns(GetQueryableMockDbSet(tripPickupStops).Object);
-        _contextMock.Setup(x => x.Directions).Returns(GetQueryableMockDbSet(directions).Object);
+        _contextMock.Setup(x => x.TripPickupStops).Returns(GetQueryableMockDbSet(tripPickupStops));
+        _contextMock.Setup(x => x.Directions).Returns(GetQueryableMockDbSet(directions));
 
         var dto = new TripPickupStopUpdateDto(DirectionId: 20, Order: 1, PickupTimeOffset: TimeSpan.FromMinutes(45));
 
@@ -150,7 +150,7 @@ public class TripBusinessTest : TestBase
             new TripPickupStop { TripPickupStopId = 1, TripId = 1, DirectionId = 10, Order = 0, PickupTimeOffset = TimeSpan.Zero, Status = EntityStatusEnum.Active }
         };
 
-        _contextMock.Setup(x => x.TripPickupStops).Returns(GetQueryableMockDbSet(tripPickupStops).Object);
+        _contextMock.Setup(x => x.TripPickupStops).Returns(GetQueryableMockDbSet(tripPickupStops));
 
         // Act
         var result = await _tripBusiness.DeleteDirection(1);

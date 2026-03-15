@@ -29,7 +29,7 @@ public class VehicleTypeBusinessTests : TestBase
     {
         var existing = new VehicleType { VehicleTypeId = 1, Name = "Truck" };
         _contextMock.Setup(x => x.VehicleTypes)
-            .Returns(GetQueryableMockDbSet(new List<VehicleType> { existing }).Object);
+            .Returns(GetQueryableMockDbSet(new List<VehicleType> { existing }));
 
         var dto = new VehicleTypeCreateRequestDto("Truck", null, 10, null);
 
@@ -43,7 +43,7 @@ public class VehicleTypeBusinessTests : TestBase
     public async Task Create_ShouldSucceed_WhenDataIsValid()
     {
         var vehicleTypes = new List<VehicleType>();
-        _contextMock.Setup(x => x.VehicleTypes).Returns(GetMockDbSetWithIdentity(vehicleTypes).Object);
+        _contextMock.Setup(x => x.VehicleTypes).Returns(GetMockDbSetWithIdentity(vehicleTypes));
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
         var dto = new VehicleTypeCreateRequestDto("SUV", null, 10, null);
@@ -66,8 +66,8 @@ public class VehicleTypeBusinessTests : TestBase
            new Vehicle { InternalNumber = "456", VehicleTypeId = 0 }
        };
 
-        _contextMock.Setup(x => x.VehicleTypes).Returns(GetMockDbSetWithIdentity(vehicleTypes).Object);
-        _contextMock.Setup(x => x.Vehicles).Returns(GetQueryableMockDbSet(vehiclesInDb).Object);
+        _contextMock.Setup(x => x.VehicleTypes).Returns(GetMockDbSetWithIdentity(vehicleTypes));
+        _contextMock.Setup(x => x.Vehicles).Returns(GetQueryableMockDbSet(vehiclesInDb));
 
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
@@ -97,7 +97,7 @@ public class VehicleTypeBusinessTests : TestBase
     public async Task Delete_ShouldFail_WhenNotFound()
     {
         _contextMock.Setup(x => x.VehicleTypes)
-            .Returns(GetQueryableMockDbSet(new List<VehicleType>()).Object);
+            .Returns(GetQueryableMockDbSet(new List<VehicleType>()));
 
         var result = await _vehicleTypeBusiness.Delete(1);
 
@@ -110,7 +110,7 @@ public class VehicleTypeBusinessTests : TestBase
     {
         var vehicleType = new VehicleType { VehicleTypeId = 1, Status = EntityStatusEnum.Active };
         _contextMock.Setup(x => x.VehicleTypes)
-            .Returns(GetQueryableMockDbSet(new List<VehicleType> { vehicleType }).Object);
+            .Returns(GetQueryableMockDbSet(new List<VehicleType> { vehicleType }));
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
         var result = await _vehicleTypeBusiness.Delete(1);
@@ -123,7 +123,7 @@ public class VehicleTypeBusinessTests : TestBase
     public async Task Update_ShouldFail_WhenNotFound()
     {
         _contextMock.Setup(x => x.VehicleTypes)
-            .Returns(GetQueryableMockDbSet(new List<VehicleType>()).Object);
+            .Returns(GetQueryableMockDbSet(new List<VehicleType>()));
 
         var dto = new VehicleTypeUpdateRequestDto("New Name", null, 1);
         var result = await _vehicleTypeBusiness.Update(1, dto);
@@ -137,7 +137,7 @@ public class VehicleTypeBusinessTests : TestBase
     {
         var vehicleType = new VehicleType { VehicleTypeId = 1, Name = "Car" };
         _contextMock.Setup(x => x.VehicleTypes)
-            .Returns(GetQueryableMockDbSet(new List<VehicleType> { vehicleType }).Object);
+            .Returns(GetQueryableMockDbSet(new List<VehicleType> { vehicleType }));
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
         var dto = new VehicleTypeUpdateRequestDto("Truck", null, 1);
@@ -151,7 +151,7 @@ public class VehicleTypeBusinessTests : TestBase
     public async Task UpdateStatus_ShouldFail_WhenNotFound()
     {
         _contextMock.Setup(x => x.VehicleTypes)
-            .Returns(GetQueryableMockDbSet(new List<VehicleType>()).Object);
+            .Returns(GetQueryableMockDbSet(new List<VehicleType>()));
 
         var result = await _vehicleTypeBusiness.UpdateStatus(9, EntityStatusEnum.Inactive);
 
@@ -164,7 +164,7 @@ public class VehicleTypeBusinessTests : TestBase
     {
         var vehicleType = new VehicleType { VehicleTypeId = 1, Status = EntityStatusEnum.Active };
         _contextMock.Setup(x => x.VehicleTypes)
-            .Returns(GetQueryableMockDbSet(new List<VehicleType> { vehicleType }).Object);
+            .Returns(GetQueryableMockDbSet(new List<VehicleType> { vehicleType }));
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
         var result = await _vehicleTypeBusiness.UpdateStatus(1, EntityStatusEnum.Inactive);

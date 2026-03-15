@@ -47,7 +47,7 @@ public class CustomerBusinessTest : TestBase
         };
 
         _mockContext.Setup(x => x.Customers)
-            .Returns(GetQueryableMockDbSet(data).Object);
+            .Returns(GetQueryableMockDbSet(data));
 
         var result = await _customerBusiness.Create(dto);
 
@@ -69,7 +69,7 @@ public class CustomerBusinessTest : TestBase
        );
 
         var customers = new List<Customer>();
-        _mockContext.Setup(x => x.Customers).Returns(GetQueryableMockDbSet(customers).Object);
+        _mockContext.Setup(x => x.Customers).Returns(GetQueryableMockDbSet(customers));
         SetupSaveChangesWithOutboxAsync(_mockContext);
 
         // Act
@@ -84,8 +84,8 @@ public class CustomerBusinessTest : TestBase
     public async Task Delete_ShouldReturnFailure_WhenCustomerNotFound()
     {
         // Arrange
-        _mockContext.Setup(x => x.Customers.FindAsync(It.IsAny<int>()))
-            .ReturnsAsync((Customer)null);
+        _mockContext.Setup(x => x.Customers)
+            .Returns(GetQueryableMockDbSet(new List<Customer>()));
 
         // Act
         var result = await _customerBusiness.Delete(1);
@@ -101,8 +101,8 @@ public class CustomerBusinessTest : TestBase
         // Arrange
         var customer = new Customer { CustomerId = 1 };
 
-        _mockContext.Setup(x => x.Customers.FindAsync(1))
-            .ReturnsAsync(customer);
+        _mockContext.Setup(x => x.Customers)
+            .Returns(GetQueryableMockDbSet(new List<Customer> { customer }));
         _mockContext.Setup(x => x.SaveChangesWithOutboxAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
 
         // Act
@@ -117,8 +117,8 @@ public class CustomerBusinessTest : TestBase
     [Fact]
     public async Task Update_ShouldReturnFailure_WhenCustomerNotFound()
     {
-        _mockContext.Setup(x => x.Customers.FindAsync(It.IsAny<int>()))
-            .ReturnsAsync((Customer)null);
+        _mockContext.Setup(x => x.Customers)
+            .Returns(GetQueryableMockDbSet(new List<Customer>()));
 
         var dto = new CustomerUpdateRequestDto(FirstName: "Updated", LastName: "Name", Email: "test@gmail.com", "1212121", null);
 
@@ -133,8 +133,8 @@ public class CustomerBusinessTest : TestBase
     {
         var customer = new Customer { CustomerId = 1, FirstName = "Old", LastName = "Name" };
 
-        _mockContext.Setup(x => x.Customers.FindAsync(1))
-            .ReturnsAsync(customer);
+        _mockContext.Setup(x => x.Customers)
+            .Returns(GetQueryableMockDbSet(new List<Customer> { customer }));
         _mockContext.Setup(x => x.SaveChangesWithOutboxAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
 
         var dto = new CustomerUpdateRequestDto(FirstName: "New", LastName: "Name", Email: "test@gmail.com", Phone1: "12145354", null);
@@ -148,8 +148,8 @@ public class CustomerBusinessTest : TestBase
     [Fact]
     public async Task UpdateStatus_ShouldReturnFailure_WhenCustomerNotFound()
     {
-        _mockContext.Setup(x => x.Customers.FindAsync(It.IsAny<int>()))
-            .ReturnsAsync((Customer)null);
+        _mockContext.Setup(x => x.Customers)
+            .Returns(GetQueryableMockDbSet(new List<Customer>()));
 
         var result = await _customerBusiness.UpdateStatus(1, EntityStatusEnum.Active);
 
@@ -162,8 +162,8 @@ public class CustomerBusinessTest : TestBase
     {
         var customer = new Customer { CustomerId = 1, Status = EntityStatusEnum.Inactive };
 
-        _mockContext.Setup(x => x.Customers.FindAsync(1))
-            .ReturnsAsync(customer);
+        _mockContext.Setup(x => x.Customers)
+            .Returns(GetQueryableMockDbSet(new List<Customer> { customer }));
         _mockContext.Setup(x => x.SaveChangesWithOutboxAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
 
         var result = await _customerBusiness.UpdateStatus(1, EntityStatusEnum.Active);

@@ -48,7 +48,7 @@ public class CityBusiness : ICityBusiness
 
     public async Task<Result<bool>> Delete(int cityId)
     {
-        var city = await _context.Cities.FindAsync(cityId);
+        var city = await _context.Cities.Where(x => x.CityId == cityId).FirstOrDefaultAsync();
 
         if (city is null)
         {
@@ -145,7 +145,7 @@ public class CityBusiness : ICityBusiness
 
     public async Task<Result<bool>> UpdateStatus(int cityId, EntityStatusEnum status)
     {
-        var city = await _context.Cities.FindAsync(cityId);
+        var city = await _context.Cities.Where(x => x.CityId == cityId).FirstOrDefaultAsync();
         if (city == null)
         {
             return Result.Failure<bool>(CityError.CityNotFound);

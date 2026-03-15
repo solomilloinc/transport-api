@@ -29,11 +29,11 @@ public class TripBusiness : ITripBusiness
         if (dto.OriginCityId == dto.DestinationCityId)
             return Result.Failure<int>(TripError.InvalidTripConfiguration);
 
-        var originCity = await _context.Cities.FindAsync(dto.OriginCityId);
+        var originCity = await _context.Cities.Where(x => x.CityId == dto.OriginCityId).FirstOrDefaultAsync();
         if (originCity is null)
             return Result.Failure<int>(CityError.CityNotFound);
 
-        var destinationCity = await _context.Cities.FindAsync(dto.DestinationCityId);
+        var destinationCity = await _context.Cities.Where(x => x.CityId == dto.DestinationCityId).FirstOrDefaultAsync();
         if (destinationCity is null)
             return Result.Failure<int>(CityError.CityNotFound);
 
@@ -64,15 +64,15 @@ public class TripBusiness : ITripBusiness
         if (dto.OriginCityId == dto.DestinationCityId)
             return Result.Failure<bool>(TripError.InvalidTripConfiguration);
 
-        var trip = await _context.Trips.FindAsync(tripId);
+        var trip = await _context.Trips.Where(x => x.TripId == tripId).FirstOrDefaultAsync();
         if (trip is null)
             return Result.Failure<bool>(TripError.TripNotFound);
 
-        var originCity = await _context.Cities.FindAsync(dto.OriginCityId);
+        var originCity = await _context.Cities.Where(x => x.CityId == dto.OriginCityId).FirstOrDefaultAsync();
         if (originCity is null)
             return Result.Failure<bool>(CityError.CityNotFound);
 
-        var destinationCity = await _context.Cities.FindAsync(dto.DestinationCityId);
+        var destinationCity = await _context.Cities.Where(x => x.CityId == dto.DestinationCityId).FirstOrDefaultAsync();
         if (destinationCity is null)
             return Result.Failure<bool>(CityError.CityNotFound);
 
@@ -98,7 +98,7 @@ public class TripBusiness : ITripBusiness
 
     public async Task<Result<bool>> DeleteTrip(int tripId)
     {
-        var trip = await _context.Trips.FindAsync(tripId);
+        var trip = await _context.Trips.Where(x => x.TripId == tripId).FirstOrDefaultAsync();
         if (trip is null)
             return Result.Failure<bool>(TripError.TripNotFound);
 
@@ -112,7 +112,7 @@ public class TripBusiness : ITripBusiness
 
     public async Task<Result<bool>> UpdateTripStatus(int tripId, EntityStatusEnum status)
     {
-        var trip = await _context.Trips.FindAsync(tripId);
+        var trip = await _context.Trips.Where(x => x.TripId == tripId).FirstOrDefaultAsync();
         if (trip is null)
             return Result.Failure<bool>(TripError.TripNotFound);
 
@@ -370,17 +370,17 @@ public class TripBusiness : ITripBusiness
 
     public async Task<Result<int>> AddPrice(TripPriceCreateDto dto)
     {
-        var trip = await _context.Trips.FindAsync(dto.TripId);
+        var trip = await _context.Trips.Where(x => x.TripId == dto.TripId).FirstOrDefaultAsync();
         if (trip is null)
             return Result.Failure<int>(TripError.TripNotFound);
 
-        var city = await _context.Cities.FindAsync(dto.CityId);
+        var city = await _context.Cities.Where(x => x.CityId == dto.CityId).FirstOrDefaultAsync();
         if (city is null)
             return Result.Failure<int>(CityError.CityNotFound);
 
         if (dto.DirectionId.HasValue)
         {
-            var direction = await _context.Directions.FindAsync(dto.DirectionId.Value);
+            var direction = await _context.Directions.Where(x => x.DirectionId == dto.DirectionId.Value).FirstOrDefaultAsync();
             if (direction is null)
                 return Result.Failure<int>(CityError.CityNotFound); // TODO: Create DirectionError
         }
@@ -415,17 +415,17 @@ public class TripBusiness : ITripBusiness
 
     public async Task<Result<bool>> UpdatePrice(int tripPriceId, TripPriceUpdateDto dto)
     {
-        var tripPrice = await _context.TripPrices.FindAsync(tripPriceId);
+        var tripPrice = await _context.TripPrices.Where(x => x.TripPriceId == tripPriceId).FirstOrDefaultAsync();
         if (tripPrice is null)
             return Result.Failure<bool>(TripError.TripPriceNotFound);
 
-        var city = await _context.Cities.FindAsync(dto.CityId);
+        var city = await _context.Cities.Where(x => x.CityId == dto.CityId).FirstOrDefaultAsync();
         if (city is null)
             return Result.Failure<bool>(CityError.CityNotFound);
 
         if (dto.DirectionId.HasValue)
         {
-            var direction = await _context.Directions.FindAsync(dto.DirectionId.Value);
+            var direction = await _context.Directions.Where(x => x.DirectionId == dto.DirectionId.Value).FirstOrDefaultAsync();
             if (direction is null)
                 return Result.Failure<bool>(CityError.CityNotFound); // TODO: Create DirectionError
         }
@@ -456,7 +456,7 @@ public class TripBusiness : ITripBusiness
 
     public async Task<Result<bool>> DeletePrice(int tripPriceId)
     {
-        var tripPrice = await _context.TripPrices.FindAsync(tripPriceId);
+        var tripPrice = await _context.TripPrices.Where(x => x.TripPriceId == tripPriceId).FirstOrDefaultAsync();
         if (tripPrice is null)
             return Result.Failure<bool>(TripError.TripPriceNotFound);
 
@@ -470,11 +470,11 @@ public class TripBusiness : ITripBusiness
 
     public async Task<Result<int>> AddDirection(TripPickupStopCreateDto dto)
     {
-        var trip = await _context.Trips.FindAsync(dto.TripId);
+        var trip = await _context.Trips.Where(x => x.TripId == dto.TripId).FirstOrDefaultAsync();
         if (trip is null)
             return Result.Failure<int>(TripError.TripNotFound);
 
-        var direction = await _context.Directions.FindAsync(dto.DirectionId);
+        var direction = await _context.Directions.Where(x => x.DirectionId == dto.DirectionId).FirstOrDefaultAsync();
         if (direction is null)
             return Result.Failure<int>(TripError.TripPickupStopNotFound);
 
@@ -503,11 +503,11 @@ public class TripBusiness : ITripBusiness
 
     public async Task<Result<bool>> UpdateDirection(int tripPickupStopId, TripPickupStopUpdateDto dto)
     {
-        var tripPickupStop = await _context.TripPickupStops.FindAsync(tripPickupStopId);
+        var tripPickupStop = await _context.TripPickupStops.Where(x => x.TripPickupStopId == tripPickupStopId).FirstOrDefaultAsync();
         if (tripPickupStop is null)
             return Result.Failure<bool>(TripError.TripPickupStopNotFound);
 
-        var direction = await _context.Directions.FindAsync(dto.DirectionId);
+        var direction = await _context.Directions.Where(x => x.DirectionId == dto.DirectionId).FirstOrDefaultAsync();
         if (direction is null)
             return Result.Failure<bool>(TripError.TripPickupStopNotFound);
 
@@ -533,7 +533,7 @@ public class TripBusiness : ITripBusiness
 
     public async Task<Result<bool>> DeleteDirection(int tripPickupStopId)
     {
-        var tripPickupStop = await _context.TripPickupStops.FindAsync(tripPickupStopId);
+        var tripPickupStop = await _context.TripPickupStops.Where(x => x.TripPickupStopId == tripPickupStopId).FirstOrDefaultAsync();
         if (tripPickupStop is null)
             return Result.Failure<bool>(TripError.TripPickupStopNotFound);
 

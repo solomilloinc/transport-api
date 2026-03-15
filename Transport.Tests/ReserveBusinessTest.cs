@@ -70,7 +70,7 @@ public class ReserveBusinessTests : TestBase
     public async Task UpdateReserveAsync_ShouldFail_WhenReserveNotFound()
     {
         _contextMock.Setup(x => x.Reserves)
-            .Returns(GetQueryableMockDbSet(new List<Reserve>()).Object);
+            .Returns(GetQueryableMockDbSet(new List<Reserve>()));
 
         var dto = new ReserveUpdateRequestDto(1, 1, DateTime.UtcNow, TimeSpan.FromHours(9), 1);
         var result = await _reserveBusiness.UpdateReserveAsync(1, dto);
@@ -84,10 +84,9 @@ public class ReserveBusinessTests : TestBase
     {
         var reserve = new Reserve { ReserveId = 1 };
         _contextMock.Setup(x => x.Reserves)
-            .Returns(GetQueryableMockDbSet(new List<Reserve> { reserve }).Object);
+            .Returns(GetQueryableMockDbSet(new List<Reserve> { reserve }));
 
-        _contextMock.Setup(x => x.Vehicles.FindAsync(1))
-            .ReturnsAsync((Vehicle)null); // vehículo no encontrado
+        _contextMock.Setup(x => x.Vehicles).Returns(GetQueryableMockDbSet(new List<Vehicle>()));
 
         var dto = new ReserveUpdateRequestDto(1, null, null, null, null);
         var result = await _reserveBusiness.UpdateReserveAsync(1, dto);
@@ -101,13 +100,11 @@ public class ReserveBusinessTests : TestBase
     {
         var reserve = new Reserve { ReserveId = 1 };
         _contextMock.Setup(x => x.Reserves)
-            .Returns(GetQueryableMockDbSet(new List<Reserve> { reserve }).Object);
+            .Returns(GetQueryableMockDbSet(new List<Reserve> { reserve }));
 
-        _contextMock.Setup(x => x.Vehicles.FindAsync(It.IsAny<int>()))
-            .ReturnsAsync(new Vehicle { VehicleId = 1 }); // simular que sí existe el vehículo
+        _contextMock.Setup(x => x.Vehicles).Returns(GetQueryableMockDbSet(new List<Vehicle> { new Vehicle { VehicleId = 1 } }));
 
-        _contextMock.Setup(x => x.Drivers.FindAsync(1))
-            .ReturnsAsync((Driver)null); // chofer no encontrado
+        _contextMock.Setup(x => x.Drivers).Returns(GetQueryableMockDbSet(new List<Driver>()));
 
         var dto = new ReserveUpdateRequestDto(null, 1, null, null, null);
         var result = await _reserveBusiness.UpdateReserveAsync(1, dto);
@@ -121,13 +118,11 @@ public class ReserveBusinessTests : TestBase
     {
         var reserve = new Reserve { ReserveId = 1, Status = ReserveStatusEnum.Available };
         _contextMock.Setup(x => x.Reserves)
-            .Returns(GetQueryableMockDbSet(new List<Reserve> { reserve }).Object);
+            .Returns(GetQueryableMockDbSet(new List<Reserve> { reserve }));
 
-        _contextMock.Setup(x => x.Vehicles.FindAsync(2))
-            .ReturnsAsync(new Vehicle { VehicleId = 2 });
+        _contextMock.Setup(x => x.Vehicles).Returns(GetQueryableMockDbSet(new List<Vehicle> { new Vehicle { VehicleId = 2 } }));
 
-        _contextMock.Setup(x => x.Drivers.FindAsync(3))
-            .ReturnsAsync(new Driver { DriverId = 3 });
+        _contextMock.Setup(x => x.Drivers).Returns(GetQueryableMockDbSet(new List<Driver> { new Driver { DriverId = 3 } }));
 
         _contextMock.Setup(x => x.SaveChangesWithOutboxAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(1);
@@ -178,7 +173,7 @@ public class ReserveBusinessTests : TestBase
             ServiceId = 1,
             Trip = trip
         };
-        var trips = new List<Trip> { new Trip { TripId = 1, OriginCityId = 1, DestinationCityId = 2, Status = EntityStatusEnum.Active, Prices = new List<TripPrice> { new TripPrice { ReserveTypeId = ReserveTypeIdEnum.IdaVuelta, Price = 100, Status = EntityStatusEnum.Active } } } };
+        var trips = new List<Trip> { new Trip { TripId = 1, OriginCityId = 1, DestinationCityId = 2, Status = EntityStatusEnum.Active, Prices = new List<TripPrice> { new TripPrice { ReserveTypeId = ReserveTypeIdEnum.IdaVuelta, CityId = 2, Price = 100, Status = EntityStatusEnum.Active } } } };
 
 
         var customer = new Customer
@@ -191,35 +186,30 @@ public class ReserveBusinessTests : TestBase
             CurrentBalance = 0
         };
 
-        var origin = new Direction { DirectionId = 10, Name = "PickupLocation" };
-        var destination = new Direction { DirectionId = 20, Name = "DropoffLocation" };
+        var origin = new Direction { DirectionId = 1, Name = "PickupLocation", CityId = 1 };
+        var destination = new Direction { DirectionId = 2, Name = "DropoffLocation", CityId = 2 };
 
         var reservePaymentsList = new List<ReservePayment>();
-        _contextMock.Setup(c => c.ReservePayments).Returns(GetMockDbSetWithIdentity(reservePaymentsList).Object);
+        _contextMock.Setup(c => c.ReservePayments).Returns(GetMockDbSetWithIdentity(reservePaymentsList));
 
         var accountTransactionsList = new List<CustomerAccountTransaction>();
-        _contextMock.Setup(c => c.CustomerAccountTransactions).Returns(GetMockDbSetWithIdentity(accountTransactionsList).Object);
+        _contextMock.Setup(c => c.CustomerAccountTransactions).Returns(GetMockDbSetWithIdentity(accountTransactionsList));
 
         var customers = new List<Customer> { customer };
         var directions = new List<Direction> { origin, destination };
         var passengers = new List<Passenger>();
         var users = new List<User>();
 
-        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(reservesList).Object);
-        _contextMock.Setup(c => c.Vehicles.FindAsync(It.IsAny<int>())).ReturnsAsync(vehicle);
-        _contextMock.Setup(c => c.Services).Returns(GetQueryableMockDbSet(new List<Service> { service }).Object);
-        _contextMock.Setup(c => c.Customers).Returns(GetQueryableMockDbSet(customers).Object);
-        _contextMock.Setup(c => c.Customers.FindAsync(It.IsAny<int>())).ReturnsAsync(customer);
-        _contextMock.Setup(c => c.Directions).Returns(GetQueryableMockDbSet(directions).Object);
-        _contextMock.Setup(c => c.Directions.FindAsync(It.IsAny<int>())).ReturnsAsync(origin);
-        _contextMock.Setup(c => c.Passengers).Returns(GetMockDbSetWithIdentity(passengers).Object);
-        _contextMock.Setup(c => c.Users).Returns(GetQueryableMockDbSet(users).Object);
-        _contextMock.Setup(c => c.Trips).Returns(GetQueryableMockDbSet(trips).Object);
+        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(reservesList));
+        _contextMock.Setup(c => c.Vehicles).Returns(GetQueryableMockDbSet(new List<Vehicle> { vehicle }));
+        _contextMock.Setup(c => c.Services).Returns(GetQueryableMockDbSet(new List<Service> { service }));
+        _contextMock.Setup(c => c.Customers).Returns(GetQueryableMockDbSet(customers));
+        _contextMock.Setup(c => c.Directions).Returns(GetQueryableMockDbSet(directions));
+        _contextMock.Setup(c => c.Passengers).Returns(GetMockDbSetWithIdentity(passengers));
+        _contextMock.Setup(c => c.Users).Returns(GetQueryableMockDbSet(users));
+        _contextMock.Setup(c => c.Trips).Returns(GetQueryableMockDbSet(trips));
 
-        _contextMock.Setup(c => c.Customers.Update(It.IsAny<Customer>())).Callback<Customer>(c =>
-        {
-            customer.CurrentBalance = c.CurrentBalance;
-        });
+        // TestDbSet handles Update() - no mock needed
 
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
@@ -265,7 +255,7 @@ public class ReserveBusinessTests : TestBase
         var result = await _reserveBusiness.CreatePassengerReserves(request);
 
         // Assert
-        Assert.True(result.IsSuccess);
+        result.IsSuccess.Should().BeTrue();
 
         // Lógica de pagos:
         // - paymentCount == 1: solo 1 pago (parent)
@@ -354,8 +344,8 @@ public class ReserveBusinessTests : TestBase
         var trips = new List<Trip>
         {
             new Trip { TripId = 1, OriginCityId = 1, DestinationCityId = 2, Status = EntityStatusEnum.Active, Prices = new List<TripPrice> {
-                new TripPrice { ReserveTypeId = ReserveTypeIdEnum.Ida, Price = 100, Status = EntityStatusEnum.Active },
-                new TripPrice { ReserveTypeId = ReserveTypeIdEnum.IdaVuelta, Price = 100, Status = EntityStatusEnum.Active }
+                new TripPrice { ReserveTypeId = ReserveTypeIdEnum.Ida, CityId = 2, Price = 100, Status = EntityStatusEnum.Active },
+                new TripPrice { ReserveTypeId = ReserveTypeIdEnum.IdaVuelta, CityId = 2, Price = 100, Status = EntityStatusEnum.Active }
             }}
         };
         var origin = new Direction { DirectionId = 1, Name = "Pickup" };
@@ -373,15 +363,14 @@ public class ReserveBusinessTests : TestBase
         var passengers = new List<Passenger>();
         var reservesList = new List<Reserve> { reserve1, reserve2 };
 
-        _contextMock.Setup(c => c.ReservePayments).Returns(GetMockDbSetWithIdentity(reservePaymentsList).Object);
-        _contextMock.Setup(c => c.Vehicles.FindAsync(It.IsAny<int>())).ReturnsAsync(vehicle);
-        _contextMock.Setup(c => c.Services).Returns(GetMockDbSetWithIdentity(new List<Service> { service }).Object);
-        _contextMock.Setup(c => c.Directions.FindAsync(It.IsAny<int>())).ReturnsAsync(destination);
-        _contextMock.Setup(c => c.Directions.FindAsync(It.IsAny<int>())).ReturnsAsync(origin);
-        _contextMock.Setup(c => c.Passengers).Returns(GetMockDbSetWithIdentity(passengers).Object);
-        _contextMock.Setup(c => c.Reserves).Returns(GetMockDbSetWithIdentity(reservesList).Object);
-        _contextMock.Setup(c => c.Customers).Returns(GetMockDbSetWithIdentity(new List<Customer> { customer }).Object);
-        _contextMock.Setup(c => c.Trips).Returns(GetQueryableMockDbSet(trips).Object);
+        _contextMock.Setup(c => c.ReservePayments).Returns(GetMockDbSetWithIdentity(reservePaymentsList));
+        _contextMock.Setup(c => c.Vehicles).Returns(GetQueryableMockDbSet(new List<Vehicle> { vehicle }));
+        _contextMock.Setup(c => c.Services).Returns(GetMockDbSetWithIdentity(new List<Service> { service }));
+        _contextMock.Setup(c => c.Directions).Returns(GetQueryableMockDbSet(new List<Direction> { origin, destination }));
+        _contextMock.Setup(c => c.Passengers).Returns(GetMockDbSetWithIdentity(passengers));
+        _contextMock.Setup(c => c.Reserves).Returns(GetMockDbSetWithIdentity(reservesList));
+        _contextMock.Setup(c => c.Customers).Returns(GetMockDbSetWithIdentity(new List<Customer> { customer }));
+        _contextMock.Setup(c => c.Trips).Returns(GetQueryableMockDbSet(trips));
 
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
@@ -393,7 +382,7 @@ public class ReserveBusinessTests : TestBase
 
         _contextMock
             .Setup(c => c.Users)
-            .Returns(GetMockDbSetWithIdentity(new List<User> { user }).Object);
+            .Returns(GetMockDbSetWithIdentity(new List<User> { user }));
 
         _userContextMock.SetupGet(x => x.UserId).Returns(999);
 
@@ -577,7 +566,7 @@ public class ReserveBusinessTests : TestBase
     public async Task CreatePaymentsAsync_ShouldFail_WhenReserveNotFound()
     {
         var reserves = new List<Reserve>();
-        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(reserves).Object);
+        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(reserves));
 
         _unitOfWorkMock.Setup(uow => uow.ExecuteInTransactionAsync(It.IsAny<Func<Task<Result<bool>>>>(), It.IsAny<IsolationLevel>()))
                        .Returns<Func<Task<Result<bool>>>, IsolationLevel>(async (func, _) => await func());
@@ -598,9 +587,9 @@ public class ReserveBusinessTests : TestBase
         var passengers = new List<Passenger>();
         var reserves = new List<Reserve> { new Reserve { ReserveId = 1, Passengers = passengers } };
         var customers = new List<Customer> { new Customer { CustomerId = 1 } };
-        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(reserves).Object);
-        _contextMock.Setup(c => c.Customers).Returns(GetQueryableMockDbSet(customers).Object);
-        _contextMock.Setup(c => c.Customers.FindAsync(1)).ReturnsAsync(new Customer { CustomerId = 1 });
+        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(reserves));
+        _contextMock.Setup(c => c.Customers).Returns(GetQueryableMockDbSet(customers));
+        // (Customers already set up via GetQueryableMockDbSet above)
 
         _unitOfWorkMock
           .Setup(uow => uow.ExecuteInTransactionAsync<bool>(
@@ -620,9 +609,9 @@ public class ReserveBusinessTests : TestBase
         var passengers = new List<Passenger>();
         var reserves = new List<Reserve> { new Reserve { ReserveId = 1, Passengers = passengers } };
         var customers = new List<Customer> { new Customer { CustomerId = 1 } };
-        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(reserves).Object);
-        _contextMock.Setup(c => c.Customers).Returns(GetQueryableMockDbSet(customers).Object);
-        _contextMock.Setup(c => c.Customers.FindAsync(1)).ReturnsAsync(new Customer { CustomerId = 1 });
+        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(reserves));
+        _contextMock.Setup(c => c.Customers).Returns(GetQueryableMockDbSet(customers));
+        // (Customers already set up via GetQueryableMockDbSet above)
 
         _unitOfWorkMock
          .Setup(uow => uow.ExecuteInTransactionAsync<bool>(
@@ -647,9 +636,9 @@ public class ReserveBusinessTests : TestBase
         var passengers = new List<Passenger>();
         var reserves = new List<Reserve> { new Reserve { ReserveId = 1, Passengers = passengers } };
         var customers = new List<Customer> { new Customer { CustomerId = 1 } };
-        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(reserves).Object);
-        _contextMock.Setup(c => c.Customers).Returns(GetQueryableMockDbSet(customers).Object);
-        _contextMock.Setup(c => c.Customers.FindAsync(1)).ReturnsAsync(new Customer { CustomerId = 1 });
+        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(reserves));
+        _contextMock.Setup(c => c.Customers).Returns(GetQueryableMockDbSet(customers));
+        // (Customers already set up via GetQueryableMockDbSet above)
 
         _unitOfWorkMock
         .Setup(uow => uow.ExecuteInTransactionAsync<bool>(
@@ -681,23 +670,20 @@ public class ReserveBusinessTests : TestBase
         var trips = new List<Trip>
         {
             new Trip { TripId = 1, OriginCityId = 1, DestinationCityId = 2, Status = EntityStatusEnum.Active, Prices = new List<TripPrice> {
-                new TripPrice { ReserveTypeId = ReserveTypeIdEnum.Ida, Price = 100, Status = EntityStatusEnum.Active }
+                new TripPrice { ReserveTypeId = ReserveTypeIdEnum.Ida, CityId = 2, Price = 100, Status = EntityStatusEnum.Active }
             }}
         };
 
         var customers = new List<Customer> { customer };
-        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(reserves).Object);
-        _contextMock.Setup(c => c.Passengers).Returns(GetQueryableMockDbSet(passengers).Object);
-        _contextMock.Setup(c => c.Customers).Returns(GetQueryableMockDbSet(customers).Object);
-        _contextMock.Setup(c => c.Customers.FindAsync(1)).ReturnsAsync(customer);
-        _contextMock.Setup(c => c.Services).Returns(GetQueryableMockDbSet(new List<Service> { service }).Object);
-        _contextMock.Setup(c => c.Trips).Returns(GetQueryableMockDbSet(trips).Object);
+        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(reserves));
+        _contextMock.Setup(c => c.Passengers).Returns(GetQueryableMockDbSet(passengers));
+        _contextMock.Setup(c => c.Customers).Returns(GetQueryableMockDbSet(customers));
+        _contextMock.Setup(c => c.Services).Returns(GetQueryableMockDbSet(new List<Service> { service }));
+        _contextMock.Setup(c => c.Trips).Returns(GetQueryableMockDbSet(trips));
 
         var customerAccountTransactions = new List<CustomerAccountTransaction>();
-        var reservePaymentsDbSet = GetMockDbSetWithIdentity(paymentsDb);
-        var customerAccountTransactionsDbSet = GetMockDbSetWithIdentity(customerAccountTransactions);
-        _contextMock.Setup(c => c.ReservePayments).Returns(reservePaymentsDbSet.Object);
-        _contextMock.Setup(c => c.CustomerAccountTransactions).Returns(customerAccountTransactionsDbSet.Object);
+        _contextMock.Setup(c => c.ReservePayments).Returns(GetMockDbSetWithIdentity(paymentsDb));
+        _contextMock.Setup(c => c.CustomerAccountTransactions).Returns(GetMockDbSetWithIdentity(customerAccountTransactions));
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
         _unitOfWorkMock
@@ -769,11 +755,10 @@ public class ReserveBusinessTests : TestBase
             new CreatePaymentRequestDto(3000m, 2)
         };
 
-        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(reserves).Object);
-        _contextMock.Setup(c => c.Passengers).Returns(GetQueryableMockDbSet(passengers).Object);
-        _contextMock.Setup(c => c.Customers).Returns(GetQueryableMockDbSet(new List<Customer> { customer }).Object);
-        _contextMock.Setup(c => c.Customers.FindAsync(customerId)).ReturnsAsync(customer);
-        _contextMock.Setup(c => c.ReservePayments).Returns(GetQueryableMockDbSet(reservePayments).Object);
+        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(reserves));
+        _contextMock.Setup(c => c.Passengers).Returns(GetQueryableMockDbSet(passengers));
+        _contextMock.Setup(c => c.Customers).Returns(GetQueryableMockDbSet(new List<Customer> { customer }));
+        _contextMock.Setup(c => c.ReservePayments).Returns(GetQueryableMockDbSet(reservePayments));
 
         _unitOfWorkMock
             .Setup(uow => uow.ExecuteInTransactionAsync<bool>(
@@ -809,10 +794,9 @@ public class ReserveBusinessTests : TestBase
 
         var customer = new Customer { CustomerId = customerId };
 
-        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(reserves).Object);
-        _contextMock.Setup(c => c.Customers).Returns(GetQueryableMockDbSet(new List<Customer> { customer }).Object);
-        _contextMock.Setup(c => c.Customers.FindAsync(customerId)).ReturnsAsync(customer);
-        _contextMock.Setup(c => c.ReservePayments).Returns(GetQueryableMockDbSet(existingPayments).Object);
+        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(reserves));
+        _contextMock.Setup(c => c.Customers).Returns(GetQueryableMockDbSet(new List<Customer> { customer }));
+        _contextMock.Setup(c => c.ReservePayments).Returns(GetQueryableMockDbSet(existingPayments));
 
         _unitOfWorkMock
             .Setup(uow => uow.ExecuteInTransactionAsync<bool>(
@@ -853,11 +837,9 @@ public class ReserveBusinessTests : TestBase
         var locks = new List<ReserveSlotLock>();
         var users = new List<User>();
 
-        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(reserves).Object);
-        _contextMock.Setup(c => c.ReserveSlotLocks).Returns(GetQueryableMockDbSet(locks).Object);
-        _contextMock.Setup(c => c.Users).Returns(GetQueryableMockDbSet(users).Object);
-        _contextMock.Setup(c => c.ReserveSlotLocks.Add(It.IsAny<ReserveSlotLock>()))
-            .Callback<ReserveSlotLock>(locks.Add);
+        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(reserves));
+        _contextMock.Setup(c => c.ReserveSlotLocks).Returns(GetMockDbSetWithIdentity(locks));
+        _contextMock.Setup(c => c.Users).Returns(GetQueryableMockDbSet(users));
 
         _userContextMock.Setup(x => x.Email).Returns("test@example.com");
         _userContextMock.Setup(x => x.UserId).Returns(1);
@@ -916,9 +898,9 @@ public class ReserveBusinessTests : TestBase
         var locks = new List<ReserveSlotLock>();
         var users = new List<User>();
 
-        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(reserves).Object);
-        _contextMock.Setup(c => c.ReserveSlotLocks).Returns(GetQueryableMockDbSet(locks).Object);
-        _contextMock.Setup(c => c.Users).Returns(GetQueryableMockDbSet(users).Object);
+        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(reserves));
+        _contextMock.Setup(c => c.ReserveSlotLocks).Returns(GetQueryableMockDbSet(locks));
+        _contextMock.Setup(c => c.Users).Returns(GetQueryableMockDbSet(users));
 
         _userContextMock.Setup(x => x.Email).Returns("test@example.com");
         _userContextMock.Setup(x => x.UserId).Returns(1);
@@ -964,9 +946,9 @@ public class ReserveBusinessTests : TestBase
 
         var users = new List<User>();
 
-        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(reserves).Object);
-        _contextMock.Setup(c => c.ReserveSlotLocks).Returns(GetQueryableMockDbSet(existingLocks).Object);
-        _contextMock.Setup(c => c.Users).Returns(GetQueryableMockDbSet(users).Object);
+        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(reserves));
+        _contextMock.Setup(c => c.ReserveSlotLocks).Returns(GetQueryableMockDbSet(existingLocks));
+        _contextMock.Setup(c => c.Users).Returns(GetQueryableMockDbSet(users));
 
         _userContextMock.Setup(x => x.Email).Returns("test@example.com");
         _userContextMock.Setup(x => x.UserId).Returns(1);
@@ -1041,21 +1023,21 @@ public class ReserveBusinessTests : TestBase
         var trips = new List<Trip>
         {
             new Trip { TripId = 1, OriginCityId = 1, DestinationCityId = 2, Status = EntityStatusEnum.Active, Prices = new List<TripPrice> {
-                new TripPrice { ReserveTypeId = ReserveTypeIdEnum.Ida, Price = 100, Status = EntityStatusEnum.Active }
+                new TripPrice { ReserveTypeId = ReserveTypeIdEnum.Ida, CityId = 2, Price = 100, Status = EntityStatusEnum.Active }
             }}
         };
 
-        var direction = new Direction { DirectionId = 1, Name = "Location" };
+        var direction = new Direction { DirectionId = 1, Name = "Location", CityId = 1 };
 
-        _contextMock.Setup(c => c.ReserveSlotLocks).Returns(GetQueryableMockDbSet(locks).Object);
-        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(reserves).Object);
-        _contextMock.Setup(c => c.Passengers).Returns(GetMockDbSetWithIdentity(passengers).Object);
-        _contextMock.Setup(c => c.ReservePayments).Returns(GetMockDbSetWithIdentity(payments).Object);
-        _contextMock.Setup(c => c.Vehicles.FindAsync(It.IsAny<int>())).ReturnsAsync(vehicle);
-        _contextMock.Setup(c => c.Services).Returns(GetQueryableMockDbSet(new List<Service> { service }).Object);
-        _contextMock.Setup(c => c.Trips).Returns(GetQueryableMockDbSet(trips).Object);
-        _contextMock.Setup(c => c.Directions.FindAsync(It.IsAny<int>())).ReturnsAsync(direction);
-        _contextMock.Setup(c => c.Customers).Returns(GetQueryableMockDbSet(new List<Customer>()).Object);
+        _contextMock.Setup(c => c.ReserveSlotLocks).Returns(GetQueryableMockDbSet(locks));
+        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(reserves));
+        _contextMock.Setup(c => c.Passengers).Returns(GetMockDbSetWithIdentity(passengers));
+        _contextMock.Setup(c => c.ReservePayments).Returns(GetMockDbSetWithIdentity(payments));
+        _contextMock.Setup(c => c.Vehicles).Returns(GetQueryableMockDbSet(new List<Vehicle> { vehicle }));
+        _contextMock.Setup(c => c.Services).Returns(GetQueryableMockDbSet(new List<Service> { service }));
+        _contextMock.Setup(c => c.Trips).Returns(GetQueryableMockDbSet(trips));
+        _contextMock.Setup(c => c.Directions).Returns(GetQueryableMockDbSet(new List<Direction> { direction }));
+        _contextMock.Setup(c => c.Customers).Returns(GetQueryableMockDbSet(new List<Customer>()));
 
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
@@ -1124,7 +1106,7 @@ public class ReserveBusinessTests : TestBase
 
         var locks = new List<ReserveSlotLock> { expiredLock };
 
-        _contextMock.Setup(c => c.ReserveSlotLocks).Returns(GetQueryableMockDbSet(locks).Object);
+        _contextMock.Setup(c => c.ReserveSlotLocks).Returns(GetQueryableMockDbSet(locks));
 
         _unitOfWorkMock
             .Setup(u => u.ExecuteInTransactionAsync(It.IsAny<Func<Task<Result<CreateReserveExternalResult>>>>(), It.IsAny<IsolationLevel>()))
@@ -1175,7 +1157,7 @@ public class ReserveBusinessTests : TestBase
 
         var locks = new List<ReserveSlotLock> { activeLock };
 
-        _contextMock.Setup(c => c.ReserveSlotLocks).Returns(GetQueryableMockDbSet(locks).Object);
+        _contextMock.Setup(c => c.ReserveSlotLocks).Returns(GetQueryableMockDbSet(locks));
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
         _unitOfWorkMock
@@ -1218,7 +1200,7 @@ public class ReserveBusinessTests : TestBase
 
         var locks = new List<ReserveSlotLock> { activeLock, expiredLock1, expiredLock2 };
 
-        _contextMock.Setup(c => c.ReserveSlotLocks).Returns(GetQueryableMockDbSet(locks).Object);
+        _contextMock.Setup(c => c.ReserveSlotLocks).Returns(GetQueryableMockDbSet(locks));
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
         // Act
@@ -1272,17 +1254,10 @@ public class ReserveBusinessTests : TestBase
         var reserves = new List<Reserve> { reserve };
 
         var locks = new List<ReserveSlotLock>();
-        var lockCounter = 0;
 
-        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(reserves).Object);
-        _contextMock.Setup(c => c.ReserveSlotLocks).Returns(GetQueryableMockDbSet(locks).Object);
-        _contextMock.Setup(c => c.Users).Returns(GetQueryableMockDbSet(new List<User>()).Object);
-        _contextMock.Setup(c => c.ReserveSlotLocks.Add(It.IsAny<ReserveSlotLock>()))
-            .Callback<ReserveSlotLock>(l =>
-            {
-                l.ReserveSlotLockId = ++lockCounter;
-                locks.Add(l);
-            });
+        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(reserves));
+        _contextMock.Setup(c => c.ReserveSlotLocks).Returns(GetMockDbSetWithIdentity(locks));
+        _contextMock.Setup(c => c.Users).Returns(GetQueryableMockDbSet(new List<User>()));
 
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
@@ -1406,7 +1381,7 @@ public class ReserveBusinessTests : TestBase
         var trips = new List<Trip>
         {
             new Trip { TripId = 1, OriginCityId = 1, DestinationCityId = 2, Status = EntityStatusEnum.Active, Prices = new List<TripPrice> {
-                new TripPrice { ReserveTypeId = ReserveTypeIdEnum.Ida, Price = 100, Status = EntityStatusEnum.Active }
+                new TripPrice { ReserveTypeId = ReserveTypeIdEnum.Ida, CityId = 2, Price = 100, Status = EntityStatusEnum.Active }
             }}
         };
 
@@ -1420,22 +1395,21 @@ public class ReserveBusinessTests : TestBase
             CurrentBalance = 0
         };
 
-        var direction = new Direction { DirectionId = 1, Name = "Location" };
+        var direction = new Direction { DirectionId = 1, Name = "Location", CityId = 1 };
 
         var paymentsDb = new List<ReservePayment>();
         var accountTransactions = new List<CustomerAccountTransaction>();
         var passengers = new List<Passenger>();
 
-        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(new List<Reserve> { todayReserve, reserve }).Object);
-        _contextMock.Setup(c => c.Vehicles.FindAsync(It.IsAny<int>())).ReturnsAsync(vehicle);
-        _contextMock.Setup(c => c.Services).Returns(GetQueryableMockDbSet(new List<Service> { service }).Object);
-        _contextMock.Setup(c => c.Trips).Returns(GetQueryableMockDbSet(trips).Object);
-        _contextMock.Setup(c => c.Customers).Returns(GetQueryableMockDbSet(new List<Customer> { customer }).Object);
-        _contextMock.Setup(c => c.Customers.FindAsync(1)).ReturnsAsync(customer);
-        _contextMock.Setup(c => c.Directions.FindAsync(It.IsAny<int>())).ReturnsAsync(direction);
-        _contextMock.Setup(c => c.Passengers).Returns(GetMockDbSetWithIdentity(passengers).Object);
-        _contextMock.Setup(c => c.ReservePayments).Returns(GetMockDbSetWithIdentity(paymentsDb).Object);
-        _contextMock.Setup(c => c.CustomerAccountTransactions).Returns(GetMockDbSetWithIdentity(accountTransactions).Object);
+        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(new List<Reserve> { todayReserve, reserve }));
+        _contextMock.Setup(c => c.Vehicles).Returns(GetQueryableMockDbSet(new List<Vehicle> { vehicle }));
+        _contextMock.Setup(c => c.Services).Returns(GetQueryableMockDbSet(new List<Service> { service }));
+        _contextMock.Setup(c => c.Trips).Returns(GetQueryableMockDbSet(trips));
+        _contextMock.Setup(c => c.Customers).Returns(GetQueryableMockDbSet(new List<Customer> { customer }));
+        _contextMock.Setup(c => c.Directions).Returns(GetQueryableMockDbSet(new List<Direction> { direction }));
+        _contextMock.Setup(c => c.Passengers).Returns(GetMockDbSetWithIdentity(passengers));
+        _contextMock.Setup(c => c.ReservePayments).Returns(GetMockDbSetWithIdentity(paymentsDb));
+        _contextMock.Setup(c => c.CustomerAccountTransactions).Returns(GetMockDbSetWithIdentity(accountTransactions));
 
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
@@ -1558,8 +1532,8 @@ public class ReserveBusinessTests : TestBase
         var trips = new List<Trip>
         {
             new Trip { TripId = 1, OriginCityId = 1, DestinationCityId = 2, Status = EntityStatusEnum.Active, Prices = new List<TripPrice> {
-                new TripPrice { ReserveTypeId = ReserveTypeIdEnum.Ida, Price = 100, Status = EntityStatusEnum.Active },
-                new TripPrice { ReserveTypeId = ReserveTypeIdEnum.IdaVuelta, Price = 100, Status = EntityStatusEnum.Active }
+                new TripPrice { ReserveTypeId = ReserveTypeIdEnum.Ida, CityId = 2, Price = 100, Status = EntityStatusEnum.Active },
+                new TripPrice { ReserveTypeId = ReserveTypeIdEnum.IdaVuelta, CityId = 2, Price = 100, Status = EntityStatusEnum.Active }
             }}
         };
 
@@ -1573,28 +1547,24 @@ public class ReserveBusinessTests : TestBase
             CurrentBalance = 0
         };
 
-        var direction = new Direction { DirectionId = 1, Name = "Location" };
+        var direction = new Direction { DirectionId = 1, Name = "Location", CityId = 1 };
         var paymentsDb = new List<ReservePayment>();
         var accountTransactions = new List<CustomerAccountTransaction>();
         var passengers = new List<Passenger>();
         var users = new List<User>();
 
-        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(new List<Reserve> { reserveIda, reserveVuelta }).Object);
-        _contextMock.Setup(c => c.Vehicles.FindAsync(It.IsAny<int>())).ReturnsAsync(vehicle);
-        _contextMock.Setup(c => c.Services).Returns(GetQueryableMockDbSet(new List<Service> { service }).Object);
-        _contextMock.Setup(c => c.Trips).Returns(GetQueryableMockDbSet(trips).Object);
-        _contextMock.Setup(c => c.Customers).Returns(GetQueryableMockDbSet(new List<Customer> { customer }).Object);
-        _contextMock.Setup(c => c.Customers.FindAsync(1)).ReturnsAsync(customer);
-        _contextMock.Setup(c => c.Directions.FindAsync(It.IsAny<int>())).ReturnsAsync(direction);
-        _contextMock.Setup(c => c.Passengers).Returns(GetMockDbSetWithIdentity(passengers).Object);
-        _contextMock.Setup(c => c.ReservePayments).Returns(GetMockDbSetWithIdentity(paymentsDb).Object);
-        _contextMock.Setup(c => c.CustomerAccountTransactions).Returns(GetMockDbSetWithIdentity(accountTransactions).Object);
-        _contextMock.Setup(c => c.Users).Returns(GetQueryableMockDbSet(users).Object);
+        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(new List<Reserve> { reserveIda, reserveVuelta }));
+        _contextMock.Setup(c => c.Vehicles).Returns(GetQueryableMockDbSet(new List<Vehicle> { vehicle }));
+        _contextMock.Setup(c => c.Services).Returns(GetQueryableMockDbSet(new List<Service> { service }));
+        _contextMock.Setup(c => c.Trips).Returns(GetQueryableMockDbSet(trips));
+        _contextMock.Setup(c => c.Customers).Returns(GetQueryableMockDbSet(new List<Customer> { customer }));
+        _contextMock.Setup(c => c.Directions).Returns(GetQueryableMockDbSet(new List<Direction> { direction }));
+        _contextMock.Setup(c => c.Passengers).Returns(GetMockDbSetWithIdentity(passengers));
+        _contextMock.Setup(c => c.ReservePayments).Returns(GetMockDbSetWithIdentity(paymentsDb));
+        _contextMock.Setup(c => c.CustomerAccountTransactions).Returns(GetMockDbSetWithIdentity(accountTransactions));
+        _contextMock.Setup(c => c.Users).Returns(GetQueryableMockDbSet(users));
 
-        _contextMock.Setup(c => c.Customers.Update(It.IsAny<Customer>())).Callback<Customer>(c =>
-        {
-            customer.CurrentBalance = c.CurrentBalance;
-        });
+        // TestDbSet handles Update() - no mock needed
 
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
@@ -1725,7 +1695,7 @@ public class ReserveBusinessTests : TestBase
         var trips = new List<Trip>
         {
             new Trip { TripId = 1, OriginCityId = 1, DestinationCityId = 2, Status = EntityStatusEnum.Active, Prices = new List<TripPrice> {
-                new TripPrice { ReserveTypeId = ReserveTypeIdEnum.Ida, Price = 100, Status = EntityStatusEnum.Active }
+                new TripPrice { ReserveTypeId = ReserveTypeIdEnum.Ida, CityId = 2, Price = 100, Status = EntityStatusEnum.Active }
             }}
         };
 
@@ -1739,28 +1709,24 @@ public class ReserveBusinessTests : TestBase
             CurrentBalance = 0
         };
 
-        var direction = new Direction { DirectionId = 1, Name = "Location" };
+        var direction = new Direction { DirectionId = 1, Name = "Location", CityId = 1 };
         var paymentsDb = new List<ReservePayment>();
         var accountTransactions = new List<CustomerAccountTransaction>();
         var passengers = new List<Passenger>();
         var users = new List<User>();
 
-        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(new List<Reserve> { reserve1, reserve2, reserve3 }).Object);
-        _contextMock.Setup(c => c.Vehicles.FindAsync(It.IsAny<int>())).ReturnsAsync(vehicle);
-        _contextMock.Setup(c => c.Services).Returns(GetQueryableMockDbSet(new List<Service> { service }).Object);
-        _contextMock.Setup(c => c.Trips).Returns(GetQueryableMockDbSet(trips).Object);
-        _contextMock.Setup(c => c.Customers).Returns(GetQueryableMockDbSet(new List<Customer> { customer }).Object);
-        _contextMock.Setup(c => c.Customers.FindAsync(1)).ReturnsAsync(customer);
-        _contextMock.Setup(c => c.Directions.FindAsync(It.IsAny<int>())).ReturnsAsync(direction);
-        _contextMock.Setup(c => c.Passengers).Returns(GetMockDbSetWithIdentity(passengers).Object);
-        _contextMock.Setup(c => c.ReservePayments).Returns(GetMockDbSetWithIdentity(paymentsDb).Object);
-        _contextMock.Setup(c => c.CustomerAccountTransactions).Returns(GetMockDbSetWithIdentity(accountTransactions).Object);
-        _contextMock.Setup(c => c.Users).Returns(GetQueryableMockDbSet(users).Object);
+        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(new List<Reserve> { reserve1, reserve2, reserve3 }));
+        _contextMock.Setup(c => c.Vehicles).Returns(GetQueryableMockDbSet(new List<Vehicle> { vehicle }));
+        _contextMock.Setup(c => c.Services).Returns(GetQueryableMockDbSet(new List<Service> { service }));
+        _contextMock.Setup(c => c.Trips).Returns(GetQueryableMockDbSet(trips));
+        _contextMock.Setup(c => c.Customers).Returns(GetQueryableMockDbSet(new List<Customer> { customer }));
+        _contextMock.Setup(c => c.Directions).Returns(GetQueryableMockDbSet(new List<Direction> { direction }));
+        _contextMock.Setup(c => c.Passengers).Returns(GetMockDbSetWithIdentity(passengers));
+        _contextMock.Setup(c => c.ReservePayments).Returns(GetMockDbSetWithIdentity(paymentsDb));
+        _contextMock.Setup(c => c.CustomerAccountTransactions).Returns(GetMockDbSetWithIdentity(accountTransactions));
+        _contextMock.Setup(c => c.Users).Returns(GetQueryableMockDbSet(users));
 
-        _contextMock.Setup(c => c.Customers.Update(It.IsAny<Customer>())).Callback<Customer>(c =>
-        {
-            customer.CurrentBalance = c.CurrentBalance;
-        });
+        // TestDbSet handles Update() - no mock needed
 
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
@@ -1843,7 +1809,7 @@ public class ReserveBusinessTests : TestBase
     {
         // Arrange
         _contextMock.Setup(c => c.Reserves)
-            .Returns(GetQueryableMockDbSet(new List<Reserve>()).Object);
+            .Returns(GetQueryableMockDbSet(new List<Reserve>()));
 
         var request = new PagedReportRequestDto<ReservePaymentSummaryFilterRequestDto>();
 
@@ -1864,9 +1830,9 @@ public class ReserveBusinessTests : TestBase
         var payments = new List<ReservePayment>();
 
         _contextMock.Setup(c => c.Reserves)
-            .Returns(GetQueryableMockDbSet(reserves).Object);
+            .Returns(GetQueryableMockDbSet(reserves));
         _contextMock.Setup(c => c.ReservePayments)
-            .Returns(GetQueryableMockDbSet(payments).Object);
+            .Returns(GetQueryableMockDbSet(payments));
 
         var request = new PagedReportRequestDto<ReservePaymentSummaryFilterRequestDto>();
 
@@ -1900,9 +1866,9 @@ public class ReserveBusinessTests : TestBase
         };
 
         _contextMock.Setup(c => c.Reserves)
-            .Returns(GetQueryableMockDbSet(reserves).Object);
+            .Returns(GetQueryableMockDbSet(reserves));
         _contextMock.Setup(c => c.ReservePayments)
-            .Returns(GetQueryableMockDbSet(payments).Object);
+            .Returns(GetQueryableMockDbSet(payments));
 
         var request = new PagedReportRequestDto<ReservePaymentSummaryFilterRequestDto>();
 
@@ -1962,9 +1928,9 @@ public class ReserveBusinessTests : TestBase
         };
 
         _contextMock.Setup(c => c.Reserves)
-            .Returns(GetQueryableMockDbSet(reserves).Object);
+            .Returns(GetQueryableMockDbSet(reserves));
         _contextMock.Setup(c => c.ReservePayments)
-            .Returns(GetQueryableMockDbSet(payments).Object);
+            .Returns(GetQueryableMockDbSet(payments));
 
         var request = new PagedReportRequestDto<ReservePaymentSummaryFilterRequestDto>();
 
@@ -2017,9 +1983,9 @@ public class ReserveBusinessTests : TestBase
         };
 
         _contextMock.Setup(c => c.Reserves)
-            .Returns(GetQueryableMockDbSet(reserves).Object);
+            .Returns(GetQueryableMockDbSet(reserves));
         _contextMock.Setup(c => c.ReservePayments)
-            .Returns(GetQueryableMockDbSet(payments).Object);
+            .Returns(GetQueryableMockDbSet(payments));
 
         var request = new PagedReportRequestDto<ReservePaymentSummaryFilterRequestDto>();
 
@@ -2096,15 +2062,15 @@ public class ReserveBusinessTests : TestBase
         var trips = new List<Trip>
         {
             new Trip { TripId = 1, OriginCityId = 1, DestinationCityId = 2, Status = EntityStatusEnum.Active, Prices = new List<TripPrice> {
-                new TripPrice { ReserveTypeId = ReserveTypeIdEnum.Ida, Price = 100, Status = EntityStatusEnum.Active },
-                new TripPrice { ReserveTypeId = ReserveTypeIdEnum.IdaVuelta, Price = 200, Status = EntityStatusEnum.Active }
+                new TripPrice { ReserveTypeId = ReserveTypeIdEnum.Ida, CityId = 2, Price = 100, Status = EntityStatusEnum.Active },
+                new TripPrice { ReserveTypeId = ReserveTypeIdEnum.IdaVuelta, CityId = 2, Price = 200, Status = EntityStatusEnum.Active }
             }}
         };
 
-        _contextMock.Setup(c => c.Passengers).Returns(GetQueryableMockDbSet(passengers).Object);
-        _contextMock.Setup(c => c.ReservePayments).Returns(GetQueryableMockDbSet(payments).Object);
-        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(new List<Reserve> { reserve1 }).Object);
-        _contextMock.Setup(c => c.Trips).Returns(GetQueryableMockDbSet(trips).Object);
+        _contextMock.Setup(c => c.Passengers).Returns(GetQueryableMockDbSet(passengers));
+        _contextMock.Setup(c => c.ReservePayments).Returns(GetQueryableMockDbSet(payments));
+        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(new List<Reserve> { reserve1 }));
+        _contextMock.Setup(c => c.Trips).Returns(GetQueryableMockDbSet(trips));
 
         var request = new PagedReportRequestDto<PassengerReserveReportFilterRequestDto>
         {
@@ -2135,8 +2101,8 @@ public class ReserveBusinessTests : TestBase
         var trips = new List<Trip>
         {
             new Trip { TripId = 1, OriginCityId = 1, DestinationCityId = 2, Status = EntityStatusEnum.Active, Prices = new List<TripPrice> {
-                new TripPrice { ReserveTypeId = ReserveTypeIdEnum.Ida, Price = 1500, Status = EntityStatusEnum.Active },
-                new TripPrice { ReserveTypeId = ReserveTypeIdEnum.IdaVuelta, Price = 2500, Status = EntityStatusEnum.Active }
+                new TripPrice { ReserveTypeId = ReserveTypeIdEnum.Ida, CityId = 2, Price = 1500, Status = EntityStatusEnum.Active },
+                new TripPrice { ReserveTypeId = ReserveTypeIdEnum.IdaVuelta, CityId = 2, Price = 2500, Status = EntityStatusEnum.Active }
             }}
         };
         var vehicle = new Vehicle { AvailableQuantity = 10 };
@@ -2177,10 +2143,10 @@ public class ReserveBusinessTests : TestBase
         };
         reserve1.Passengers = passengers;
 
-        _contextMock.Setup(c => c.Passengers).Returns(GetQueryableMockDbSet(passengers).Object);
-        _contextMock.Setup(c => c.Trips).Returns(GetQueryableMockDbSet(trips).Object);
-        _contextMock.Setup(c => c.ReservePayments).Returns(GetQueryableMockDbSet(new List<ReservePayment>()).Object);
-        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(new List<Reserve> { reserve1 }).Object);
+        _contextMock.Setup(c => c.Passengers).Returns(GetQueryableMockDbSet(passengers));
+        _contextMock.Setup(c => c.Trips).Returns(GetQueryableMockDbSet(trips));
+        _contextMock.Setup(c => c.ReservePayments).Returns(GetQueryableMockDbSet(new List<ReservePayment>()));
+        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(new List<Reserve> { reserve1 }));
 
         var request = new PagedReportRequestDto<PassengerReserveReportFilterRequestDto>
         {
@@ -2215,24 +2181,23 @@ public class ReserveBusinessTests : TestBase
         var reserve = new Reserve { ReserveId = 1, Status = ReserveStatusEnum.Confirmed, Passengers = new List<Passenger>(), VehicleId = 1, ServiceId = 1, TripId = 1, Trip = trip, Driver = new Driver { FirstName = "John", LastName = "Doe" } };
         var vehicle = new Vehicle { VehicleId = 1, AvailableQuantity = 10 };
         var service = new Service { ServiceId = 1, Trip = trip };
-        var trips = new List<Trip> { new Trip { TripId = 1, OriginCityId = 1, DestinationCityId = 2, Status = EntityStatusEnum.Active, Prices = new List<TripPrice> { new TripPrice { ReserveTypeId = ReserveTypeIdEnum.Ida, Price = 100, Status = EntityStatusEnum.Active } } } };
+        var trips = new List<Trip> { new Trip { TripId = 1, OriginCityId = 1, DestinationCityId = 2, Status = EntityStatusEnum.Active, Prices = new List<TripPrice> { new TripPrice { ReserveTypeId = ReserveTypeIdEnum.Ida, CityId = 2, Price = 100, Status = EntityStatusEnum.Active } } } };
         var customer = new Customer { CustomerId = 1, FirstName = "Jane", LastName = "Smith", DocumentNumber = "12345678", Email = "jane@test.com", CurrentBalance = 0 };
-        var origin = new Direction { DirectionId = 10, Name = "Pickup" };
+        var origin = new Direction { DirectionId = 1, Name = "Pickup", CityId = 1 };
+        var dropoff = new Direction { DirectionId = 2, Name = "Dropoff", CityId = 2 };
         var passengers = new List<Passenger>();
         var accountTransactions = new List<CustomerAccountTransaction>();
 
-        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(new List<Reserve> { reserve }).Object);
-        _contextMock.Setup(c => c.Vehicles.FindAsync(It.IsAny<int>())).ReturnsAsync(vehicle);
-        _contextMock.Setup(c => c.Services).Returns(GetQueryableMockDbSet(new List<Service> { service }).Object);
-        _contextMock.Setup(c => c.Customers).Returns(GetQueryableMockDbSet(new List<Customer> { customer }).Object);
-        _contextMock.Setup(c => c.Customers.FindAsync(It.IsAny<int>())).ReturnsAsync(customer);
-        _contextMock.Setup(c => c.Directions).Returns(GetQueryableMockDbSet(new List<Direction> { origin }).Object);
-        _contextMock.Setup(c => c.Directions.FindAsync(It.IsAny<int>())).ReturnsAsync(origin);
-        _contextMock.Setup(c => c.Passengers).Returns(GetMockDbSetWithIdentity(passengers).Object);
-        _contextMock.Setup(c => c.Trips).Returns(GetQueryableMockDbSet(trips).Object);
-        _contextMock.Setup(c => c.Users).Returns(GetQueryableMockDbSet(new List<User>()).Object);
-        _contextMock.Setup(c => c.CustomerAccountTransactions).Returns(GetMockDbSetWithIdentity(accountTransactions).Object);
-        _contextMock.Setup(c => c.Customers.Update(It.IsAny<Customer>())).Callback<Customer>(c => { customer.CurrentBalance = c.CurrentBalance; });
+        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(new List<Reserve> { reserve }));
+        _contextMock.Setup(c => c.Vehicles).Returns(GetQueryableMockDbSet(new List<Vehicle> { vehicle }));
+        _contextMock.Setup(c => c.Services).Returns(GetQueryableMockDbSet(new List<Service> { service }));
+        _contextMock.Setup(c => c.Customers).Returns(GetQueryableMockDbSet(new List<Customer> { customer }));
+        _contextMock.Setup(c => c.Directions).Returns(GetQueryableMockDbSet(new List<Direction> { origin, dropoff }));
+        _contextMock.Setup(c => c.Passengers).Returns(GetMockDbSetWithIdentity(passengers));
+        _contextMock.Setup(c => c.Trips).Returns(GetQueryableMockDbSet(trips));
+        _contextMock.Setup(c => c.Users).Returns(GetQueryableMockDbSet(new List<User>()));
+        _contextMock.Setup(c => c.CustomerAccountTransactions).Returns(GetMockDbSetWithIdentity(accountTransactions));
+        // TestDbSet handles Update() - no mock needed
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
         _unitOfWorkMock
@@ -2263,26 +2228,25 @@ public class ReserveBusinessTests : TestBase
         var reserve = new Reserve { ReserveId = 1, Status = ReserveStatusEnum.Confirmed, Passengers = new List<Passenger>(), VehicleId = 1, ServiceId = 1, TripId = 1, Trip = trip, Driver = new Driver { FirstName = "John", LastName = "Doe" } };
         var vehicle = new Vehicle { VehicleId = 1, AvailableQuantity = 10 };
         var service = new Service { ServiceId = 1, Trip = trip };
-        var trips = new List<Trip> { new Trip { TripId = 1, OriginCityId = 1, DestinationCityId = 2, Status = EntityStatusEnum.Active, Prices = new List<TripPrice> { new TripPrice { ReserveTypeId = ReserveTypeIdEnum.Ida, Price = 100, Status = EntityStatusEnum.Active } } } };
+        var trips = new List<Trip> { new Trip { TripId = 1, OriginCityId = 1, DestinationCityId = 2, Status = EntityStatusEnum.Active, Prices = new List<TripPrice> { new TripPrice { ReserveTypeId = ReserveTypeIdEnum.Ida, CityId = 2, Price = 100, Status = EntityStatusEnum.Active } } } };
         var customer = new Customer { CustomerId = 1, FirstName = "Jane", LastName = "Smith", DocumentNumber = "12345678", Email = "jane@test.com", CurrentBalance = 0 };
-        var origin = new Direction { DirectionId = 10, Name = "Pickup" };
+        var origin = new Direction { DirectionId = 1, Name = "Pickup", CityId = 1 };
+        var dropoff = new Direction { DirectionId = 2, Name = "Dropoff", CityId = 2 };
         var passengers = new List<Passenger>();
         var reservePayments = new List<ReservePayment>();
         var accountTransactions = new List<CustomerAccountTransaction>();
 
-        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(new List<Reserve> { reserve }).Object);
-        _contextMock.Setup(c => c.Vehicles.FindAsync(It.IsAny<int>())).ReturnsAsync(vehicle);
-        _contextMock.Setup(c => c.Services).Returns(GetQueryableMockDbSet(new List<Service> { service }).Object);
-        _contextMock.Setup(c => c.Customers).Returns(GetQueryableMockDbSet(new List<Customer> { customer }).Object);
-        _contextMock.Setup(c => c.Customers.FindAsync(It.IsAny<int>())).ReturnsAsync(customer);
-        _contextMock.Setup(c => c.Directions).Returns(GetQueryableMockDbSet(new List<Direction> { origin }).Object);
-        _contextMock.Setup(c => c.Directions.FindAsync(It.IsAny<int>())).ReturnsAsync(origin);
-        _contextMock.Setup(c => c.Passengers).Returns(GetMockDbSetWithIdentity(passengers).Object);
-        _contextMock.Setup(c => c.ReservePayments).Returns(GetMockDbSetWithIdentity(reservePayments).Object);
-        _contextMock.Setup(c => c.Trips).Returns(GetQueryableMockDbSet(trips).Object);
-        _contextMock.Setup(c => c.Users).Returns(GetQueryableMockDbSet(new List<User>()).Object);
-        _contextMock.Setup(c => c.CustomerAccountTransactions).Returns(GetMockDbSetWithIdentity(accountTransactions).Object);
-        _contextMock.Setup(c => c.Customers.Update(It.IsAny<Customer>())).Callback<Customer>(c => { customer.CurrentBalance = c.CurrentBalance; });
+        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(new List<Reserve> { reserve }));
+        _contextMock.Setup(c => c.Vehicles).Returns(GetQueryableMockDbSet(new List<Vehicle> { vehicle }));
+        _contextMock.Setup(c => c.Services).Returns(GetQueryableMockDbSet(new List<Service> { service }));
+        _contextMock.Setup(c => c.Customers).Returns(GetQueryableMockDbSet(new List<Customer> { customer }));
+        _contextMock.Setup(c => c.Directions).Returns(GetQueryableMockDbSet(new List<Direction> { origin, dropoff }));
+        _contextMock.Setup(c => c.Passengers).Returns(GetMockDbSetWithIdentity(passengers));
+        _contextMock.Setup(c => c.ReservePayments).Returns(GetMockDbSetWithIdentity(reservePayments));
+        _contextMock.Setup(c => c.Trips).Returns(GetQueryableMockDbSet(trips));
+        _contextMock.Setup(c => c.Users).Returns(GetQueryableMockDbSet(new List<User>()));
+        _contextMock.Setup(c => c.CustomerAccountTransactions).Returns(GetMockDbSetWithIdentity(accountTransactions));
+        // TestDbSet handles Update() - no mock needed
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
         _unitOfWorkMock
@@ -2314,26 +2278,25 @@ public class ReserveBusinessTests : TestBase
         var reserve = new Reserve { ReserveId = 1, Status = ReserveStatusEnum.Confirmed, Passengers = new List<Passenger>(), VehicleId = 1, ServiceId = 1, TripId = 1, Trip = trip, Driver = new Driver { FirstName = "John", LastName = "Doe" } };
         var vehicle = new Vehicle { VehicleId = 1, AvailableQuantity = 10 };
         var service = new Service { ServiceId = 1, Trip = trip };
-        var trips = new List<Trip> { new Trip { TripId = 1, OriginCityId = 1, DestinationCityId = 2, Status = EntityStatusEnum.Active, Prices = new List<TripPrice> { new TripPrice { ReserveTypeId = ReserveTypeIdEnum.Ida, Price = 100, Status = EntityStatusEnum.Active } } } };
+        var trips = new List<Trip> { new Trip { TripId = 1, OriginCityId = 1, DestinationCityId = 2, Status = EntityStatusEnum.Active, Prices = new List<TripPrice> { new TripPrice { ReserveTypeId = ReserveTypeIdEnum.Ida, CityId = 2, Price = 100, Status = EntityStatusEnum.Active } } } };
         var customer = new Customer { CustomerId = 1, FirstName = "Jane", LastName = "Smith", DocumentNumber = "12345678", Email = "jane@test.com", CurrentBalance = 0 };
-        var origin = new Direction { DirectionId = 10, Name = "Pickup" };
+        var origin = new Direction { DirectionId = 1, Name = "Pickup", CityId = 1 };
+        var dropoff = new Direction { DirectionId = 2, Name = "Dropoff", CityId = 2 };
         var passengers = new List<Passenger>();
         var reservePayments = new List<ReservePayment>();
         var accountTransactions = new List<CustomerAccountTransaction>();
 
-        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(new List<Reserve> { reserve }).Object);
-        _contextMock.Setup(c => c.Vehicles.FindAsync(It.IsAny<int>())).ReturnsAsync(vehicle);
-        _contextMock.Setup(c => c.Services).Returns(GetQueryableMockDbSet(new List<Service> { service }).Object);
-        _contextMock.Setup(c => c.Customers).Returns(GetQueryableMockDbSet(new List<Customer> { customer }).Object);
-        _contextMock.Setup(c => c.Customers.FindAsync(It.IsAny<int>())).ReturnsAsync(customer);
-        _contextMock.Setup(c => c.Directions).Returns(GetQueryableMockDbSet(new List<Direction> { origin }).Object);
-        _contextMock.Setup(c => c.Directions.FindAsync(It.IsAny<int>())).ReturnsAsync(origin);
-        _contextMock.Setup(c => c.Passengers).Returns(GetMockDbSetWithIdentity(passengers).Object);
-        _contextMock.Setup(c => c.ReservePayments).Returns(GetMockDbSetWithIdentity(reservePayments).Object);
-        _contextMock.Setup(c => c.Trips).Returns(GetQueryableMockDbSet(trips).Object);
-        _contextMock.Setup(c => c.Users).Returns(GetQueryableMockDbSet(new List<User>()).Object);
-        _contextMock.Setup(c => c.CustomerAccountTransactions).Returns(GetMockDbSetWithIdentity(accountTransactions).Object);
-        _contextMock.Setup(c => c.Customers.Update(It.IsAny<Customer>())).Callback<Customer>(c => { customer.CurrentBalance = c.CurrentBalance; });
+        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(new List<Reserve> { reserve }));
+        _contextMock.Setup(c => c.Vehicles).Returns(GetQueryableMockDbSet(new List<Vehicle> { vehicle }));
+        _contextMock.Setup(c => c.Services).Returns(GetQueryableMockDbSet(new List<Service> { service }));
+        _contextMock.Setup(c => c.Customers).Returns(GetQueryableMockDbSet(new List<Customer> { customer }));
+        _contextMock.Setup(c => c.Directions).Returns(GetQueryableMockDbSet(new List<Direction> { origin, dropoff }));
+        _contextMock.Setup(c => c.Passengers).Returns(GetMockDbSetWithIdentity(passengers));
+        _contextMock.Setup(c => c.ReservePayments).Returns(GetMockDbSetWithIdentity(reservePayments));
+        _contextMock.Setup(c => c.Trips).Returns(GetQueryableMockDbSet(trips));
+        _contextMock.Setup(c => c.Users).Returns(GetQueryableMockDbSet(new List<User>()));
+        _contextMock.Setup(c => c.CustomerAccountTransactions).Returns(GetMockDbSetWithIdentity(accountTransactions));
+        // TestDbSet handles Update() - no mock needed
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
         _unitOfWorkMock
@@ -2368,12 +2331,11 @@ public class ReserveBusinessTests : TestBase
         var existingPayments = new List<ReservePayment>(); // No previous payments
         var accountTransactions = new List<CustomerAccountTransaction>();
 
-        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(new List<Reserve> { reserve }).Object);
-        _contextMock.Setup(c => c.Customers).Returns(GetQueryableMockDbSet(new List<Customer> { customer }).Object);
-        _contextMock.Setup(c => c.Customers.FindAsync(1)).ReturnsAsync(customer);
-        _contextMock.Setup(c => c.ReservePayments).Returns(GetMockDbSetWithIdentity(paymentsDb).Object);
-        _contextMock.Setup(c => c.CustomerAccountTransactions).Returns(GetMockDbSetWithIdentity(accountTransactions).Object);
-        _contextMock.Setup(c => c.Customers.Update(It.IsAny<Customer>())).Callback<Customer>(c => { customer.CurrentBalance = c.CurrentBalance; });
+        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(new List<Reserve> { reserve }));
+        _contextMock.Setup(c => c.Customers).Returns(GetQueryableMockDbSet(new List<Customer> { customer }));
+        _contextMock.Setup(c => c.ReservePayments).Returns(GetMockDbSetWithIdentity(paymentsDb));
+        _contextMock.Setup(c => c.CustomerAccountTransactions).Returns(GetMockDbSetWithIdentity(accountTransactions));
+        // TestDbSet handles Update() - no mock needed
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
         _unitOfWorkMock
@@ -2406,15 +2368,13 @@ public class ReserveBusinessTests : TestBase
 
         // Combine existing + new for the DbSet
         var allPayments = new List<ReservePayment>(existingPayments);
-        var mockDbSet = GetMockDbSetWithIdentity(allPayments);
 
-        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(new List<Reserve> { reserve }).Object);
-        _contextMock.Setup(c => c.Passengers).Returns(GetQueryableMockDbSet(passengers).Object);
-        _contextMock.Setup(c => c.Customers).Returns(GetQueryableMockDbSet(new List<Customer> { customer }).Object);
-        _contextMock.Setup(c => c.Customers.FindAsync(1)).ReturnsAsync(customer);
-        _contextMock.Setup(c => c.ReservePayments).Returns(mockDbSet.Object);
-        _contextMock.Setup(c => c.CustomerAccountTransactions).Returns(GetMockDbSetWithIdentity(accountTransactions).Object);
-        _contextMock.Setup(c => c.Customers.Update(It.IsAny<Customer>())).Callback<Customer>(c => { customer.CurrentBalance = c.CurrentBalance; });
+        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(new List<Reserve> { reserve }));
+        _contextMock.Setup(c => c.Passengers).Returns(GetQueryableMockDbSet(passengers));
+        _contextMock.Setup(c => c.Customers).Returns(GetQueryableMockDbSet(new List<Customer> { customer }));
+        _contextMock.Setup(c => c.ReservePayments).Returns(GetMockDbSetWithIdentity(allPayments));
+        _contextMock.Setup(c => c.CustomerAccountTransactions).Returns(GetMockDbSetWithIdentity(accountTransactions));
+        // TestDbSet handles Update() - no mock needed
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
         _unitOfWorkMock
@@ -2443,12 +2403,12 @@ public class ReserveBusinessTests : TestBase
         var reservePayments = new List<ReservePayment>();
         var accountTransactions = new List<CustomerAccountTransaction>();
 
-        _contextMock.Setup(c => c.Customers.FindAsync(1)).ReturnsAsync(customer);
-        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(new List<Reserve> { reserve1, reserve2 }).Object);
-        _contextMock.Setup(c => c.Passengers).Returns(GetQueryableMockDbSet(allPassengers).Object);
-        _contextMock.Setup(c => c.ReservePayments).Returns(GetMockDbSetWithIdentity(reservePayments).Object);
-        _contextMock.Setup(c => c.CustomerAccountTransactions).Returns(GetMockDbSetWithIdentity(accountTransactions).Object);
-        _contextMock.Setup(c => c.Customers.Update(It.IsAny<Customer>())).Callback<Customer>(c => { customer.CurrentBalance = c.CurrentBalance; });
+        _contextMock.Setup(c => c.Customers).Returns(GetQueryableMockDbSet(new List<Customer> { customer }));
+        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(new List<Reserve> { reserve1, reserve2 }));
+        _contextMock.Setup(c => c.Passengers).Returns(GetQueryableMockDbSet(allPassengers));
+        _contextMock.Setup(c => c.ReservePayments).Returns(GetMockDbSetWithIdentity(reservePayments));
+        _contextMock.Setup(c => c.CustomerAccountTransactions).Returns(GetMockDbSetWithIdentity(accountTransactions));
+        // TestDbSet handles Update() - no mock needed
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
         _unitOfWorkMock
@@ -2480,12 +2440,12 @@ public class ReserveBusinessTests : TestBase
         var reservePayments = new List<ReservePayment>();
         var accountTransactions = new List<CustomerAccountTransaction>();
 
-        _contextMock.Setup(c => c.Customers.FindAsync(1)).ReturnsAsync(customer);
-        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(new List<Reserve> { reserve1, reserve2 }).Object);
-        _contextMock.Setup(c => c.Passengers).Returns(GetQueryableMockDbSet(allPassengers).Object);
-        _contextMock.Setup(c => c.ReservePayments).Returns(GetMockDbSetWithIdentity(reservePayments).Object);
-        _contextMock.Setup(c => c.CustomerAccountTransactions).Returns(GetMockDbSetWithIdentity(accountTransactions).Object);
-        _contextMock.Setup(c => c.Customers.Update(It.IsAny<Customer>())).Callback<Customer>(c => { customer.CurrentBalance = c.CurrentBalance; });
+        _contextMock.Setup(c => c.Customers).Returns(GetQueryableMockDbSet(new List<Customer> { customer }));
+        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(new List<Reserve> { reserve1, reserve2 }));
+        _contextMock.Setup(c => c.Passengers).Returns(GetQueryableMockDbSet(allPassengers));
+        _contextMock.Setup(c => c.ReservePayments).Returns(GetMockDbSetWithIdentity(reservePayments));
+        _contextMock.Setup(c => c.CustomerAccountTransactions).Returns(GetMockDbSetWithIdentity(accountTransactions));
+        // TestDbSet handles Update() - no mock needed
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
         _unitOfWorkMock
@@ -2513,9 +2473,9 @@ public class ReserveBusinessTests : TestBase
         var reserve1 = new Reserve { ReserveId = 1, Passengers = passengers1 };
         var reservePayments = new List<ReservePayment>();
 
-        _contextMock.Setup(c => c.Customers.FindAsync(1)).ReturnsAsync(customer);
-        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(new List<Reserve> { reserve1 }).Object);
-        _contextMock.Setup(c => c.ReservePayments).Returns(GetQueryableMockDbSet(reservePayments).Object);
+        _contextMock.Setup(c => c.Customers).Returns(GetQueryableMockDbSet(new List<Customer> { customer }));
+        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(new List<Reserve> { reserve1 }));
+        _contextMock.Setup(c => c.ReservePayments).Returns(GetQueryableMockDbSet(reservePayments));
 
         _unitOfWorkMock
             .Setup(uow => uow.ExecuteInTransactionAsync<bool>(It.IsAny<Func<Task<Result<bool>>>>(), It.IsAny<IsolationLevel>()))
@@ -2543,9 +2503,9 @@ public class ReserveBusinessTests : TestBase
             new ReservePayment { ReservePaymentId = 1, ReserveId = 1, CustomerId = 1, Amount = 100, Status = StatusPaymentEnum.Paid, ParentReservePaymentId = null }
         };
 
-        _contextMock.Setup(c => c.Customers.FindAsync(1)).ReturnsAsync(customer);
-        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(new List<Reserve> { reserve1 }).Object);
-        _contextMock.Setup(c => c.ReservePayments).Returns(GetQueryableMockDbSet(existingPayments).Object);
+        _contextMock.Setup(c => c.Customers).Returns(GetQueryableMockDbSet(new List<Customer> { customer }));
+        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(new List<Reserve> { reserve1 }));
+        _contextMock.Setup(c => c.ReservePayments).Returns(GetQueryableMockDbSet(existingPayments));
 
         _unitOfWorkMock
             .Setup(uow => uow.ExecuteInTransactionAsync<bool>(It.IsAny<Func<Task<Result<bool>>>>(), It.IsAny<IsolationLevel>()))

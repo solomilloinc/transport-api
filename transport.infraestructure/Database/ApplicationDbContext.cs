@@ -1,4 +1,6 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using System.Linq.Expressions;
+using System.Reflection;
+using Microsoft.EntityFrameworkCore;
 using Transport.SharedKernel;
 using Transport.Domain;
 using Transport.Domain.CashBoxes;
@@ -56,6 +58,9 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     private readonly IUserContext _userContext;
     private readonly ITenantContext _tenantContext;
 
+    // EF Core re-evaluates this on each query, enabling per-request tenant filtering
+    private int CurrentTenantId => _tenantContext?.TenantId ?? 0;
+
     public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options, IUserContext userContext, ITenantContext tenantContext)
         : base(options)
     {
@@ -79,7 +84,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
                 entity.Property("UpdatedDate");
             }
 
-            // Configure TenantId FK for all ITenantScoped entities
+            // Configure TenantId FK + Global Query Filter for all ITenantScoped entities
             if (typeof(ITenantScoped).IsAssignableFrom(entityType.ClrType))
             {
                 var entity = modelBuilder.Entity(entityType.ClrType);
@@ -91,6 +96,14 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
                     .HasForeignKey("TenantId")
                     .OnDelete(DeleteBehavior.Restrict)
                     .IsRequired();
+
+                // Global Query Filter: e => e.TenantId == CurrentTenantId
+                var clrType = entityType.ClrType;
+                var parameter = Expression.Parameter(clrType, "e");
+                var tenantIdProperty = Expression.Property(parameter, nameof(ITenantScoped.TenantId));
+                var currentTenantId = Expression.Property(Expression.Constant(this), nameof(CurrentTenantId));
+                var filter = Expression.Lambda(Expression.Equal(tenantIdProperty, currentTenantId), parameter);
+                entity.HasQueryFilter(filter);
             }
         }
 
@@ -114,6 +127,20 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
             {
                 entry.Entity.UpdatedDate = now;
                 entry.Entity.UpdatedBy = username;
+            }
+        }
+
+        // Auto-set TenantId on insert, prevent modification on update
+        foreach (var entry in ChangeTracker.Entries<ITenantScoped>())
+        {
+            if (entry.State == EntityState.Added)
+            {
+                entry.Entity.TenantId = CurrentTenantId;
+            }
+
+            if (entry.State == EntityState.Modified)
+            {
+                entry.Property(nameof(ITenantScoped.TenantId)).IsModified = false;
             }
         }
 

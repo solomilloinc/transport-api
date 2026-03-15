@@ -74,7 +74,7 @@ public class UserBusiness : IUserBusiness
         if (storedRefreshToken.IsExpired)
             return Result.Failure<RefreshTokenResponseDto>(RefreshTokenError.TokenExpired);
 
-        var user = await dbContext.Users.FindAsync(storedRefreshToken.UserId);
+        var user = await dbContext.Users.Where(x => x.UserId == storedRefreshToken.UserId).FirstOrDefaultAsync();
         var claims = ClaimBuilder.Create()
             .SetEmail(user!.Email)
             .SetRole(((RoleEnum)user.RoleId).ToString())

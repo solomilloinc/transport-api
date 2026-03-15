@@ -68,7 +68,7 @@ public class CustomerBusiness : ICustomerBusiness
 
     public async Task<Result<bool>> Delete(int customerId)
     {
-        var customer = await _context.Customers.FindAsync(customerId);
+        var customer = await _context.Customers.Where(x => x.CustomerId == customerId).FirstOrDefaultAsync();
 
         if (customer is null)
         {
@@ -118,7 +118,7 @@ public class CustomerBusiness : ICustomerBusiness
 
     public async Task<Result<bool>> Update(int customerId, CustomerUpdateRequestDto dto)
     {
-        var customer = await _context.Customers.FindAsync(customerId);
+        var customer = await _context.Customers.Where(x => x.CustomerId == customerId).FirstOrDefaultAsync();
 
         if (customer is null)
         {
@@ -163,7 +163,7 @@ public class CustomerBusiness : ICustomerBusiness
 
     public async Task<Result<bool>> UpdateStatus(int customerId, EntityStatusEnum status)
     {
-        var customer = await _context.Customers.FindAsync(customerId);
+        var customer = await _context.Customers.Where(x => x.CustomerId == customerId).FirstOrDefaultAsync();
 
         if (customer is null)
         {

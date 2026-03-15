@@ -47,7 +47,7 @@ public class UserBusinessTests : TestBase
         var loginDto = new LoginDto("test@example.com", "password", "127.0.0.1");
 
         _contextMock.Setup(x => x.Users)
-            .Returns(GetQueryableMockDbSet(new List<User>()).Object);
+            .Returns(GetQueryableMockDbSet(new List<User>()));
         _passwordHasherMock.Setup(p => p.Verify(It.IsAny<string>(), It.IsAny<string>())).Returns(false);
 
         Func<Task> action = async () => await _userBusiness.Login(loginDto);
@@ -68,7 +68,7 @@ public class UserBusinessTests : TestBase
             Role = new Role { RoleId = 1, Name = "Admin" }
         };
 
-        _contextMock.Setup(x => x.Users).Returns(GetQueryableMockDbSet(new List<User> { user }).Object);
+        _contextMock.Setup(x => x.Users).Returns(GetQueryableMockDbSet(new List<User> { user }));
         _passwordHasherMock.Setup(p => p.Verify("password", "hashedPassword")).Returns(true);
         _jwtServiceMock.Setup(j => j.BuildToken(It.IsAny<IEnumerable<Claim>>())).Returns("access-token");
         _tokenProviderMock.Setup(tp => tp.GenerateRefreshToken()).Returns("refresh-token");
@@ -117,7 +117,7 @@ public class UserBusinessTests : TestBase
         };
 
         _tokenProviderMock.Setup(tp => tp.GetRefreshTokenByHashAsync(refreshToken)).ReturnsAsync(storedToken);
-        _contextMock.Setup(c => c.Users.FindAsync(userId)).ReturnsAsync(user);
+        _contextMock.Setup(c => c.Users).Returns(GetQueryableMockDbSet(new List<User> { user }));
         _jwtServiceMock.Setup(j => j.BuildToken(It.IsAny<IEnumerable<Claim>>())).Returns("new-access");
         _tokenProviderMock.Setup(tp => tp.GenerateRefreshToken()).Returns("new-refresh");
         _tokenProviderMock.Setup(tp => tp.SaveRefreshTokenAsync("new-refresh", userId, ip)).Returns(Task.CompletedTask);
