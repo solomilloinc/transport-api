@@ -33,6 +33,18 @@ public class ExceptionHandlingMiddleware : IFunctionsWorkerMiddleware
                 await SetProblemDetailsResponse(context, failure);
             }
         }
+        catch (TenantResolutionException ex)
+        {
+            _logger.LogWarning(ex, "Tenant resolution failed");
+
+            await SetProblemDetailsResponse(context, new ProblemDetails
+            {
+                Status = StatusCodes.Status400BadRequest,
+                Title = "Tenant Resolution Failed",
+                Detail = ex.Message,
+                Type = "https://tools.ietf.org/html/rfc7231#section-6.5.1"
+            });
+        }
         catch (Exception ex) when (IsUnauthorized(ex))
         {
             _logger.LogWarning(ex, "Unauthorized access");

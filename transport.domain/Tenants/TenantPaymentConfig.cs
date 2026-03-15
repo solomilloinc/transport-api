@@ -8,6 +8,7 @@ public class TenantPaymentConfig : IAuditable
     public int TenantId { get; set; }
     public string AccessToken { get; set; } = null!;
     public string PublicKey { get; set; } = null!;
+    public string? WebhookSecret { get; set; }
     public EntityStatusEnum Status { get; set; } = EntityStatusEnum.Active;
 
     public string CreatedBy { get; set; } = null!;

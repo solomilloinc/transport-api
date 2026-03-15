@@ -32,5 +32,11 @@ public class ClaimBuilder
         return this;
     }
 
+    public ClaimBuilder SetTenantId(int tenantId)
+    {
+        claims.Add(new Claim("tenant_id", tenantId.ToString()));
+        return this;
+    }
+
     public ICollection<Claim> Build() => claims;
 }

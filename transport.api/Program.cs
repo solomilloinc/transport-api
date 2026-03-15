@@ -23,6 +23,7 @@ var host = new HostBuilder()
      .ConfigureFunctionsWorkerDefaults(x =>
      {
          x.UseMiddleware<ExceptionHandlingMiddleware>();
+         x.UseMiddleware<TenantResolutionMiddleware>();
          x.UseMiddleware<AuthorizationMiddleware>();
      })
     .ConfigureOpenApi()
@@ -35,6 +36,7 @@ var host = new HostBuilder()
     {
         services.AddApplicationInsightsTelemetryWorkerService();
         services.ConfigureFunctionsApplicationInsights();
+        services.AddMemoryCache();
         services.AddApplication()
                 .AddInfrastructure(configuration);
 

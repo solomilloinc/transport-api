@@ -1,40 +1,53 @@
-﻿using Microsoft.Azure.Functions.Worker;
+using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Attributes;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json.Linq;
 using System.Net;
-using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
+using Newtonsoft.Json;
+using Transport.Business.Authentication;
+using Transport.Business.Data;
+using Transport.Business.Services.Payment;
 using Transport.Domain.Reserves.Abstraction;
+using Transport.Infraestructure.Authentication;
 using Transport.SharedKernel.Configuration;
+using Transport.SharedKernel.Contracts.Reserve;
 
 public class PaymentIntegrationFunction
 {
     private readonly ILogger _logger;
     private readonly IReserveBusiness _reserveBusiness;
     private readonly IMpIntegrationOption _mpIntegrationOption;
-    private readonly string _mpWebhookSecret;
+    private readonly IApplicationDbContext _dbContext;
+    private readonly ITenantContext _tenantContext;
+    private readonly IMercadoPagoPaymentGateway _paymentGateway;
 
     public PaymentIntegrationFunction(ILogger<PaymentIntegrationFunction> logger,
-        IReserveBusiness reserveBusiness, 
-        IMpIntegrationOption mpIntegrationOption)
+        IReserveBusiness reserveBusiness,
+        IMpIntegrationOption mpIntegrationOption,
+        IApplicationDbContext dbContext,
+        ITenantContext tenantContext,
+        IMercadoPagoPaymentGateway paymentGateway)
     {
         _logger = logger;
         _mpIntegrationOption = mpIntegrationOption;
         _reserveBusiness = reserveBusiness;
+        _dbContext = dbContext;
+        _tenantContext = tenantContext;
+        _paymentGateway = paymentGateway;
     }
 
     [Function("MPWebhook")]
     public async Task<HttpResponseData> Run(
        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "mp-webhook")] HttpRequestData req)
     {
-        // Leer el cuerpo de la solicitud  
         var body = await req.ReadAsStringAsync();
 
         var query = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
-        var dataId = query["data.id"]; // data.id debe venir como query param  
+        var dataId = query["data.id"];
 
         req.Headers.TryGetValues("x-signature", out var sigs);
         req.Headers.TryGetValues("x-request-id", out var requestIds);
@@ -42,36 +55,87 @@ public class PaymentIntegrationFunction
         var signature = sigs?.FirstOrDefault();
         var requestId = requestIds?.FirstOrDefault();
 
-        // Verificamos firma HMAC-SHA256  
-        if (!IsValidMercadoPagoHmacSignature(req, signature, requestId, dataId, _mpIntegrationOption.WebhookSecret))
+        // Step 1: Validate HMAC with global webhook secret
+        if (!IsValidMercadoPagoHmacSignature(signature, requestId, dataId, _mpIntegrationOption.WebhookSecret))
         {
-            _logger.LogWarning("Firma inválida de MercadoPago");
+            _logger.LogWarning("Invalid MercadoPago signature");
             var unauthorized = req.CreateResponse(HttpStatusCode.Unauthorized);
             await unauthorized.WriteStringAsync("Firma inválida.");
             return unauthorized;
         }
 
-        // Parseamos el evento  
-        var payload = JObject.Parse(body);
+        var payload = JObject.Parse(body!);
         string? type = payload["type"]?.ToString();
         string? id = payload["data"]?["id"]?.ToString();
 
-        if (type == "payment" && !string.IsNullOrEmpty(id))
+        if (type != "payment" || string.IsNullOrEmpty(id))
         {
-            await _reserveBusiness.UpdateReservePaymentsByExternalId(id);
-            _logger.LogInformation("Evento de pago recibido: ID={id}, Tipo={type}", id, type);           
+            var invalidResp = req.CreateResponse(HttpStatusCode.BadRequest);
+            await invalidResp.WriteStringAsync("Evento no manejado o sin ID.");
+            return invalidResp;
+        }
 
+        // Step 2: Call MP API to get payment details (uses global/fallback AccessToken since no tenant yet)
+        var mpPayment = await _paymentGateway.GetPaymentAsync(id);
+
+        if (mpPayment.Status == "in_process" || mpPayment.Status == "pending")
+        {
+            var okResp = req.CreateResponse(HttpStatusCode.OK);
+            await okResp.WriteStringAsync("Payment in process.");
+            return okResp;
+        }
+
+        // Step 3: Resolve tenant from ReservePayment using IgnoreQueryFilters
+        // ExternalReference = ReservePaymentId
+        if (!int.TryParse(mpPayment.ExternalReference, out var reservePaymentId))
+        {
+            _logger.LogWarning("Invalid ExternalReference in MP payment: {ExternalReference}", mpPayment.ExternalReference);
+            var badResp = req.CreateResponse(HttpStatusCode.BadRequest);
+            await badResp.WriteStringAsync("ExternalReference inválido.");
+            return badResp;
+        }
+
+        var reservePayment = await _dbContext.ReservePayments
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(rp => rp.ReservePaymentId == reservePaymentId);
+
+        if (reservePayment is null)
+        {
+            _logger.LogWarning("ReservePayment not found for ExternalReference: {ReservePaymentId}", reservePaymentId);
+            var notFoundResp = req.CreateResponse(HttpStatusCode.BadRequest);
+            await notFoundResp.WriteStringAsync("Pago no encontrado.");
+            return notFoundResp;
+        }
+
+        // Step 4: Set tenant context
+        if (_tenantContext is TenantContext tc)
+        {
+            tc.TenantId = reservePayment.TenantId;
+        }
+
+        // Step 5: Process payment with pre-fetched MP payment (avoids double API call)
+        var externalPayment = new ExternalPaymentResultDto(
+            PaymentExternalId: mpPayment.Id,
+            ExternalReference: mpPayment.ExternalReference,
+            Status: mpPayment.Status,
+            StatusDetail: mpPayment.StatusDetail,
+            RawJson: JsonConvert.SerializeObject(mpPayment)
+        );
+        var result = await _reserveBusiness.ProcessPaymentFromWebhook(externalPayment);
+
+        if (result.IsSuccess)
+        {
+            _logger.LogInformation("Payment webhook processed: ID={PaymentId}, TenantId={TenantId}", id, reservePayment.TenantId);
             var successResp = req.CreateResponse(HttpStatusCode.OK);
             await successResp.WriteStringAsync("Webhook procesado correctamente.");
             return successResp;
         }
 
-        var invalidResp = req.CreateResponse(HttpStatusCode.BadRequest);
-        await invalidResp.WriteStringAsync("Evento no manejado o sin ID.");
-        return invalidResp;
+        _logger.LogError("Payment webhook processing failed: {Error}", result.Error);
+        var errorResp = req.CreateResponse(HttpStatusCode.InternalServerError);
+        await errorResp.WriteStringAsync("Error procesando webhook.");
+        return errorResp;
     }
-
-
 
     [Function("WalletForSuccess")]
     [OpenApiOperation(operationId: "wallet-for-success", tags: new[] { "Reserves" })]
@@ -87,7 +151,7 @@ public class PaymentIntegrationFunction
         return response;
     }
 
-    private bool IsValidMercadoPagoHmacSignature(HttpRequestData req, string? signatureHeader, string? requestIdHeader, string? dataIdQuery, string secret)
+    private static bool IsValidMercadoPagoHmacSignature(string? signatureHeader, string? requestIdHeader, string? dataIdQuery, string secret)
     {
         if (string.IsNullOrWhiteSpace(signatureHeader) || string.IsNullOrWhiteSpace(requestIdHeader) || string.IsNullOrWhiteSpace(dataIdQuery))
             return false;
@@ -106,7 +170,6 @@ public class PaymentIntegrationFunction
 
         if (string.IsNullOrEmpty(ts) || string.IsNullOrEmpty(v1)) return false;
 
-        // Armar el string en el formato correcto
         var manifest = $"id:{dataIdQuery.ToLowerInvariant()};request-id:{requestIdHeader};ts:{ts};";
 
         using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(secret));
@@ -115,7 +178,6 @@ public class PaymentIntegrationFunction
 
         return computedHashHex == v1.ToLowerInvariant();
     }
-
 }
 
 public record CreatePreferenceRequestDto(

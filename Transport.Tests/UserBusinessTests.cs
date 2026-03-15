@@ -22,6 +22,7 @@ public class UserBusinessTests : TestBase
     private readonly Mock<IPasswordHasher> _passwordHasherMock;
     private readonly Mock<ITokenProvider> _tokenProviderMock;
     private readonly Mock<IUnitOfWork> _unitOfWorkMock;
+    private readonly Mock<ITenantContext> _tenantContextMock;
     private readonly IUserBusiness _userBusiness;
 
     public UserBusinessTests()
@@ -31,13 +32,16 @@ public class UserBusinessTests : TestBase
         _passwordHasherMock = new Mock<IPasswordHasher>();
         _tokenProviderMock = new Mock<ITokenProvider>();
         _unitOfWorkMock = new Mock<IUnitOfWork>();
+        _tenantContextMock = new Mock<ITenantContext>();
+        _tenantContextMock.Setup(x => x.TenantId).Returns(1);
 
         _userBusiness = new UserBusiness(
             _jwtServiceMock.Object,
             _contextMock.Object,
             _passwordHasherMock.Object,
             _tokenProviderMock.Object,
-            _unitOfWorkMock.Object
+            _unitOfWorkMock.Object,
+            _tenantContextMock.Object
         );
     }
 
@@ -65,6 +69,7 @@ public class UserBusinessTests : TestBase
             UserId = 1,
             Email = "test@example.com",
             Password = "hashedPassword",
+            TenantId = 1,
             Role = new Role { RoleId = 1, Name = "Admin" }
         };
 

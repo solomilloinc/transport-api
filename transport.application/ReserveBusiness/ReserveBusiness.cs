@@ -515,6 +515,7 @@ public class ReserveBusiness : IReserveBusiness
             var firstPassenger = dto.Items.First();
             var reserveCreatedEvent = new CustomerReserveCreatedEvent(
                 ReserveId: mainReserve.ReserveId,
+                TenantId: mainReserve.TenantId,
                 CustomerId: firstPassenger.CustomerId,
                 CustomerEmail: firstPassenger.Email,
                 CustomerFullName: $"{firstPassenger.FirstName} {firstPassenger.LastName}",
@@ -834,6 +835,78 @@ public class ReserveBusiness : IReserveBusiness
             parentPayment.StatusDetail = mpPayment.StatusDetail;
             parentPayment.PaymentExternalId = mpPayment.Id;
             parentPayment.ResultApiExternalRawJson = JsonConvert.SerializeObject(mpPayment);
+            parentPayment.UpdatedBy = "System";
+            parentPayment.UpdatedDate = DateTime.UtcNow;
+            _context.ReservePayments.Update(parentPayment);
+
+            // Actualizar hijos (mismo estado que el padre)
+            var children = await _context.ReservePayments
+                .Where(c => c.ParentReservePaymentId == parentPayment.ReservePaymentId)
+                .ToListAsync();
+
+            foreach (var child in children)
+            {
+                child.Status = parentPayment.Status;
+                child.StatusDetail = parentPayment.StatusDetail;
+                _context.ReservePayments.Update(child);
+            }
+
+            // Actualizar pasajeros de la(s) reserva(s) del padre y de cada hijo
+            var reserveIdsToTouch = new List<int> { parentPayment.ReserveId };
+            reserveIdsToTouch.AddRange(children.Select(ch => ch.ReserveId));
+
+            var reservesToUpdate = await _context.Reserves
+                .Include(r => r.Passengers)
+                .Where(r => reserveIdsToTouch.Contains(r.ReserveId))
+                .ToListAsync();
+
+            var newPassengerStatus = internalStatus.Value == StatusPaymentEnum.Paid
+                ? PassengerStatusEnum.Confirmed
+                : PassengerStatusEnum.Cancelled;
+
+            foreach (var reserve in reservesToUpdate)
+            {
+                foreach (var passenger in reserve.Passengers)
+                {
+                    passenger.Status = newPassengerStatus;
+                    _context.Passengers.Update(passenger);
+                }
+            }
+
+            await _context.SaveChangesWithOutboxAsync();
+            return Result.Success(true);
+        });
+    }
+
+    public async Task<Result<bool>> ProcessPaymentFromWebhook(ExternalPaymentResultDto externalPayment)
+    {
+        // Si ya se actualizó, salir rápido
+        if (_context.ReservePayments.Any(p => p.PaymentExternalId == externalPayment.PaymentExternalId
+            && p.Status != StatusPaymentEnum.Pending))
+        {
+            return Result.Success(true);
+        }
+
+        return await _unitOfWork.ExecuteInTransactionAsync(async () =>
+        {
+            // ExternalReference = ReservePaymentId (del padre)
+            var parentPayment = await _context.ReservePayments
+                .FirstOrDefaultAsync(rp => rp.ReservePaymentId == int.Parse(externalPayment.ExternalReference));
+
+            if (parentPayment == null)
+                return Result.Failure<bool>(Error.NotFound("Payment.NotFound",
+                    "No se encontró el pago con el ID externo proporcionado"));
+
+            var internalStatus = GetPaymentStatusFromExternal(externalPayment.Status);
+            if (internalStatus == null)
+                return Result.Failure<bool>(Error.Validation("Payment.InvalidStatus",
+                    "Estado de pago no reconocido"));
+
+            // Actualizar padre
+            parentPayment.Status = internalStatus.Value;
+            parentPayment.StatusDetail = externalPayment.StatusDetail;
+            parentPayment.PaymentExternalId = externalPayment.PaymentExternalId;
+            parentPayment.ResultApiExternalRawJson = externalPayment.RawJson;
             parentPayment.UpdatedBy = "System";
             parentPayment.UpdatedDate = DateTime.UtcNow;
             _context.ReservePayments.Update(parentPayment);

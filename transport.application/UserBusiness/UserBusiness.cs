@@ -17,21 +17,26 @@ public class UserBusiness : IUserBusiness
     private readonly IPasswordHasher passwordHasher;
     private readonly ITokenProvider tokenProvider;
     private readonly IUnitOfWork unitOfWork;
+    private readonly ITenantContext tenantContext;
 
-    public UserBusiness(IJwtService jwtService, IApplicationDbContext dbContext, IPasswordHasher passwordHasher, ITokenProvider tokenProvider, IUnitOfWork unitOfWork)
+    public UserBusiness(IJwtService jwtService, IApplicationDbContext dbContext, IPasswordHasher passwordHasher, ITokenProvider tokenProvider, IUnitOfWork unitOfWork, ITenantContext tenantContext)
     {
         this.jwtService = jwtService;
         this.dbContext = dbContext;
         this.passwordHasher = passwordHasher;
         this.tokenProvider = tokenProvider;
         this.unitOfWork = unitOfWork;
+        this.tenantContext = tenantContext;
     }
 
     public async Task<Result<LoginResponseDto>> Login(LoginDto login)
     {
+        var tenantId = tenantContext.TenantId;
+
         var user = await dbContext.Users
             .Include(u => u.Role)
-            .SingleOrDefaultAsync(u => u.Email == login.Email);
+            .Where(u => u.Email == login.Email && u.TenantId == tenantId)
+            .FirstOrDefaultAsync();
 
         if (user is null || !passwordHasher.Verify(login.Password, user.Password))
         {
@@ -42,6 +47,7 @@ public class UserBusiness : IUserBusiness
             .SetEmail(user.Email)
             .SetRole(((RoleEnum)user.Role.RoleId).ToString())
             .SetId(user.UserId.ToString())
+            .SetTenantId(user.TenantId)
             .Build();
 
         var accessToken = jwtService.BuildToken(tokens);
@@ -79,6 +85,7 @@ public class UserBusiness : IUserBusiness
             .SetEmail(user!.Email)
             .SetRole(((RoleEnum)user.RoleId).ToString())
             .SetId(user.UserId.ToString())
+            .SetTenantId(user.TenantId)
             .Build();
 
         var newAccessToken = jwtService.BuildToken(claims);
