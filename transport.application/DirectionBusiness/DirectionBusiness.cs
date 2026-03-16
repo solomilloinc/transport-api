@@ -36,7 +36,7 @@ public class DirectionBusiness : IDirectionBusiness
 
     public async Task<Result<bool>> UpdateAsync(int directionId, DirectionUpdateDto dto)
     {
-        var direction = await _context.Directions.FindAsync(directionId);
+        var direction = await _context.Directions.Where(x => x.DirectionId == directionId).FirstOrDefaultAsync();
         if (direction == null) return Result.Failure<bool>(DirectionError.DirectionNotFound);
 
         direction.Name = dto.Name;
@@ -51,7 +51,7 @@ public class DirectionBusiness : IDirectionBusiness
 
     public async Task<Result<bool>> DeleteAsync(int directionId)
     {
-        var direction = await _context.Directions.FindAsync(directionId);
+        var direction = await _context.Directions.Where(x => x.DirectionId == directionId).FirstOrDefaultAsync();
         if (direction == null) return Result.Failure<bool>(DirectionError.DirectionNotFound);
 
         direction.Status = SharedKernel.EntityStatusEnum.Deleted;

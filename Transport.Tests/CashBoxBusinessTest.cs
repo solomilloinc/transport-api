@@ -28,7 +28,7 @@ public class CashBoxBusinessTests : TestBase
         {
             new User { UserId = 1, Email = "admin@test.com" }
         };
-        _contextMock.Setup(c => c.Users).Returns(GetQueryableMockDbSet(users).Object);
+        _contextMock.Setup(c => c.Users).Returns(GetQueryableMockDbSet(users));
 
         _cashBoxBusiness = new CashBoxBusiness(_contextMock.Object, _userContextMock.Object);
     }
@@ -44,16 +44,11 @@ public class CashBoxBusinessTests : TestBase
         };
         var payments = new List<ReservePayment>();
 
-        var cashBoxMock = GetMockDbSetWithIdentity(cashBoxes);
-        cashBoxMock.Setup(m => m.Add(It.IsAny<CashBox>())).Callback<CashBox>(c =>
+        _contextMock.Setup(c => c.CashBoxes).Returns(GetMockDbSetWithIdentity(cashBoxes, onAdd: c =>
         {
-            c.CashBoxId = 2;
             c.OpenedByUser = user;
-            cashBoxes.Add(c);
-        });
-
-        _contextMock.Setup(c => c.CashBoxes).Returns(cashBoxMock.Object);
-        _contextMock.Setup(c => c.ReservePayments).Returns(GetQueryableMockDbSet(payments).Object);
+        }));
+        _contextMock.Setup(c => c.ReservePayments).Returns(GetQueryableMockDbSet(payments));
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
         // Act
@@ -68,37 +63,37 @@ public class CashBoxBusinessTests : TestBase
     }
 
     // TODO: Habilitar cuando se confirme la funcionalidad de pagos pendientes
-    // [Fact]
-    // public async Task CloseCashBox_ShouldFail_WhenHasPendingPayments()
-    // {
-    //     // Arrange
-    //     var user = new User { UserId = 1, Email = "admin@test.com" };
-    //     var cashBoxes = new List<CashBox>
-    //     {
-    //         new CashBox { CashBoxId = 1, Status = CashBoxStatusEnum.Open, OpenedByUserId = 1, OpenedByUser = user }
-    //     };
-    //     var payments = new List<ReservePayment>
-    //     {
-    //         new ReservePayment { CashBoxId = 1, Status = StatusPaymentEnum.Pending }
-    //     };
-    //
-    //     _contextMock.Setup(c => c.CashBoxes).Returns(GetQueryableMockDbSet(cashBoxes).Object);
-    //     _contextMock.Setup(c => c.ReservePayments).Returns(GetQueryableMockDbSet(payments).Object);
-    //
-    //     // Act
-    //     var result = await _cashBoxBusiness.CloseCashBox(new CloseCashBoxRequestDto("Test Description"));
-    //
-    //     // Assert
-    //     result.IsFailure.Should().BeTrue();
-    //     result.Error.Code.Should().Be("CashBox.CannotCloseWithPendingPayments");
-    // }
+    [Fact]
+    public async Task CloseCashBox_ShouldFail_WhenHasPendingPayments()
+    {
+        // Arrange
+        var user = new User { UserId = 1, Email = "admin@test.com" };
+        var cashBoxes = new List<CashBox>
+         {
+             new CashBox { CashBoxId = 1, Status = CashBoxStatusEnum.Open, OpenedByUserId = 1, OpenedByUser = user }
+         };
+        var payments = new List<ReservePayment>
+         {
+             new ReservePayment { CashBoxId = 1, Status = StatusPaymentEnum.Pending }
+         };
+
+        _contextMock.Setup(c => c.CashBoxes).Returns(GetQueryableMockDbSet(cashBoxes));
+        _contextMock.Setup(c => c.ReservePayments).Returns(GetQueryableMockDbSet(payments));
+
+        // Act
+        var result = await _cashBoxBusiness.CloseCashBox(new CloseCashBoxRequestDto("Test Description"));
+
+        // Assert
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("CashBox.CannotCloseWithPendingPayments");
+    }
 
     [Fact]
     public async Task CloseCashBox_ShouldFail_WhenNoOpenCashBox()
     {
         // Arrange
         var cashBoxes = new List<CashBox>();
-        _contextMock.Setup(c => c.CashBoxes).Returns(GetQueryableMockDbSet(cashBoxes).Object);
+        _contextMock.Setup(c => c.CashBoxes).Returns(GetQueryableMockDbSet(cashBoxes));
 
         // Act
         var result = await _cashBoxBusiness.CloseCashBox(new CloseCashBoxRequestDto("Test Description"));
@@ -119,8 +114,8 @@ public class CashBoxBusinessTests : TestBase
         };
         var payments = new List<ReservePayment>();
 
-        _contextMock.Setup(c => c.CashBoxes).Returns(GetQueryableMockDbSet(cashBoxes).Object);
-        _contextMock.Setup(c => c.ReservePayments).Returns(GetQueryableMockDbSet(payments).Object);
+        _contextMock.Setup(c => c.CashBoxes).Returns(GetQueryableMockDbSet(cashBoxes));
+        _contextMock.Setup(c => c.ReservePayments).Returns(GetQueryableMockDbSet(payments));
 
         // Act
         var result = await _cashBoxBusiness.GetCurrentCashBox();
@@ -135,7 +130,7 @@ public class CashBoxBusinessTests : TestBase
     {
         // Arrange
         var cashBoxes = new List<CashBox>();
-        _contextMock.Setup(c => c.CashBoxes).Returns(GetQueryableMockDbSet(cashBoxes).Object);
+        _contextMock.Setup(c => c.CashBoxes).Returns(GetQueryableMockDbSet(cashBoxes));
 
         // Act
         var result = await _cashBoxBusiness.GetCurrentCashBox();
@@ -168,8 +163,8 @@ public class CashBoxBusinessTests : TestBase
             new ReservePayment { ReservePaymentId = 4, CashBoxId = 1, Status = StatusPaymentEnum.Paid, Amount = 50, Method = PaymentMethodEnum.Cash, ParentReservePaymentId = 2 }
         };
 
-        _contextMock.Setup(c => c.CashBoxes).Returns(GetQueryableMockDbSet(cashBoxes).Object);
-        _contextMock.Setup(c => c.ReservePayments).Returns(GetQueryableMockDbSet(payments).Object);
+        _contextMock.Setup(c => c.CashBoxes).Returns(GetQueryableMockDbSet(cashBoxes));
+        _contextMock.Setup(c => c.ReservePayments).Returns(GetQueryableMockDbSet(payments));
 
         // Act
         var result = await _cashBoxBusiness.GetCurrentCashBox();

@@ -5,9 +5,10 @@ using Transport.SharedKernel;
 
 namespace Transport.Domain.Trips;
 
-public class TripPrice : IAuditable
+public class TripPrice : IAuditable, ITenantScoped
 {
     public int TripPriceId { get; set; }
+    public int TenantId { get; set; }
     public int TripId { get; set; }
     public int CityId { get; set; }
     public int? DirectionId { get; set; }

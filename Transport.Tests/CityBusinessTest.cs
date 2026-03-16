@@ -30,7 +30,7 @@ public class CityBusinessTests : TestBase
     {
         var existing = new City { CityId = 1, Code = "123", Name = "test" };
         _contextMock.Setup(x => x.Cities)
-            .Returns(GetQueryableMockDbSet(new List<City> { existing }).Object);
+            .Returns(GetQueryableMockDbSet(new List<City> { existing }));
 
         var dto = new CityCreateRequestDto("123", "test", null);
 
@@ -44,7 +44,7 @@ public class CityBusinessTests : TestBase
     public async Task Create_ShouldSucceed_WhenDataIsValid()
     {
         var Cities = new List<City>();
-        _contextMock.Setup(x => x.Cities).Returns(GetMockDbSetWithIdentity(Cities).Object);
+        _contextMock.Setup(x => x.Cities).Returns(GetMockDbSetWithIdentity(Cities));
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
         var dto = new CityCreateRequestDto("ABC", "test", null);
@@ -59,7 +59,7 @@ public class CityBusinessTests : TestBase
     public async Task Delete_ShouldFail_WhenNotFound()
     {
         _contextMock.Setup(x => x.Cities)
-            .Returns(GetQueryableMockDbSet(new List<City>()).Object);
+            .Returns(GetQueryableMockDbSet(new List<City>()));
 
         var result = await _CityBusiness.Delete(1);
 
@@ -72,7 +72,7 @@ public class CityBusinessTests : TestBase
     {
         var city = new City { CityId = 1, Status = EntityStatusEnum.Active };
         _contextMock.Setup(x => x.Cities)
-            .Returns(GetQueryableMockDbSet(new List<City> { city }).Object);
+            .Returns(GetQueryableMockDbSet(new List<City> { city }));
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
         var result = await _CityBusiness.Delete(1);
@@ -85,7 +85,7 @@ public class CityBusinessTests : TestBase
     public async Task Update_ShouldFail_WhenNotFound()
     {
         _contextMock.Setup(x => x.Cities)
-            .Returns(GetQueryableMockDbSet(new List<City>()).Object);
+            .Returns(GetQueryableMockDbSet(new List<City>()));
 
         var dto = new CityUpdateRequestDto("222", "test", null);
         var result = await _CityBusiness.Update(1, dto);
@@ -99,7 +99,7 @@ public class CityBusinessTests : TestBase
     {
         var City = new City { CityId = 1, Code = "123", Name = "test" };
         _contextMock.Setup(x => x.Cities)
-            .Returns(GetQueryableMockDbSet(new List<City> { City }).Object);
+            .Returns(GetQueryableMockDbSet(new List<City> { City }));
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
         var dto = new CityUpdateRequestDto("222", "test", null);
@@ -113,7 +113,7 @@ public class CityBusinessTests : TestBase
     public async Task UpdateStatus_ShouldFail_WhenNotFound()
     {
         _contextMock.Setup(x => x.Cities)
-            .Returns(GetQueryableMockDbSet(new List<City>()).Object);
+            .Returns(GetQueryableMockDbSet(new List<City>()));
 
         var result = await _CityBusiness.UpdateStatus(9, EntityStatusEnum.Inactive);
 
@@ -126,7 +126,7 @@ public class CityBusinessTests : TestBase
     {
         var City = new City { CityId = 1, Status = EntityStatusEnum.Active };
         _contextMock.Setup(x => x.Cities)
-            .Returns(GetQueryableMockDbSet(new List<City> { City }).Object);
+            .Returns(GetQueryableMockDbSet(new List<City> { City }));
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
         var result = await _CityBusiness.UpdateStatus(1, EntityStatusEnum.Inactive);
@@ -163,7 +163,7 @@ public class CityBusinessTests : TestBase
         }
     };
 
-        _contextMock.Setup(x => x.Cities).Returns(GetQueryableMockDbSet(cities).Object);
+        _contextMock.Setup(x => x.Cities).Returns(GetQueryableMockDbSet(cities));
 
         var requestDto = new PagedReportRequestDto<CityReportFilterRequestDto>
         {
@@ -192,7 +192,7 @@ public class CityBusinessTests : TestBase
     public async Task Create_ShouldSucceed_WithDirections()
     {
         var cities = new List<City>();
-        _contextMock.Setup(x => x.Cities).Returns(GetMockDbSetWithIdentity(cities).Object);
+        _contextMock.Setup(x => x.Cities).Returns(GetMockDbSetWithIdentity(cities));
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
         var directions = new List<DirectionCreateRequestDto>
@@ -229,10 +229,7 @@ public class CityBusinessTests : TestBase
 
         var cities = new List<City> { city };
         _contextMock.Setup(x => x.Cities)
-            .Returns(GetQueryableMockDbSet(cities).Object);
-
-        _contextMock.Setup(x => x.Cities.FindAsync(1))
-            .ReturnsAsync(city);
+            .Returns(GetQueryableMockDbSet(cities));
 
         SetupSaveChangesWithOutboxAsync(_contextMock);
 

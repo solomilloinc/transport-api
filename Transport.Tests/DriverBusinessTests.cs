@@ -33,7 +33,7 @@ public class DriverBusinessTests : TestBase
         var existingDriver = new Driver { DocumentNumber = "12345678" };
 
         var driversDbSetMock = GetQueryableMockDbSet(new List<Driver> { existingDriver });
-        _contextMock.Setup(x => x.Drivers).Returns(driversDbSetMock.Object);
+        _contextMock.Setup(x => x.Drivers).Returns(driversDbSetMock);
 
         var dto = new DriverCreateRequestDto("Juan", "Pérez", "12345678");
 
@@ -50,7 +50,7 @@ public class DriverBusinessTests : TestBase
     {
         // Arrange
         var driversDbSetMock = GetQueryableMockDbSet(new List<Driver>());
-        _contextMock.Setup(x => x.Drivers).Returns(driversDbSetMock.Object);
+        _contextMock.Setup(x => x.Drivers).Returns(driversDbSetMock);
 
         var dto = new DriverCreateRequestDto("Pedro", "Lopez", "37976806");
 
@@ -66,8 +66,7 @@ public class DriverBusinessTests : TestBase
     public async Task Create_ShouldSucceed_WhenValidData()
     {
         var drivers = new List<Driver>();
-        var driversDbSetMock = GetMockDbSetWithIdentity(drivers);
-        _contextMock.Setup(x => x.Drivers).Returns(driversDbSetMock.Object);
+        _contextMock.Setup(x => x.Drivers).Returns(GetMockDbSetWithIdentity(drivers));
 
         _contextMock.Setup(x => x.SaveChangesWithOutboxAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(1);
@@ -87,7 +86,7 @@ public class DriverBusinessTests : TestBase
     {
         // Arrange
         var drivers = new List<Driver>();
-        _contextMock.Setup(x => x.Drivers).Returns(GetQueryableMockDbSet(drivers).Object);
+        _contextMock.Setup(x => x.Drivers).Returns(GetQueryableMockDbSet(drivers));
 
         // Act
         var result = await _driverBusiness.Delete(99);
@@ -104,7 +103,7 @@ public class DriverBusinessTests : TestBase
         var driver = new Driver { DriverId = 1, Status = EntityStatusEnum.Active };
         var drivers = new List<Driver> { driver };
 
-        _contextMock.Setup(x => x.Drivers).Returns(GetQueryableMockDbSet(drivers).Object);
+        _contextMock.Setup(x => x.Drivers).Returns(GetQueryableMockDbSet(drivers));
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
         // Act
@@ -119,7 +118,7 @@ public class DriverBusinessTests : TestBase
     public async Task Update_ShouldFail_WhenDriverNotFound()
     {
         var drivers = new List<Driver>();
-        _contextMock.Setup(x => x.Drivers).Returns(GetQueryableMockDbSet(drivers).Object);
+        _contextMock.Setup(x => x.Drivers).Returns(GetQueryableMockDbSet(drivers));
 
         var dto = new DriverUpdateRequestDto("NuevoNombre", "NuevoApellido");
 
@@ -134,7 +133,7 @@ public class DriverBusinessTests : TestBase
     {
         var driver = new Driver { DriverId = 1, FirstName = "Original", LastName = "Original" };
         var drivers = new List<Driver> { driver };
-        _contextMock.Setup(x => x.Drivers).Returns(GetQueryableMockDbSet(drivers).Object);
+        _contextMock.Setup(x => x.Drivers).Returns(GetQueryableMockDbSet(drivers));
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
         var dto = new DriverUpdateRequestDto("Editado", "ApellidoEditado");
@@ -150,7 +149,7 @@ public class DriverBusinessTests : TestBase
     public async Task UpdateStatus_ShouldFail_WhenDriverNotFound()
     {
         var drivers = new List<Driver>();
-        _contextMock.Setup(x => x.Drivers).Returns(GetQueryableMockDbSet(drivers).Object);
+        _contextMock.Setup(x => x.Drivers).Returns(GetQueryableMockDbSet(drivers));
 
         var result = await _driverBusiness.UpdateStatus(100, EntityStatusEnum.Inactive);
 
@@ -164,7 +163,7 @@ public class DriverBusinessTests : TestBase
         var driver = new Driver { DriverId = 1, Status = EntityStatusEnum.Active };
         var drivers = new List<Driver> { driver };
 
-        _contextMock.Setup(x => x.Drivers).Returns(GetQueryableMockDbSet(drivers).Object);
+        _contextMock.Setup(x => x.Drivers).Returns(GetQueryableMockDbSet(drivers));
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
         var result = await _driverBusiness.UpdateStatus(1, EntityStatusEnum.Inactive);
@@ -207,7 +206,7 @@ public class DriverBusinessTests : TestBase
         }
     };
 
-        _contextMock.Setup(x => x.Drivers).Returns(GetQueryableMockDbSet(drivers).Object);
+        _contextMock.Setup(x => x.Drivers).Returns(GetQueryableMockDbSet(drivers));
 
         var requestDto = new PagedReportRequestDto<DriverReportFilterRequestDto>
         {

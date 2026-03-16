@@ -118,9 +118,9 @@ public class ReserveReportBusinessTest : TestBase
         };
 
         _contextMock.Setup(x => x.Reserves)
-            .Returns(GetQueryableMockDbSet(reserves).Object);
+            .Returns(GetQueryableMockDbSet(reserves));
         _contextMock.Setup(x => x.Trips)
-            .Returns(GetQueryableMockDbSet(new List<Trip>()).Object);
+            .Returns(GetQueryableMockDbSet(new List<Trip>()));
 
         // Act
         var result = await _reserveBusiness.GetReserveReport(reserveDate, request);
@@ -206,9 +206,9 @@ public class ReserveReportBusinessTest : TestBase
         };
 
         _contextMock.Setup(x => x.Reserves)
-            .Returns(GetQueryableMockDbSet(reserves).Object);
+            .Returns(GetQueryableMockDbSet(reserves));
         _contextMock.Setup(x => x.Trips)
-            .Returns(GetQueryableMockDbSet(new List<Trip>()).Object);
+            .Returns(GetQueryableMockDbSet(new List<Trip>()));
 
         // Act
         var result = await _reserveBusiness.GetReserveReport(reserveDate, request);
@@ -256,9 +256,9 @@ public class ReserveReportBusinessTest : TestBase
         };
 
         _contextMock.Setup(x => x.Reserves)
-            .Returns(GetQueryableMockDbSet(reserves).Object);
+            .Returns(GetQueryableMockDbSet(reserves));
         _contextMock.Setup(x => x.Trips)
-            .Returns(GetQueryableMockDbSet(new List<Trip>()).Object);
+            .Returns(GetQueryableMockDbSet(new List<Trip>()));
 
         // Act
         var result = await _reserveBusiness.GetReserveReport(requestDate, request);
@@ -303,9 +303,9 @@ public class ReserveReportBusinessTest : TestBase
         };
 
         _contextMock.Setup(x => x.Reserves)
-            .Returns(GetQueryableMockDbSet(reserves).Object);
+            .Returns(GetQueryableMockDbSet(reserves));
         _contextMock.Setup(x => x.Trips)
-            .Returns(GetQueryableMockDbSet(new List<Trip>()).Object);
+            .Returns(GetQueryableMockDbSet(new List<Trip>()));
 
         // Act
         var result = await _reserveBusiness.GetReserveReport(reserveDate, request);
@@ -440,10 +440,10 @@ public class ReserveReportBusinessTest : TestBase
         };
 
         _contextMock.Setup(x => x.Reserves)
-            .Returns(GetQueryableMockDbSet(reserves).Object);
+            .Returns(GetQueryableMockDbSet(reserves));
 
         _contextMock.Setup(x => x.Trips)
-            .Returns(GetQueryableMockDbSet(trips).Object);
+            .Returns(GetQueryableMockDbSet(trips));
 
         // Act
         var result = await _reserveBusiness.GetReserveReport(request);
@@ -544,8 +544,8 @@ public class ReserveReportBusinessTest : TestBase
                 ReturnDate: null)
         };
 
-        _contextMock.Setup(x => x.Reserves).Returns(GetQueryableMockDbSet(reserves).Object);
-        _contextMock.Setup(x => x.Trips).Returns(GetQueryableMockDbSet(trips).Object);
+        _contextMock.Setup(x => x.Reserves).Returns(GetQueryableMockDbSet(reserves));
+        _contextMock.Setup(x => x.Trips).Returns(GetQueryableMockDbSet(trips));
 
         // Act
         var result = await _reserveBusiness.GetReserveReport(request);
@@ -659,8 +659,8 @@ public class ReserveReportBusinessTest : TestBase
                 ReturnDate: returnDate)
         };
 
-        _contextMock.Setup(x => x.Reserves).Returns(GetQueryableMockDbSet(reserves).Object);
-        _contextMock.Setup(x => x.Trips).Returns(GetQueryableMockDbSet(trips).Object);
+        _contextMock.Setup(x => x.Reserves).Returns(GetQueryableMockDbSet(reserves));
+        _contextMock.Setup(x => x.Trips).Returns(GetQueryableMockDbSet(trips));
 
         // Act
         var result = await _reserveBusiness.GetReserveReport(request);

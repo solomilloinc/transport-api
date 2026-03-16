@@ -9,9 +9,10 @@ using Transport.Domain.Vehicles;
 using Transport.SharedKernel;
 
 namespace Transport.Domain.Reserves;
-public class Reserve: Entity, IAuditable
+public class Reserve: Entity, IAuditable, ITenantScoped
 {
     public int ReserveId { get; set; }
+    public int TenantId { get; set; }
     public DateTime ReserveDate { get; set; }
     public int VehicleId { get; set; }
     public int? DriverId { get; set; }

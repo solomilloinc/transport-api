@@ -12,7 +12,7 @@ public class CityConfiguration : IEntityTypeConfiguration<City>
         builder.HasKey(c => c.CityId);
         builder.Property(c => c.Code).HasMaxLength(50).IsRequired();
         builder.Property(c => c.Name).HasMaxLength(100).IsRequired();
-        builder.HasIndex(c => c.Code).IsUnique();
+        builder.HasIndex(c => new { c.TenantId, c.Code }).IsUnique();
         builder.Property(r => r.Status).IsRequired();
     }
 }

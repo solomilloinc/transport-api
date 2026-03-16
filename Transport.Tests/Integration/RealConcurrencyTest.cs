@@ -53,7 +53,11 @@ public class RealConcurrencyTest : IDisposable
         userContextMock.Setup(x => x.Email).Returns("test@example.com");
         userContextMock.Setup(x => x.UserId).Returns(null);
 
+        var tenantContextMock = new Mock<ITenantContext>();
+        tenantContextMock.Setup(x => x.TenantId).Returns(1);
+
         services.AddSingleton(userContextMock.Object);
+        services.AddSingleton(tenantContextMock.Object);
 
         // Configurar SQL Server REAL
         services.AddDbContext<ApplicationDbContext>(options =>
@@ -223,7 +227,11 @@ public class RealConcurrencyTest : IDisposable
         userContextMock.Setup(x => x.Email).Returns("test@example.com");
         userContextMock.Setup(x => x.UserId).Returns(null);
 
+        var tenantContextMock = new Mock<ITenantContext>();
+        tenantContextMock.Setup(x => x.TenantId).Returns(1);
+
         services.AddSingleton(userContextMock.Object);
+        services.AddSingleton(tenantContextMock.Object);
 
         // Configurar SQL Server con nueva instancia de DbContext
         services.AddDbContext<ApplicationDbContext>(options =>

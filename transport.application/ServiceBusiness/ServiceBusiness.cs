@@ -28,14 +28,14 @@ public class ServiceBusiness : IServiceBusiness
 
     public async Task<Result<int>> Create(ServiceCreateRequestDto requestDto)
     {
-        var trip = await _context.Trips.FindAsync(requestDto.TripId);
+        var trip = await _context.Trips.Where(x => x.TripId == requestDto.TripId).FirstOrDefaultAsync();
         if (trip is null)
             return Result.Failure<int>(TripError.TripNotFound);
 
         if (trip.Status != EntityStatusEnum.Active)
             return Result.Failure<int>(TripError.TripNotActive);
 
-        Vehicle vehicle = await _context.Vehicles.FindAsync(requestDto.VehicleId);
+        Vehicle vehicle = await _context.Vehicles.Where(x => x.VehicleId == requestDto.VehicleId).FirstOrDefaultAsync();
         if (vehicle is null)
             return Result.Failure<int>(VehicleError.VehicleNotFound);
 
@@ -171,7 +171,7 @@ public class ServiceBusiness : IServiceBusiness
         if (service == null)
             return Result.Failure<bool>(ServiceError.ServiceNotFound);
 
-        var trip = await _context.Trips.FindAsync(dto.TripId);
+        var trip = await _context.Trips.Where(x => x.TripId == dto.TripId).FirstOrDefaultAsync();
         if (trip is null)
             return Result.Failure<bool>(TripError.TripNotFound);
 
@@ -229,7 +229,7 @@ public class ServiceBusiness : IServiceBusiness
 
     public async Task<Result<bool>> Delete(int serviceId)
     {
-        var service = await _context.Services.FindAsync(serviceId);
+        var service = await _context.Services.Where(x => x.ServiceId == serviceId).FirstOrDefaultAsync();
 
         if (service == null)
             return Result.Failure<bool>(ServiceError.ServiceNotFound);
@@ -244,7 +244,7 @@ public class ServiceBusiness : IServiceBusiness
 
     public async Task<Result<bool>> UpdateStatus(int serviceId, EntityStatusEnum status)
     {
-        var service = await _context.Services.FindAsync(serviceId);
+        var service = await _context.Services.Where(x => x.ServiceId == serviceId).FirstOrDefaultAsync();
 
         if (service == null)
             return Result.Failure<bool>(ServiceError.ServiceNotFound);
@@ -357,7 +357,7 @@ public class ServiceBusiness : IServiceBusiness
 
     public async Task<Result<int>> CreateSchedule(int serviceId, ServiceScheduleCreateDto request)
     {
-        var service = await _context.Services.FindAsync(serviceId);
+        var service = await _context.Services.Where(x => x.ServiceId == serviceId).FirstOrDefaultAsync();
         if (service is null)
             return Result.Failure<int>(ServiceError.ServiceNotFound);
 
@@ -377,7 +377,7 @@ public class ServiceBusiness : IServiceBusiness
 
     public async Task<Result<bool>> UpdateSchedule(int scheduleId, ServiceScheduleUpdateDto request)
     {
-        var schedule = await _context.ServiceSchedules.FindAsync(scheduleId);
+        var schedule = await _context.ServiceSchedules.Where(x => x.ServiceScheduleId == scheduleId).FirstOrDefaultAsync();
 
         if (schedule is null)
             return Result.Failure<bool>(ServiceError.ServiceScheduleNotFound);
@@ -393,7 +393,7 @@ public class ServiceBusiness : IServiceBusiness
 
     public async Task<Result<bool>> DeleteSchedule(int scheduleId)
     {
-        var schedule = await _context.ServiceSchedules.FindAsync(scheduleId);
+        var schedule = await _context.ServiceSchedules.Where(x => x.ServiceScheduleId == scheduleId).FirstOrDefaultAsync();
 
         if (schedule is null)
             return Result.Failure<bool>(ServiceError.ServiceScheduleNotFound);
@@ -408,7 +408,7 @@ public class ServiceBusiness : IServiceBusiness
 
     public async Task<Result<bool>> UpdateScheduleStatus(int scheduleId, EntityStatusEnum status)
     {
-        var schedule = await _context.ServiceSchedules.FindAsync(scheduleId);
+        var schedule = await _context.ServiceSchedules.Where(x => x.ServiceScheduleId == scheduleId).FirstOrDefaultAsync();
 
         if (schedule is null)
             return Result.Failure<bool>(ServiceError.ServiceScheduleNotFound);

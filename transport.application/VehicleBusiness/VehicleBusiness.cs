@@ -59,7 +59,7 @@ public class VehicleBusiness : IVehicleBusiness
 
     public async Task<Result<bool>> Delete(int vehicleId)
     {
-        var vehicle = await _context.Vehicles.FindAsync(vehicleId);
+        var vehicle = await _context.Vehicles.Where(x => x.VehicleId == vehicleId).FirstOrDefaultAsync();
 
         if (vehicle is null)
         {
@@ -77,14 +77,14 @@ public class VehicleBusiness : IVehicleBusiness
 
     public async Task<Result<bool>> Update(int vehicleId, VehicleUpdateRequestDto dto)
     {
-        var vehicle = await _context.Vehicles.FindAsync(vehicleId);
+        var vehicle = await _context.Vehicles.Where(x => x.VehicleId == vehicleId).FirstOrDefaultAsync();
 
         if (vehicle is null)
         {
             return Result.Failure<bool>(VehicleError.VehicleNotFound);
         }
 
-        var vehicleType = await _context.VehicleTypes.FindAsync(dto.VehicleTypeId);
+        var vehicleType = await _context.VehicleTypes.Where(x => x.VehicleTypeId == dto.VehicleTypeId).FirstOrDefaultAsync();
 
         if (vehicleType is null)
         {
@@ -108,7 +108,7 @@ public class VehicleBusiness : IVehicleBusiness
 
     public async Task<Result<bool>> UpdateStatus(int vehicleId, EntityStatusEnum status)
     {
-        var vehicle = await _context.Vehicles.FindAsync(vehicleId);
+        var vehicle = await _context.Vehicles.Where(x => x.VehicleId == vehicleId).FirstOrDefaultAsync();
 
         if (vehicle is null)
         {

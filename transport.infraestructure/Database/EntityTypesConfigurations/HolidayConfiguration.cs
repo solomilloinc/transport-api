@@ -11,7 +11,7 @@ public class HolidayConfiguration : IEntityTypeConfiguration<Holiday>
         builder.ToTable("Holiday");
         builder.HasKey(h => h.HolidayId);
         builder.Property(h => h.HolidayDate).IsRequired();
-        builder.HasIndex(h => h.HolidayDate).IsUnique();
+        builder.HasIndex(h => new { h.TenantId, h.HolidayDate }).IsUnique();
         builder.Property(h => h.Description).HasMaxLength(255).IsRequired();
     }
 }

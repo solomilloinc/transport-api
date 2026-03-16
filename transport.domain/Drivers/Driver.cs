@@ -3,9 +3,10 @@ using Transport.SharedKernel;
 
 namespace Transport.Domain.Drivers;
 
-public class Driver: Entity, IAuditable
+public class Driver: Entity, IAuditable, ITenantScoped
 {
     public int DriverId { get; set; }
+    public int TenantId { get; set; }
     public string FirstName { get; set; } = null!;
     public string LastName { get; set; } = null!;
     public string DocumentNumber { get; set; } = null!;

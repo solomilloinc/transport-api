@@ -30,7 +30,7 @@ public class VehicleBusinessTests : TestBase
     {
         var existing = new Vehicle { VehicleId = 1, InternalNumber = "123" };
         _contextMock.Setup(x => x.Vehicles)
-            .Returns(GetQueryableMockDbSet(new List<Vehicle> { existing }).Object);
+            .Returns(GetQueryableMockDbSet(new List<Vehicle> { existing }));
 
         var dto = new VehicleCreateRequestDto(1, "123", null);
 
@@ -49,10 +49,10 @@ public class VehicleBusinessTests : TestBase
         };
 
         _contextMock.Setup(x => x.VehicleTypes)
-            .Returns(GetQueryableMockDbSet(vehicleTypes).Object);
+            .Returns(GetQueryableMockDbSet(vehicleTypes));
 
         var vehicles = new List<Vehicle>();
-        _contextMock.Setup(x => x.Vehicles).Returns(GetMockDbSetWithIdentity(vehicles).Object);
+        _contextMock.Setup(x => x.Vehicles).Returns(GetMockDbSetWithIdentity(vehicles));
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
         var dto = new VehicleCreateRequestDto(1, "ABC", 1);
@@ -67,7 +67,7 @@ public class VehicleBusinessTests : TestBase
     public async Task Delete_ShouldFail_WhenNotFound()
     {
         _contextMock.Setup(x => x.Vehicles)
-            .Returns(GetQueryableMockDbSet(new List<Vehicle>()).Object);
+            .Returns(GetQueryableMockDbSet(new List<Vehicle>()));
 
         var result = await _vehicleBusiness.Delete(1);
 
@@ -80,7 +80,7 @@ public class VehicleBusinessTests : TestBase
     {
         var vehicle = new Vehicle { VehicleId = 1, Status = EntityStatusEnum.Active };
         _contextMock.Setup(x => x.Vehicles)
-            .Returns(GetQueryableMockDbSet(new List<Vehicle> { vehicle }).Object);
+            .Returns(GetQueryableMockDbSet(new List<Vehicle> { vehicle }));
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
         var result = await _vehicleBusiness.Delete(1);
@@ -93,7 +93,7 @@ public class VehicleBusinessTests : TestBase
     public async Task Update_ShouldFail_WhenNotFound()
     {
         _contextMock.Setup(x => x.Vehicles)
-            .Returns(GetQueryableMockDbSet(new List<Vehicle>()).Object);
+            .Returns(GetQueryableMockDbSet(new List<Vehicle>()));
 
         var dto = new VehicleUpdateRequestDto(999, "222", 1);
         var result = await _vehicleBusiness.Update(1, dto);
@@ -111,11 +111,11 @@ public class VehicleBusinessTests : TestBase
         };
 
         _contextMock.Setup(x => x.VehicleTypes)
-            .Returns(GetQueryableMockDbSet(vehicleTypes).Object);
+            .Returns(GetQueryableMockDbSet(vehicleTypes));
 
         var vehicle = new Vehicle { VehicleId = 1, InternalNumber = "111", VehicleTypeId = 1 };
         _contextMock.Setup(x => x.Vehicles)
-            .Returns(GetQueryableMockDbSet(new List<Vehicle> { vehicle }).Object);
+            .Returns(GetQueryableMockDbSet(new List<Vehicle> { vehicle }));
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
         var dto = new VehicleUpdateRequestDto(1, "222", 1);
@@ -130,7 +130,7 @@ public class VehicleBusinessTests : TestBase
     public async Task UpdateStatus_ShouldFail_WhenNotFound()
     {
         _contextMock.Setup(x => x.Vehicles)
-            .Returns(GetQueryableMockDbSet(new List<Vehicle>()).Object);
+            .Returns(GetQueryableMockDbSet(new List<Vehicle>()));
 
         var result = await _vehicleBusiness.UpdateStatus(9, EntityStatusEnum.Inactive);
 
@@ -143,7 +143,7 @@ public class VehicleBusinessTests : TestBase
     {
         var vehicle = new Vehicle { VehicleId = 1, Status = EntityStatusEnum.Active };
         _contextMock.Setup(x => x.Vehicles)
-            .Returns(GetQueryableMockDbSet(new List<Vehicle> { vehicle }).Object);
+            .Returns(GetQueryableMockDbSet(new List<Vehicle> { vehicle }));
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
         var result = await _vehicleBusiness.UpdateStatus(1, EntityStatusEnum.Inactive);

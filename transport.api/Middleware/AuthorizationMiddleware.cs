@@ -1,9 +1,9 @@
-﻿using System.IdentityModel.Tokens.Jwt;
 using System.Reflection;
 using System.Security.Claims;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Middleware;
 using Transport.Business.Authentication;
+using Transport.Domain.Users;
 using Transport.Infraestructure.Authentication;
 using Transport.Infraestructure.Authorization;
 
@@ -17,11 +17,14 @@ public class AuthorizationMiddleware : IFunctionsWorkerMiddleware
     private static readonly HashSet<string> ExcludedPaths = new()
         {
             "MPWebhook",
+            "WalletForSuccess",
             "RenderSwaggerUI",
             "RenderSwaggerDocument",
             "OutboxTimerFunction",
             "CustomerReserveCreatedSubscriptionFunction",
             "ReserveSlotLockCleanup",
+            "RefreshTokenCleanup",
+            "ResolveTenant",
         };
     public AuthorizationMiddleware(IAuthorizationService service, ITokenProvider tokenProvider)
     {
@@ -67,6 +70,26 @@ public class AuthorizationMiddleware : IFunctionsWorkerMiddleware
                 var userContext = context.InstanceServices.GetService(typeof(IUserContext)) as UserContext;
                 userContext!.UserId = parsedId;
                 userContext.Email = email;
+            }
+
+            // Tenant cross-validation: JWT tenant_id vs TenantContext (set by TenantResolutionMiddleware)
+            var tenantIdClaim = claims?.FindFirst("tenant_id")?.Value;
+            if (int.TryParse(tenantIdClaim, out var jwtTenantId))
+            {
+                var tenantContext = context.InstanceServices.GetService(typeof(ITenantContext)) as TenantContext;
+                var roleClaim = claims?.FindFirst(ClaimTypes.Role)?.Value;
+                var isSuperAdmin = roleClaim == RoleEnum.SuperAdmin.ToString();
+
+                if (isSuperAdmin)
+                {
+                    // SuperAdmin: header tenant overrides JWT tenant (already set by TenantResolutionMiddleware)
+                    // No cross-validation needed - SuperAdmin can operate on any tenant
+                }
+                else if (tenantContext!.TenantId != jwtTenantId)
+                {
+                    // Regular user: JWT tenant must match header tenant
+                    throw new UnauthorizedAccessException("Tenant mismatch: token tenant does not match request tenant");
+                }
             }
 
             await next(context);

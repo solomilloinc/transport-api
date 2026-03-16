@@ -63,7 +63,7 @@ public class ReserveBusiness : IReserveBusiness
     public async Task<Result<int>> CreateReserve(ReserveCreateDto dto)
     {
         // Validate Vehicle
-        var vehicle = await _context.Vehicles.FindAsync(dto.VehicleId);
+        var vehicle = await _context.Vehicles.Where(x => x.VehicleId == dto.VehicleId).FirstOrDefaultAsync();
         if (vehicle is null)
             return Result.Failure<int>(VehicleError.VehicleNotFound);
 
@@ -85,7 +85,7 @@ public class ReserveBusiness : IReserveBusiness
         // Validate Driver if provided
         if (dto.DriverId.HasValue)
         {
-            var driver = await _context.Drivers.FindAsync(dto.DriverId.Value);
+            var driver = await _context.Drivers.Where(x => x.DriverId == dto.DriverId.Value).FirstOrDefaultAsync();
             if (driver is null)
                 return Result.Failure<int>(DriverError.DriverNotFound);
         }
@@ -134,7 +134,7 @@ public class ReserveBusiness : IReserveBusiness
                 "PassengerReserveCreateRequestWrapperDto.CustomerIdRequired",
                 "CustomerId is required in at least one passenger item."));
 
-        var payer = await _context.Customers.FindAsync(customerId);
+        var payer = await _context.Customers.Where(x => x.CustomerId == customerId).FirstOrDefaultAsync();
         if (payer is null)
             return Result.Failure<bool>(CustomerError.NotFound);
 
@@ -190,7 +190,7 @@ public class ReserveBusiness : IReserveBusiness
                     }
                 }
 
-                var vehicle = await _context.Vehicles.FindAsync(reserve.VehicleId);
+                var vehicle = await _context.Vehicles.Where(x => x.VehicleId == reserve.VehicleId).FirstOrDefaultAsync();
                 var existingPassengerCount = reserve.Passengers.Count;
                 var totalAfterInsert = existingPassengerCount + passengerReserves.Items.Count;
 
@@ -418,7 +418,7 @@ public class ReserveBusiness : IReserveBusiness
                 .Include(s => s.Trip.DestinationCity)
                 .SingleOrDefaultAsync(s => s.ServiceId == reserve.ServiceId);
 
-            var vehicle = await _context.Vehicles.FindAsync(reserve.VehicleId);
+            var vehicle = await _context.Vehicles.Where(x => x.VehicleId == reserve.VehicleId).FirstOrDefaultAsync();
 
             var existingPassengerCount = reserve.Passengers.Count;
             var totalAfterInsert = existingPassengerCount + dto.Items.Count;
@@ -515,6 +515,7 @@ public class ReserveBusiness : IReserveBusiness
             var firstPassenger = dto.Items.First();
             var reserveCreatedEvent = new CustomerReserveCreatedEvent(
                 ReserveId: mainReserve.ReserveId,
+                TenantId: mainReserve.TenantId,
                 CustomerId: firstPassenger.CustomerId,
                 CustomerEmail: firstPassenger.Email,
                 CustomerFullName: $"{firstPassenger.FirstName} {firstPassenger.LastName}",
@@ -766,7 +767,7 @@ public class ReserveBusiness : IReserveBusiness
         if (locationId is null || locationId == 0)
             return Result.Success<Direction?>(null);
 
-        var direction = await _context.Directions.FindAsync(locationId);
+        var direction = await _context.Directions.Where(x => x.DirectionId == locationId).FirstOrDefaultAsync();
 
         if (direction is null)
         {
@@ -834,6 +835,78 @@ public class ReserveBusiness : IReserveBusiness
             parentPayment.StatusDetail = mpPayment.StatusDetail;
             parentPayment.PaymentExternalId = mpPayment.Id;
             parentPayment.ResultApiExternalRawJson = JsonConvert.SerializeObject(mpPayment);
+            parentPayment.UpdatedBy = "System";
+            parentPayment.UpdatedDate = DateTime.UtcNow;
+            _context.ReservePayments.Update(parentPayment);
+
+            // Actualizar hijos (mismo estado que el padre)
+            var children = await _context.ReservePayments
+                .Where(c => c.ParentReservePaymentId == parentPayment.ReservePaymentId)
+                .ToListAsync();
+
+            foreach (var child in children)
+            {
+                child.Status = parentPayment.Status;
+                child.StatusDetail = parentPayment.StatusDetail;
+                _context.ReservePayments.Update(child);
+            }
+
+            // Actualizar pasajeros de la(s) reserva(s) del padre y de cada hijo
+            var reserveIdsToTouch = new List<int> { parentPayment.ReserveId };
+            reserveIdsToTouch.AddRange(children.Select(ch => ch.ReserveId));
+
+            var reservesToUpdate = await _context.Reserves
+                .Include(r => r.Passengers)
+                .Where(r => reserveIdsToTouch.Contains(r.ReserveId))
+                .ToListAsync();
+
+            var newPassengerStatus = internalStatus.Value == StatusPaymentEnum.Paid
+                ? PassengerStatusEnum.Confirmed
+                : PassengerStatusEnum.Cancelled;
+
+            foreach (var reserve in reservesToUpdate)
+            {
+                foreach (var passenger in reserve.Passengers)
+                {
+                    passenger.Status = newPassengerStatus;
+                    _context.Passengers.Update(passenger);
+                }
+            }
+
+            await _context.SaveChangesWithOutboxAsync();
+            return Result.Success(true);
+        });
+    }
+
+    public async Task<Result<bool>> ProcessPaymentFromWebhook(ExternalPaymentResultDto externalPayment)
+    {
+        // Si ya se actualizó, salir rápido
+        if (_context.ReservePayments.Any(p => p.PaymentExternalId == externalPayment.PaymentExternalId
+            && p.Status != StatusPaymentEnum.Pending))
+        {
+            return Result.Success(true);
+        }
+
+        return await _unitOfWork.ExecuteInTransactionAsync(async () =>
+        {
+            // ExternalReference = ReservePaymentId (del padre)
+            var parentPayment = await _context.ReservePayments
+                .FirstOrDefaultAsync(rp => rp.ReservePaymentId == int.Parse(externalPayment.ExternalReference));
+
+            if (parentPayment == null)
+                return Result.Failure<bool>(Error.NotFound("Payment.NotFound",
+                    "No se encontró el pago con el ID externo proporcionado"));
+
+            var internalStatus = GetPaymentStatusFromExternal(externalPayment.Status);
+            if (internalStatus == null)
+                return Result.Failure<bool>(Error.Validation("Payment.InvalidStatus",
+                    "Estado de pago no reconocido"));
+
+            // Actualizar padre
+            parentPayment.Status = internalStatus.Value;
+            parentPayment.StatusDetail = externalPayment.StatusDetail;
+            parentPayment.PaymentExternalId = externalPayment.PaymentExternalId;
+            parentPayment.ResultApiExternalRawJson = externalPayment.RawJson;
             parentPayment.UpdatedBy = "System";
             parentPayment.UpdatedDate = DateTime.UtcNow;
             _context.ReservePayments.Update(parentPayment);
@@ -1307,7 +1380,7 @@ public class ReserveBusiness : IReserveBusiness
 
         if (request.VehicleId != null)
         {
-            var vehicle = await _context.Vehicles.FindAsync(request.VehicleId);
+            var vehicle = await _context.Vehicles.Where(x => x.VehicleId == request.VehicleId).FirstOrDefaultAsync();
             if (vehicle is null)
                 return Result.Failure<bool>(VehicleError.VehicleNotFound);
             reserve.VehicleId = request.VehicleId.Value;
@@ -1315,7 +1388,7 @@ public class ReserveBusiness : IReserveBusiness
 
         if (request.DriverId != null)
         {
-            var driver = await _context.Drivers.FindAsync(request.DriverId);
+            var driver = await _context.Drivers.Where(x => x.DriverId == request.DriverId).FirstOrDefaultAsync();
             if (driver is null)
                 return Result.Failure<bool>(DriverError.DriverNotFound);
             reserve.DriverId = request.DriverId.Value;
@@ -1345,7 +1418,7 @@ public class ReserveBusiness : IReserveBusiness
 
         if (request.PickupLocationId.HasValue)
         {
-            var pickup = await _context.Directions.FindAsync(request.PickupLocationId);
+            var pickup = await _context.Directions.Where(x => x.DirectionId == request.PickupLocationId).FirstOrDefaultAsync();
             if (pickup == null)
                 return Result.Failure<bool>(Error.NotFound("Pickup.NotFound", "Pickup location not found"));
 
@@ -1355,7 +1428,7 @@ public class ReserveBusiness : IReserveBusiness
 
         if (request.DropoffLocationId.HasValue)
         {
-            var dropoff = await _context.Directions.FindAsync(request.DropoffLocationId);
+            var dropoff = await _context.Directions.Where(x => x.DirectionId == request.DropoffLocationId).FirstOrDefaultAsync();
             if (dropoff == null)
                 return Result.Failure<bool>(Error.NotFound("Dropoff.NotFound", "Dropoff location not found"));
 
@@ -1440,7 +1513,7 @@ public class ReserveBusiness : IReserveBusiness
                 return Result.Failure<bool>(
                     ReserveError.OverPaymentNotAllowed(remainingAmount, providedAmount));
 
-            Customer payer = await _context.Customers.FindAsync(customerId);
+            Customer payer = await _context.Customers.Where(x => x.CustomerId == customerId).FirstOrDefaultAsync();
             if (payer == null)
                 return Result.Failure<bool>(CustomerError.NotFound);
 
@@ -1530,7 +1603,7 @@ public class ReserveBusiness : IReserveBusiness
         return await _unitOfWork.ExecuteInTransactionAsync(async () =>
         {
             // 1. Validar customer existe
-            var customer = await _context.Customers.FindAsync(request.CustomerId);
+            var customer = await _context.Customers.Where(x => x.CustomerId == request.CustomerId).FirstOrDefaultAsync();
             if (customer is null)
                 return Result.Failure<bool>(CustomerError.NotFound);
 
@@ -1694,7 +1767,7 @@ public class ReserveBusiness : IReserveBusiness
 
     public async Task<Result<List<CustomerPendingReserveDto>>> GetCustomerPendingReservesAsync(int customerId)
     {
-        var customer = await _context.Customers.FindAsync(customerId);
+        var customer = await _context.Customers.Where(x => x.CustomerId == customerId).FirstOrDefaultAsync();
         if (customer is null)
             return Result.Failure<List<CustomerPendingReserveDto>>(CustomerError.NotFound);
 
@@ -2045,7 +2118,7 @@ public class ReserveBusiness : IReserveBusiness
         int? dropoffCityId = null;
         if (dropoffLocationId.HasValue)
         {
-            var dropoffDirection = await _context.Directions.FindAsync(dropoffLocationId.Value);
+            var dropoffDirection = await _context.Directions.Where(x => x.DirectionId == dropoffLocationId.Value).FirstOrDefaultAsync();
             dropoffCityId = dropoffDirection?.CityId;
             
             // PRIORITY 1: Specific Price for this Direction (Stop)

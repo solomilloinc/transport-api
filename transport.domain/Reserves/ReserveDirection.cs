@@ -7,9 +7,10 @@ namespace Transport.Domain.Reserves;
 /// Whitelist of allowed directions for an individual reserve (not created from batch).
 /// Used to filter available pickup/dropoff options for this specific reserve.
 /// </summary>
-public class ReserveDirection : Entity, IAuditable
+public class ReserveDirection : Entity, IAuditable, ITenantScoped
 {
     public int ReserveDirectionId { get; set; }
+    public int TenantId { get; set; }
     public int ReserveId { get; set; }
     public int DirectionId { get; set; }
 

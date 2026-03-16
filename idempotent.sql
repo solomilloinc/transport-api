@@ -1600,3 +1600,898 @@ GO
 COMMIT;
 GO
 
+BEGIN TRANSACTION;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    DROP INDEX [IX_Trip_OriginCityId_DestinationCityId] ON [Trip];
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    DROP INDEX [IX_Holiday_HolidayDate] ON [Holiday];
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    DROP INDEX [IX_Driver_DocumentNumber] ON [Driver];
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    DROP INDEX [IX_Customer_DocumentNumber] ON [Customer];
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    DROP INDEX [IX_Customer_Email] ON [Customer];
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    DROP INDEX [IX_City_Code] ON [City];
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    ALTER TABLE [VehicleType] ADD [TenantId] int NOT NULL DEFAULT 1;
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    ALTER TABLE [Vehicle] ADD [TenantId] int NOT NULL DEFAULT 1;
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    ALTER TABLE [User] ADD [TenantId] int NOT NULL DEFAULT 0;
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    ALTER TABLE [TripPrice] ADD [TenantId] int NOT NULL DEFAULT 1;
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    ALTER TABLE [TripPickupStop] ADD [TenantId] int NOT NULL DEFAULT 1;
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    ALTER TABLE [Trip] ADD [TenantId] int NOT NULL DEFAULT 1;
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    ALTER TABLE [ServiceSchedule] ADD [TenantId] int NOT NULL DEFAULT 1;
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    ALTER TABLE [ServiceDirection] ADD [TenantId] int NOT NULL DEFAULT 1;
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    ALTER TABLE [ServiceCustomer] ADD [TenantId] int NOT NULL DEFAULT 1;
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    ALTER TABLE [Service] ADD [TenantId] int NOT NULL DEFAULT 1;
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    ALTER TABLE [ReserveSlotLock] ADD [TenantId] int NOT NULL DEFAULT 1;
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    ALTER TABLE [ReservePayment] ADD [TenantId] int NOT NULL DEFAULT 1;
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    ALTER TABLE [ReserveDirection] ADD [TenantId] int NOT NULL DEFAULT 1;
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    ALTER TABLE [Reserve] ADD [TenantId] int NOT NULL DEFAULT 1;
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    ALTER TABLE [Passenger] ADD [TenantId] int NOT NULL DEFAULT 1;
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    ALTER TABLE [Holiday] ADD [TenantId] int NOT NULL DEFAULT 1;
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    ALTER TABLE [Driver] ADD [TenantId] int NOT NULL DEFAULT 1;
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    ALTER TABLE [Direction] ADD [TenantId] int NOT NULL DEFAULT 1;
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    ALTER TABLE [CustomerAccountTransactions] ADD [TenantId] int NOT NULL DEFAULT 1;
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    ALTER TABLE [Customer] ADD [TenantId] int NOT NULL DEFAULT 1;
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    ALTER TABLE [City] ADD [TenantId] int NOT NULL DEFAULT 1;
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    ALTER TABLE [CashBox] ADD [TenantId] int NOT NULL DEFAULT 1;
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    CREATE TABLE [Tenant] (
+        [TenantId] int NOT NULL IDENTITY,
+        [Code] nvarchar(50) NOT NULL,
+        [Name] nvarchar(200) NOT NULL,
+        [Domain] nvarchar(253) NULL,
+        [Status] int NOT NULL,
+        [CreatedBy] VARCHAR(256) NOT NULL DEFAULT 'System',
+        [UpdatedBy] VARCHAR(256) NULL,
+        [CreatedDate] datetime2 NOT NULL DEFAULT (GETDATE()),
+        [UpdatedDate] datetime2 NULL,
+        CONSTRAINT [PK_Tenant] PRIMARY KEY ([TenantId])
+    );
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+
+                    SET IDENTITY_INSERT [Tenant] ON;
+                    INSERT INTO [Tenant] ([TenantId], [Code], [Name], [Status], [CreatedBy], [CreatedDate])
+                    VALUES (1, 'default', 'Default Tenant', 0, 'System', GETDATE());
+                    SET IDENTITY_INSERT [Tenant] OFF;
+                
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    UPDATE [User] SET [TenantId] = 1 WHERE [TenantId] = 0;
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    CREATE TABLE [TenantConfig] (
+        [TenantConfigId] int NOT NULL IDENTITY,
+        [TenantId] int NOT NULL,
+        [CompanyName] nvarchar(200) NULL,
+        [CompanyNameShort] nvarchar(100) NULL,
+        [CompanyNameLegal] nvarchar(300) NULL,
+        [LogoUrl] nvarchar(500) NULL,
+        [FaviconUrl] nvarchar(500) NULL,
+        [Tagline] nvarchar(500) NULL,
+        [ContactAddress] nvarchar(300) NULL,
+        [ContactPhone] nvarchar(50) NULL,
+        [ContactEmail] nvarchar(200) NULL,
+        [BookingsEmail] nvarchar(200) NULL,
+        [TermsText] nvarchar(max) NULL,
+        [CancellationPolicy] nvarchar(max) NULL,
+        [StyleConfigJson] nvarchar(max) NOT NULL,
+        [CreatedBy] VARCHAR(256) NOT NULL DEFAULT 'System',
+        [UpdatedBy] VARCHAR(256) NULL,
+        [CreatedDate] datetime2 NOT NULL DEFAULT (GETDATE()),
+        [UpdatedDate] datetime2 NULL,
+        CONSTRAINT [PK_TenantConfig] PRIMARY KEY ([TenantConfigId]),
+        CONSTRAINT [FK_TenantConfig_Tenant_TenantId] FOREIGN KEY ([TenantId]) REFERENCES [Tenant] ([TenantId]) ON DELETE CASCADE
+    );
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    CREATE TABLE [TenantPaymentConfig] (
+        [TenantPaymentConfigId] int NOT NULL IDENTITY,
+        [TenantId] int NOT NULL,
+        [AccessToken] nvarchar(500) NOT NULL,
+        [PublicKey] nvarchar(500) NOT NULL,
+        [WebhookSecret] nvarchar(max) NULL,
+        [Status] int NOT NULL,
+        [CreatedBy] VARCHAR(256) NOT NULL DEFAULT 'System',
+        [UpdatedBy] VARCHAR(256) NULL,
+        [CreatedDate] datetime2 NOT NULL DEFAULT (GETDATE()),
+        [UpdatedDate] datetime2 NULL,
+        CONSTRAINT [PK_TenantPaymentConfig] PRIMARY KEY ([TenantPaymentConfigId]),
+        CONSTRAINT [FK_TenantPaymentConfig_Tenant_TenantId] FOREIGN KEY ([TenantId]) REFERENCES [Tenant] ([TenantId]) ON DELETE CASCADE
+    );
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    EXEC(N'UPDATE [Role] SET [CreatedDate] = ''2026-03-15T18:39:08.2528811Z''
+    WHERE [RoleId] = 1;
+    SELECT @@ROWCOUNT');
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    EXEC(N'UPDATE [Role] SET [CreatedDate] = ''2026-03-15T18:39:08.2528813Z''
+    WHERE [RoleId] = 2;
+    SELECT @@ROWCOUNT');
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    IF EXISTS (SELECT * FROM [sys].[identity_columns] WHERE [name] IN (N'RoleId', N'CreatedBy', N'CreatedDate', N'Name', N'UpdatedBy', N'UpdatedDate') AND [object_id] = OBJECT_ID(N'[Role]'))
+        SET IDENTITY_INSERT [Role] ON;
+    EXEC(N'INSERT INTO [Role] ([RoleId], [CreatedBy], [CreatedDate], [Name], [UpdatedBy], [UpdatedDate])
+    VALUES (3, ''System'', ''2026-03-15T18:39:08.2528815Z'', N''SuperAdmin'', NULL, NULL)');
+    IF EXISTS (SELECT * FROM [sys].[identity_columns] WHERE [name] IN (N'RoleId', N'CreatedBy', N'CreatedDate', N'Name', N'UpdatedBy', N'UpdatedDate') AND [object_id] = OBJECT_ID(N'[Role]'))
+        SET IDENTITY_INSERT [Role] OFF;
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    CREATE INDEX [IX_VehicleType_TenantId] ON [VehicleType] ([TenantId]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    CREATE INDEX [IX_Vehicle_TenantId] ON [Vehicle] ([TenantId]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    CREATE INDEX [IX_User_TenantId] ON [User] ([TenantId]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    CREATE INDEX [IX_TripPrice_TenantId] ON [TripPrice] ([TenantId]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    CREATE INDEX [IX_TripPickupStop_TenantId] ON [TripPickupStop] ([TenantId]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    CREATE INDEX [IX_Trip_OriginCityId] ON [Trip] ([OriginCityId]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    CREATE INDEX [IX_Trip_TenantId] ON [Trip] ([TenantId]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    EXEC(N'CREATE UNIQUE INDEX [IX_Trip_TenantId_OriginCityId_DestinationCityId] ON [Trip] ([TenantId], [OriginCityId], [DestinationCityId]) WHERE [Status] = ''Active''');
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    CREATE INDEX [IX_ServiceSchedule_TenantId] ON [ServiceSchedule] ([TenantId]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    CREATE INDEX [IX_ServiceDirection_TenantId] ON [ServiceDirection] ([TenantId]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    CREATE INDEX [IX_ServiceCustomer_TenantId] ON [ServiceCustomer] ([TenantId]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    CREATE INDEX [IX_Service_TenantId] ON [Service] ([TenantId]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    CREATE INDEX [IX_ReserveSlotLock_TenantId] ON [ReserveSlotLock] ([TenantId]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    CREATE INDEX [IX_ReservePayment_TenantId] ON [ReservePayment] ([TenantId]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    CREATE INDEX [IX_ReserveDirection_TenantId] ON [ReserveDirection] ([TenantId]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    CREATE INDEX [IX_Reserve_TenantId] ON [Reserve] ([TenantId]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    CREATE INDEX [IX_Passenger_TenantId] ON [Passenger] ([TenantId]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    CREATE INDEX [IX_Holiday_TenantId] ON [Holiday] ([TenantId]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    CREATE UNIQUE INDEX [IX_Holiday_TenantId_HolidayDate] ON [Holiday] ([TenantId], [HolidayDate]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    CREATE INDEX [IX_Driver_TenantId] ON [Driver] ([TenantId]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    CREATE UNIQUE INDEX [IX_Driver_TenantId_DocumentNumber] ON [Driver] ([TenantId], [DocumentNumber]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    CREATE INDEX [IX_Direction_TenantId] ON [Direction] ([TenantId]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    CREATE INDEX [IX_CustomerAccountTransactions_TenantId] ON [CustomerAccountTransactions] ([TenantId]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    CREATE INDEX [IX_Customer_TenantId] ON [Customer] ([TenantId]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    CREATE UNIQUE INDEX [IX_Customer_TenantId_DocumentNumber] ON [Customer] ([TenantId], [DocumentNumber]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    CREATE UNIQUE INDEX [IX_Customer_TenantId_Email] ON [Customer] ([TenantId], [Email]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    CREATE INDEX [IX_City_TenantId] ON [City] ([TenantId]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    CREATE UNIQUE INDEX [IX_City_TenantId_Code] ON [City] ([TenantId], [Code]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    CREATE INDEX [IX_CashBox_TenantId] ON [CashBox] ([TenantId]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    CREATE UNIQUE INDEX [IX_Tenant_Code] ON [Tenant] ([Code]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    EXEC(N'CREATE UNIQUE INDEX [IX_Tenant_Domain] ON [Tenant] ([Domain]) WHERE [Domain] IS NOT NULL');
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    CREATE UNIQUE INDEX [IX_TenantConfig_TenantId] ON [TenantConfig] ([TenantId]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    CREATE UNIQUE INDEX [IX_TenantPaymentConfig_TenantId] ON [TenantPaymentConfig] ([TenantId]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    ALTER TABLE [CashBox] ADD CONSTRAINT [FK_CashBox_Tenant_TenantId] FOREIGN KEY ([TenantId]) REFERENCES [Tenant] ([TenantId]) ON DELETE NO ACTION;
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    ALTER TABLE [City] ADD CONSTRAINT [FK_City_Tenant_TenantId] FOREIGN KEY ([TenantId]) REFERENCES [Tenant] ([TenantId]) ON DELETE NO ACTION;
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    ALTER TABLE [Customer] ADD CONSTRAINT [FK_Customer_Tenant_TenantId] FOREIGN KEY ([TenantId]) REFERENCES [Tenant] ([TenantId]) ON DELETE NO ACTION;
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    ALTER TABLE [CustomerAccountTransactions] ADD CONSTRAINT [FK_CustomerAccountTransactions_Tenant_TenantId] FOREIGN KEY ([TenantId]) REFERENCES [Tenant] ([TenantId]) ON DELETE NO ACTION;
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    ALTER TABLE [Direction] ADD CONSTRAINT [FK_Direction_Tenant_TenantId] FOREIGN KEY ([TenantId]) REFERENCES [Tenant] ([TenantId]) ON DELETE NO ACTION;
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    ALTER TABLE [Driver] ADD CONSTRAINT [FK_Driver_Tenant_TenantId] FOREIGN KEY ([TenantId]) REFERENCES [Tenant] ([TenantId]) ON DELETE NO ACTION;
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    ALTER TABLE [Holiday] ADD CONSTRAINT [FK_Holiday_Tenant_TenantId] FOREIGN KEY ([TenantId]) REFERENCES [Tenant] ([TenantId]) ON DELETE NO ACTION;
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    ALTER TABLE [Passenger] ADD CONSTRAINT [FK_Passenger_Tenant_TenantId] FOREIGN KEY ([TenantId]) REFERENCES [Tenant] ([TenantId]) ON DELETE NO ACTION;
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    ALTER TABLE [Reserve] ADD CONSTRAINT [FK_Reserve_Tenant_TenantId] FOREIGN KEY ([TenantId]) REFERENCES [Tenant] ([TenantId]) ON DELETE NO ACTION;
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    ALTER TABLE [ReserveDirection] ADD CONSTRAINT [FK_ReserveDirection_Tenant_TenantId] FOREIGN KEY ([TenantId]) REFERENCES [Tenant] ([TenantId]) ON DELETE NO ACTION;
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    ALTER TABLE [ReservePayment] ADD CONSTRAINT [FK_ReservePayment_Tenant_TenantId] FOREIGN KEY ([TenantId]) REFERENCES [Tenant] ([TenantId]) ON DELETE NO ACTION;
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    ALTER TABLE [ReserveSlotLock] ADD CONSTRAINT [FK_ReserveSlotLock_Tenant_TenantId] FOREIGN KEY ([TenantId]) REFERENCES [Tenant] ([TenantId]) ON DELETE NO ACTION;
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    ALTER TABLE [Service] ADD CONSTRAINT [FK_Service_Tenant_TenantId] FOREIGN KEY ([TenantId]) REFERENCES [Tenant] ([TenantId]) ON DELETE NO ACTION;
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    ALTER TABLE [ServiceCustomer] ADD CONSTRAINT [FK_ServiceCustomer_Tenant_TenantId] FOREIGN KEY ([TenantId]) REFERENCES [Tenant] ([TenantId]) ON DELETE NO ACTION;
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    ALTER TABLE [ServiceDirection] ADD CONSTRAINT [FK_ServiceDirection_Tenant_TenantId] FOREIGN KEY ([TenantId]) REFERENCES [Tenant] ([TenantId]) ON DELETE NO ACTION;
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    ALTER TABLE [ServiceSchedule] ADD CONSTRAINT [FK_ServiceSchedule_Tenant_TenantId] FOREIGN KEY ([TenantId]) REFERENCES [Tenant] ([TenantId]) ON DELETE NO ACTION;
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    ALTER TABLE [Trip] ADD CONSTRAINT [FK_Trip_Tenant_TenantId] FOREIGN KEY ([TenantId]) REFERENCES [Tenant] ([TenantId]) ON DELETE NO ACTION;
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    ALTER TABLE [TripPickupStop] ADD CONSTRAINT [FK_TripPickupStop_Tenant_TenantId] FOREIGN KEY ([TenantId]) REFERENCES [Tenant] ([TenantId]) ON DELETE NO ACTION;
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    ALTER TABLE [TripPrice] ADD CONSTRAINT [FK_TripPrice_Tenant_TenantId] FOREIGN KEY ([TenantId]) REFERENCES [Tenant] ([TenantId]) ON DELETE NO ACTION;
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    ALTER TABLE [User] ADD CONSTRAINT [FK_User_Tenant_TenantId] FOREIGN KEY ([TenantId]) REFERENCES [Tenant] ([TenantId]) ON DELETE NO ACTION;
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    ALTER TABLE [Vehicle] ADD CONSTRAINT [FK_Vehicle_Tenant_TenantId] FOREIGN KEY ([TenantId]) REFERENCES [Tenant] ([TenantId]) ON DELETE NO ACTION;
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    ALTER TABLE [VehicleType] ADD CONSTRAINT [FK_VehicleType_Tenant_TenantId] FOREIGN KEY ([TenantId]) REFERENCES [Tenant] ([TenantId]) ON DELETE NO ACTION;
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260315183908_Multitenancy'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20260315183908_Multitenancy', N'8.0.14');
+END;
+GO
+
+COMMIT;
+GO
+

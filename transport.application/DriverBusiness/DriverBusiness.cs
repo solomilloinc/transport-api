@@ -50,7 +50,7 @@ public class DriverBusiness : IDriverBusiness
 
     public async Task<Result<bool>> Delete(int driverId)
     {
-        var driver = await _context.Drivers.FindAsync(driverId);
+        var driver = await _context.Drivers.Where(x => x.DriverId == driverId).FirstOrDefaultAsync();
 
         if (driver is null)
         {
@@ -113,7 +113,7 @@ public class DriverBusiness : IDriverBusiness
 
     public async Task<Result<bool>> Update(int driverId, DriverUpdateRequestDto dto)
     {
-        var driver = await _context.Drivers.FindAsync(driverId);
+        var driver = await _context.Drivers.Where(x => x.DriverId == driverId).FirstOrDefaultAsync();
 
         if (driver is null)
         {
@@ -131,7 +131,7 @@ public class DriverBusiness : IDriverBusiness
 
     public async Task<Result<bool>> UpdateStatus(int driverId, EntityStatusEnum status)
     {
-        var driver = await _context.Drivers.FindAsync(driverId);
+        var driver = await _context.Drivers.Where(x => x.DriverId == driverId).FirstOrDefaultAsync();
 
         if (driver is null)
         {

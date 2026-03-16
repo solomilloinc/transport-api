@@ -1,9 +1,10 @@
 ﻿using Transport.SharedKernel;
 
 namespace Transport.Domain;
-public class Holiday : IAuditable
+public class Holiday : IAuditable, ITenantScoped
 {
     public int HolidayId { get; set; }
+    public int TenantId { get; set; }
     public DateTime HolidayDate { get; set; }
     public string Description { get; set; } = null!;
 

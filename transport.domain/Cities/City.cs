@@ -3,9 +3,10 @@ using Transport.SharedKernel;
 
 namespace Transport.Domain.Cities;
 
-public class City : Entity, IAuditable
+public class City : Entity, IAuditable, ITenantScoped
 {
     public int CityId { get; set; }
+    public int TenantId { get; set; }
     public string Code { get; set; } = null!;
     public string Name { get; set; } = null!;
     public EntityStatusEnum Status { get; set; } = EntityStatusEnum.Active;

@@ -39,8 +39,7 @@ public class ServiceBusinessTests : TestBase
     [Fact]
     public async Task Create_ShouldFail_WhenTripNotFound()
     {
-        _contextMock.Setup(x => x.Trips.FindAsync(It.IsAny<int>()))
-            .ReturnsAsync((Trip)null);
+        _contextMock.Setup(x => x.Trips).Returns(GetQueryableMockDbSet(new List<Trip>()));
 
         var schedules = new List<ServiceScheduleCreateDto>
         {
@@ -64,11 +63,9 @@ public class ServiceBusinessTests : TestBase
     [Fact]
     public async Task Create_ShouldFail_WhenVehicleNotFound()
     {
-        _contextMock.Setup(x => x.Trips.FindAsync(It.IsAny<int>()))
-            .ReturnsAsync(new Trip { TripId = 1, Status = EntityStatusEnum.Active });
+        _contextMock.Setup(x => x.Trips).Returns(GetQueryableMockDbSet(new List<Trip> { new Trip { TripId = 1, Status = EntityStatusEnum.Active } }));
 
-        _contextMock.Setup(x => x.Vehicles.FindAsync(It.IsAny<int>()))
-            .ReturnsAsync((Vehicle)null);
+        _contextMock.Setup(x => x.Vehicles).Returns(GetQueryableMockDbSet(new List<Vehicle>()));
 
         var schedules = new List<ServiceScheduleCreateDto>
         {
@@ -92,11 +89,9 @@ public class ServiceBusinessTests : TestBase
     [Fact]
     public async Task Create_ShouldFail_WhenVehicleNotAvailable()
     {
-        _contextMock.Setup(x => x.Trips.FindAsync(It.IsAny<int>()))
-            .ReturnsAsync(new Trip { TripId = 1, Status = EntityStatusEnum.Active });
+        _contextMock.Setup(x => x.Trips).Returns(GetQueryableMockDbSet(new List<Trip> { new Trip { TripId = 1, Status = EntityStatusEnum.Active } }));
 
-        _contextMock.Setup(x => x.Vehicles.FindAsync(It.IsAny<int>()))
-            .ReturnsAsync(new Vehicle { VehicleId = 1, Status = EntityStatusEnum.Inactive });
+        _contextMock.Setup(x => x.Vehicles).Returns(GetQueryableMockDbSet(new List<Vehicle> { new Vehicle { VehicleId = 1, Status = EntityStatusEnum.Inactive } }));
 
         var schedules = new List<ServiceScheduleCreateDto>
         {
@@ -124,21 +119,15 @@ public class ServiceBusinessTests : TestBase
     [Fact]
     public async Task Create_ShouldSucceed_WhenDataIsValid()
     {
-        _contextMock.Setup(x => x.Trips.FindAsync(It.IsAny<int>()))
-            .ReturnsAsync(new Trip { TripId = 1, Status = EntityStatusEnum.Active });
+        _contextMock.Setup(x => x.Trips).Returns(GetQueryableMockDbSet(new List<Trip> { new Trip { TripId = 1, Status = EntityStatusEnum.Active } }));
 
-        _contextMock.Setup(x => x.Vehicles.FindAsync(It.IsAny<int>()))
-            .ReturnsAsync(new Vehicle { VehicleId = 1, Status = EntityStatusEnum.Active });
+        _contextMock.Setup(x => x.Vehicles).Returns(GetQueryableMockDbSet(new List<Vehicle> { new Vehicle { VehicleId = 1, Status = EntityStatusEnum.Active } }));
 
-        _contextMock.SetupSequence(x => x.Cities.FindAsync(It.IsAny<int>()))
-            .ReturnsAsync(new City { CityId = 1 }) // Origin
-            .ReturnsAsync(new City { CityId = 2 }); // Destination
-
-        _contextMock.Setup(x => x.Services.Add(It.IsAny<Service>()))
-            .Callback<Service>(s => s.ServiceId = 99);
+        var servicesList = new List<Service>();
+        _contextMock.Setup(x => x.Services).Returns(GetMockDbSetWithIdentity(servicesList));
 
         _contextMock.Setup(x => x.ServiceSchedules)
-            .Returns(GetQueryableMockDbSet(new List<ServiceSchedule>()).Object);
+            .Returns(GetQueryableMockDbSet(new List<ServiceSchedule>()));
 
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
@@ -216,7 +205,7 @@ public class ServiceBusinessTests : TestBase
         }
     };
 
-        _contextMock.Setup(x => x.Services).Returns(GetQueryableMockDbSet(services).Object);
+        _contextMock.Setup(x => x.Services).Returns(GetQueryableMockDbSet(services));
 
         var requestDto = new PagedReportRequestDto<ServiceReportFilterRequestDto>
         {
@@ -247,7 +236,7 @@ public class ServiceBusinessTests : TestBase
         };
 
         _contextMock.Setup(x => x.Services)
-            .Returns(GetQueryableMockDbSet(new List<Service> { service }).Object);
+            .Returns(GetQueryableMockDbSet(new List<Service> { service }));
 
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
@@ -277,13 +266,12 @@ public class ServiceBusinessTests : TestBase
         };
 
         _contextMock.Setup(x => x.Services)
-            .Returns(GetQueryableMockDbSet(new List<Service> { service }).Object);
+            .Returns(GetQueryableMockDbSet(new List<Service> { service }));
 
-        _contextMock.Setup(x => x.Trips.FindAsync(It.IsAny<int>()))
-            .ReturnsAsync(new Trip { TripId = 1, Status = EntityStatusEnum.Active });
+        _contextMock.Setup(x => x.Trips).Returns(GetQueryableMockDbSet(new List<Trip> { new Trip { TripId = 1, Status = EntityStatusEnum.Active } }));
 
         _contextMock.Setup(x => x.ServiceSchedules)
-            .Returns(GetQueryableMockDbSet(new List<ServiceSchedule>()).Object);
+            .Returns(GetQueryableMockDbSet(new List<ServiceSchedule>()));
 
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
@@ -353,11 +341,11 @@ public class ServiceBusinessTests : TestBase
         var reserves = new List<Reserve>();
         var holidays = new List<Holiday>();
 
-        _contextMock.Setup(x => x.Services).Returns(GetMockDbSetWithIdentity(services).Object);
-        _contextMock.Setup(x => x.Vehicles).Returns(GetMockDbSetWithIdentity(vehicles).Object);
-        _contextMock.Setup(x => x.Reserves).Returns(GetMockDbSetWithIdentity(reserves).Object);
-        _contextMock.Setup(x => x.Holidays).Returns(GetMockDbSetWithIdentity(holidays).Object);
-        _contextMock.Setup(x => x.Trips).Returns(GetQueryableMockDbSet(new List<Trip> { trip }).Object);
+        _contextMock.Setup(x => x.Services).Returns(GetMockDbSetWithIdentity(services));
+        _contextMock.Setup(x => x.Vehicles).Returns(GetMockDbSetWithIdentity(vehicles));
+        _contextMock.Setup(x => x.Reserves).Returns(GetMockDbSetWithIdentity(reserves));
+        _contextMock.Setup(x => x.Holidays).Returns(GetMockDbSetWithIdentity(holidays));
+        _contextMock.Setup(x => x.Trips).Returns(GetQueryableMockDbSet(new List<Trip> { trip }));
 
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
@@ -419,11 +407,11 @@ public class ServiceBusinessTests : TestBase
         var services = new List<Service> { service };
         var reserves = new List<Reserve>();
 
-        _contextMock.Setup(x => x.Services).Returns(GetMockDbSetWithIdentity(services).Object);
-        _contextMock.Setup(x => x.Vehicles).Returns(GetMockDbSetWithIdentity([vehicle]).Object);
-        _contextMock.Setup(x => x.Reserves).Returns(GetMockDbSetWithIdentity(reserves).Object);
-        _contextMock.Setup(x => x.Holidays).Returns(GetMockDbSetWithIdentity(new List<Holiday>()).Object);
-        _contextMock.Setup(x => x.Trips).Returns(GetQueryableMockDbSet(new List<Trip> { trip }).Object);
+        _contextMock.Setup(x => x.Services).Returns(GetMockDbSetWithIdentity(services));
+        _contextMock.Setup(x => x.Vehicles).Returns(GetMockDbSetWithIdentity([vehicle]));
+        _contextMock.Setup(x => x.Reserves).Returns(GetMockDbSetWithIdentity(reserves));
+        _contextMock.Setup(x => x.Holidays).Returns(GetMockDbSetWithIdentity(new List<Holiday>()));
+        _contextMock.Setup(x => x.Trips).Returns(GetQueryableMockDbSet(new List<Trip> { trip }));
 
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
@@ -482,11 +470,11 @@ public class ServiceBusinessTests : TestBase
 
         var reserves = new List<Reserve>();
 
-        _contextMock.Setup(x => x.Services).Returns(GetMockDbSetWithIdentity([service]).Object);
-        _contextMock.Setup(x => x.Vehicles).Returns(GetMockDbSetWithIdentity([vehicle]).Object);
-        _contextMock.Setup(x => x.Reserves).Returns(GetMockDbSetWithIdentity(reserves).Object);
-        _contextMock.Setup(x => x.Holidays).Returns(GetMockDbSetWithIdentity(holidays).Object);
-        _contextMock.Setup(x => x.Trips).Returns(GetQueryableMockDbSet(new List<Trip> { trip }).Object);
+        _contextMock.Setup(x => x.Services).Returns(GetMockDbSetWithIdentity([service]));
+        _contextMock.Setup(x => x.Vehicles).Returns(GetMockDbSetWithIdentity([vehicle]));
+        _contextMock.Setup(x => x.Reserves).Returns(GetMockDbSetWithIdentity(reserves));
+        _contextMock.Setup(x => x.Holidays).Returns(GetMockDbSetWithIdentity(holidays));
+        _contextMock.Setup(x => x.Trips).Returns(GetQueryableMockDbSet(new List<Trip> { trip }));
 
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
@@ -545,11 +533,11 @@ public class ServiceBusinessTests : TestBase
 
         var reserves = new List<Reserve>();
 
-        _contextMock.Setup(x => x.Services).Returns(GetMockDbSetWithIdentity([service]).Object);
-        _contextMock.Setup(x => x.Vehicles).Returns(GetMockDbSetWithIdentity([vehicle]).Object);
-        _contextMock.Setup(x => x.Reserves).Returns(GetMockDbSetWithIdentity(reserves).Object);
-        _contextMock.Setup(x => x.Holidays).Returns(GetMockDbSetWithIdentity(holidays).Object);
-        _contextMock.Setup(x => x.Trips).Returns(GetQueryableMockDbSet(new List<Trip> { trip }).Object);
+        _contextMock.Setup(x => x.Services).Returns(GetMockDbSetWithIdentity([service]));
+        _contextMock.Setup(x => x.Vehicles).Returns(GetMockDbSetWithIdentity([vehicle]));
+        _contextMock.Setup(x => x.Reserves).Returns(GetMockDbSetWithIdentity(reserves));
+        _contextMock.Setup(x => x.Holidays).Returns(GetMockDbSetWithIdentity(holidays));
+        _contextMock.Setup(x => x.Trips).Returns(GetQueryableMockDbSet(new List<Trip> { trip }));
 
         SetupSaveChangesWithOutboxAsync(_contextMock);
 

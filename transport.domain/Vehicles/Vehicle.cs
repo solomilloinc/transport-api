@@ -2,9 +2,10 @@
 
 namespace Transport.Domain.Vehicles;
 
-public class Vehicle: IAuditable
+public class Vehicle: IAuditable, ITenantScoped
 {
     public int VehicleId { get; set; }
+    public int TenantId { get; set; }
     public int VehicleTypeId { get; set; }
     public string InternalNumber { get; set; } = null!;
     public EntityStatusEnum Status { get; set; } = EntityStatusEnum.Active;

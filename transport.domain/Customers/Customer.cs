@@ -5,9 +5,10 @@ using Transport.SharedKernel;
 
 namespace Transport.Domain.Customers;
 
-public class Customer : Entity, IAuditable
+public class Customer : Entity, IAuditable, ITenantScoped
 {
     public int CustomerId { get; set; }
+    public int TenantId { get; set; }
     public string FirstName { get; set; } = null!;
     public string LastName { get; set; } = null!;
     public string Email { get; set; } = null!;

@@ -4,6 +4,7 @@ namespace Transport.Domain.Reserves;
 
 public record CustomerReserveCreatedEvent(
     int ReserveId,
+    int TenantId,
     int? CustomerId,
     string CustomerEmail,
     string CustomerFullName,

@@ -22,6 +22,7 @@ public interface IReserveBusiness
 
     Task<Result<bool>> UpdatePassengerReserveAsync(int customerReserveId, PassengerReserveUpdateRequestDto request);
     Task<Result<bool>> UpdateReservePaymentsByExternalId(string externalId);
+    Task<Result<bool>> ProcessPaymentFromWebhook(ExternalPaymentResultDto externalPayment);
     Task<Result<ReserveGroupedPagedReportResponseDto>> GetReserveReport(PagedReportRequestDto<ReserveReportFilterRequestDto> requestDto);
 
     // Resumen de pagos por reserva

@@ -63,6 +63,11 @@ namespace transport.infraestructure.Migrations
                         .IsRequired()
                         .HasColumnType("VARCHAR(20)");
 
+                    b.Property<int>("TenantId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(1);
+
                     b.Property<string>("UpdatedBy")
                         .HasColumnType("VARCHAR(256)");
 
@@ -80,6 +85,8 @@ namespace transport.infraestructure.Migrations
                     b.HasIndex("ReserveId");
 
                     b.HasIndex("Status");
+
+                    b.HasIndex("TenantId");
 
                     b.HasIndex("Status", "OpenedAt");
 
@@ -118,6 +125,11 @@ namespace transport.infraestructure.Migrations
                     b.Property<int>("Status")
                         .HasColumnType("int");
 
+                    b.Property<int>("TenantId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(1);
+
                     b.Property<string>("UpdatedBy")
                         .HasColumnType("VARCHAR(256)");
 
@@ -126,7 +138,9 @@ namespace transport.infraestructure.Migrations
 
                     b.HasKey("CityId");
 
-                    b.HasIndex("Code")
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("TenantId", "Code")
                         .IsUnique();
 
                     b.ToTable("City", (string)null);
@@ -188,6 +202,11 @@ namespace transport.infraestructure.Migrations
                     b.Property<int>("Status")
                         .HasColumnType("int");
 
+                    b.Property<int>("TenantId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(1);
+
                     b.Property<string>("UpdatedBy")
                         .HasColumnType("VARCHAR(256)");
 
@@ -196,10 +215,12 @@ namespace transport.infraestructure.Migrations
 
                     b.HasKey("CustomerId");
 
-                    b.HasIndex("DocumentNumber")
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("TenantId", "DocumentNumber")
                         .IsUnique();
 
-                    b.HasIndex("Email")
+                    b.HasIndex("TenantId", "Email")
                         .IsUnique();
 
                     b.ToTable("Customer", (string)null);
@@ -243,6 +264,11 @@ namespace transport.infraestructure.Migrations
                     b.Property<int?>("ReservePaymentId")
                         .HasColumnType("int");
 
+                    b.Property<int>("TenantId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(1);
+
                     b.Property<string>("Type")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -263,6 +289,8 @@ namespace transport.infraestructure.Migrations
                     b.HasIndex("RelatedReserveId");
 
                     b.HasIndex("ReservePaymentId");
+
+                    b.HasIndex("TenantId");
 
                     b.HasIndex("Type");
 
@@ -304,6 +332,11 @@ namespace transport.infraestructure.Migrations
                     b.Property<int>("Status")
                         .HasColumnType("int");
 
+                    b.Property<int>("TenantId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(1);
+
                     b.Property<string>("UpdatedBy")
                         .HasColumnType("VARCHAR(256)");
 
@@ -313,6 +346,8 @@ namespace transport.infraestructure.Migrations
                     b.HasKey("DirectionId");
 
                     b.HasIndex("CityId");
+
+                    b.HasIndex("TenantId");
 
                     b.ToTable("Direction", (string)null);
                 });
@@ -354,6 +389,11 @@ namespace transport.infraestructure.Migrations
                     b.Property<int>("Status")
                         .HasColumnType("int");
 
+                    b.Property<int>("TenantId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(1);
+
                     b.Property<string>("UpdatedBy")
                         .HasColumnType("VARCHAR(256)");
 
@@ -362,7 +402,9 @@ namespace transport.infraestructure.Migrations
 
                     b.HasKey("DriverId");
 
-                    b.HasIndex("DocumentNumber")
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("TenantId", "DocumentNumber")
                         .IsUnique();
 
                     b.ToTable("Driver", (string)null);
@@ -395,6 +437,11 @@ namespace transport.infraestructure.Migrations
                     b.Property<DateTime>("HolidayDate")
                         .HasColumnType("datetime2");
 
+                    b.Property<int>("TenantId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(1);
+
                     b.Property<string>("UpdatedBy")
                         .HasColumnType("VARCHAR(256)");
 
@@ -403,7 +450,9 @@ namespace transport.infraestructure.Migrations
 
                     b.HasKey("HolidayId");
 
-                    b.HasIndex("HolidayDate")
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("TenantId", "HolidayDate")
                         .IsUnique();
 
                     b.ToTable("Holiday", (string)null);
@@ -485,6 +534,11 @@ namespace transport.infraestructure.Migrations
                         .IsRequired()
                         .HasColumnType("VARCHAR(20)");
 
+                    b.Property<int>("TenantId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(1);
+
                     b.Property<string>("UpdatedBy")
                         .HasColumnType("VARCHAR(256)");
 
@@ -508,6 +562,8 @@ namespace transport.infraestructure.Migrations
                     b.HasIndex("ReserveRelatedId");
 
                     b.HasIndex("Status");
+
+                    b.HasIndex("TenantId");
 
                     b.HasIndex("ReserveId", "DocumentNumber")
                         .IsUnique();
@@ -577,6 +633,11 @@ namespace transport.infraestructure.Migrations
                         .IsRequired()
                         .HasColumnType("VARCHAR(20)");
 
+                    b.Property<int>("TenantId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(1);
+
                     b.Property<int>("TripId")
                         .HasColumnType("int");
 
@@ -594,6 +655,8 @@ namespace transport.infraestructure.Migrations
                     b.HasIndex("DriverId");
 
                     b.HasIndex("ServiceScheduleId");
+
+                    b.HasIndex("TenantId");
 
                     b.HasIndex("VehicleId");
 
@@ -631,6 +694,11 @@ namespace transport.infraestructure.Migrations
                     b.Property<int>("ReserveId")
                         .HasColumnType("int");
 
+                    b.Property<int>("TenantId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(1);
+
                     b.Property<string>("UpdatedBy")
                         .HasColumnType("VARCHAR(256)");
 
@@ -640,6 +708,8 @@ namespace transport.infraestructure.Migrations
                     b.HasKey("ReserveDirectionId");
 
                     b.HasIndex("DirectionId");
+
+                    b.HasIndex("TenantId");
 
                     b.HasIndex("ReserveId", "DirectionId")
                         .IsUnique();
@@ -707,6 +777,11 @@ namespace transport.infraestructure.Migrations
                     b.Property<string>("StatusDetail")
                         .HasColumnType("VARCHAR(MAX)");
 
+                    b.Property<int>("TenantId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(1);
+
                     b.Property<string>("UpdatedBy")
                         .HasColumnType("VARCHAR(256)");
 
@@ -726,6 +801,8 @@ namespace transport.infraestructure.Migrations
                     b.HasIndex("ReserveId");
 
                     b.HasIndex("Status");
+
+                    b.HasIndex("TenantId");
 
                     b.ToTable("ReservePayment", (string)null);
                 });
@@ -778,6 +855,11 @@ namespace transport.infraestructure.Migrations
                         .IsRequired()
                         .HasColumnType("VARCHAR(20)");
 
+                    b.Property<int>("TenantId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(1);
+
                     b.Property<string>("UpdatedBy")
                         .HasColumnType("VARCHAR(256)");
 
@@ -802,6 +884,8 @@ namespace transport.infraestructure.Migrations
                     b.HasIndex("OutboundReserveId");
 
                     b.HasIndex("ReturnReserveId");
+
+                    b.HasIndex("TenantId");
 
                     b.HasIndex("Status", "ExpiresAt");
 
@@ -844,6 +928,11 @@ namespace transport.infraestructure.Migrations
                     b.Property<int>("Status")
                         .HasColumnType("int");
 
+                    b.Property<int>("TenantId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(1);
+
                     b.Property<int>("TripId")
                         .HasColumnType("int");
 
@@ -857,6 +946,8 @@ namespace transport.infraestructure.Migrations
                         .HasColumnType("int");
 
                     b.HasKey("ServiceId");
+
+                    b.HasIndex("TenantId");
 
                     b.HasIndex("TripId");
 
@@ -890,6 +981,11 @@ namespace transport.infraestructure.Migrations
                     b.Property<int>("ServiceId")
                         .HasColumnType("int");
 
+                    b.Property<int>("TenantId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(1);
+
                     b.Property<string>("UpdatedBy")
                         .HasColumnType("VARCHAR(256)");
 
@@ -901,6 +997,8 @@ namespace transport.infraestructure.Migrations
                     b.HasIndex("CustomerId");
 
                     b.HasIndex("ServiceId");
+
+                    b.HasIndex("TenantId");
 
                     b.ToTable("ServiceCustomer", (string)null);
                 });
@@ -930,6 +1028,11 @@ namespace transport.infraestructure.Migrations
                     b.Property<int>("ServiceId")
                         .HasColumnType("int");
 
+                    b.Property<int>("TenantId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(1);
+
                     b.Property<string>("UpdatedBy")
                         .HasColumnType("VARCHAR(256)");
 
@@ -939,6 +1042,8 @@ namespace transport.infraestructure.Migrations
                     b.HasKey("ServiceDirectionId");
 
                     b.HasIndex("DirectionId");
+
+                    b.HasIndex("TenantId");
 
                     b.HasIndex("ServiceId", "DirectionId")
                         .IsUnique();
@@ -977,6 +1082,11 @@ namespace transport.infraestructure.Migrations
                     b.Property<int>("Status")
                         .HasColumnType("int");
 
+                    b.Property<int>("TenantId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(1);
+
                     b.Property<string>("UpdatedBy")
                         .HasColumnType("VARCHAR(256)");
 
@@ -987,7 +1097,201 @@ namespace transport.infraestructure.Migrations
 
                     b.HasIndex("ServiceId");
 
+                    b.HasIndex("TenantId");
+
                     b.ToTable("ServiceSchedule", (string)null);
+                });
+
+            modelBuilder.Entity("Transport.Domain.Tenants.Tenant", b =>
+                {
+                    b.Property<int>("TenantId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("TenantId"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("VARCHAR(256)")
+                        .HasDefaultValue("System");
+
+                    b.Property<DateTime>("CreatedDate")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("GETDATE()");
+
+                    b.Property<string>("Domain")
+                        .HasMaxLength(253)
+                        .HasColumnType("nvarchar(253)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("VARCHAR(256)");
+
+                    b.Property<DateTime?>("UpdatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("TenantId");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.HasIndex("Domain")
+                        .IsUnique()
+                        .HasFilter("[Domain] IS NOT NULL");
+
+                    b.ToTable("Tenant", (string)null);
+                });
+
+            modelBuilder.Entity("Transport.Domain.Tenants.TenantConfig", b =>
+                {
+                    b.Property<int>("TenantConfigId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("TenantConfigId"));
+
+                    b.Property<string>("BookingsEmail")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("CancellationPolicy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("CompanyName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("CompanyNameLegal")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<string>("CompanyNameShort")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("ContactAddress")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<string>("ContactEmail")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("ContactPhone")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("VARCHAR(256)")
+                        .HasDefaultValue("System");
+
+                    b.Property<DateTime>("CreatedDate")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("GETDATE()");
+
+                    b.Property<string>("FaviconUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("LogoUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("StyleConfigJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Tagline")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int>("TenantId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("TermsText")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("VARCHAR(256)");
+
+                    b.Property<DateTime?>("UpdatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("TenantConfigId");
+
+                    b.HasIndex("TenantId")
+                        .IsUnique();
+
+                    b.ToTable("TenantConfig", (string)null);
+                });
+
+            modelBuilder.Entity("Transport.Domain.Tenants.TenantPaymentConfig", b =>
+                {
+                    b.Property<int>("TenantPaymentConfigId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("TenantPaymentConfigId"));
+
+                    b.Property<string>("AccessToken")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("VARCHAR(256)")
+                        .HasDefaultValue("System");
+
+                    b.Property<DateTime>("CreatedDate")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("GETDATE()");
+
+                    b.Property<string>("PublicKey")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TenantId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("VARCHAR(256)");
+
+                    b.Property<DateTime?>("UpdatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("WebhookSecret")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("TenantPaymentConfigId");
+
+                    b.HasIndex("TenantId")
+                        .IsUnique();
+
+                    b.ToTable("TenantPaymentConfig", (string)null);
                 });
 
             modelBuilder.Entity("Transport.Domain.Trips.Trip", b =>
@@ -1025,6 +1329,11 @@ namespace transport.infraestructure.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<int>("TenantId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(1);
+
                     b.Property<string>("UpdatedBy")
                         .HasMaxLength(100)
                         .HasColumnType("VARCHAR(256)");
@@ -1036,7 +1345,11 @@ namespace transport.infraestructure.Migrations
 
                     b.HasIndex("DestinationCityId");
 
-                    b.HasIndex("OriginCityId", "DestinationCityId")
+                    b.HasIndex("OriginCityId");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("TenantId", "OriginCityId", "DestinationCityId")
                         .IsUnique()
                         .HasFilter("[Status] = 'Active'");
 
@@ -1076,6 +1389,11 @@ namespace transport.infraestructure.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<int>("TenantId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(1);
+
                     b.Property<int>("TripId")
                         .HasColumnType("int");
 
@@ -1089,6 +1407,8 @@ namespace transport.infraestructure.Migrations
                     b.HasKey("TripPickupStopId");
 
                     b.HasIndex("DirectionId");
+
+                    b.HasIndex("TenantId");
 
                     b.HasIndex("TripId", "DirectionId")
                         .IsUnique()
@@ -1138,6 +1458,11 @@ namespace transport.infraestructure.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<int>("TenantId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(1);
+
                     b.Property<int>("TripId")
                         .HasColumnType("int");
 
@@ -1153,6 +1478,8 @@ namespace transport.infraestructure.Migrations
                     b.HasIndex("CityId");
 
                     b.HasIndex("DirectionId");
+
+                    b.HasIndex("TenantId");
 
                     b.HasIndex("TripId", "CityId", "DirectionId", "ReserveTypeId")
                         .IsUnique()
@@ -1262,15 +1589,22 @@ namespace transport.infraestructure.Migrations
                         {
                             RoleId = 1,
                             CreatedBy = "System",
-                            CreatedDate = new DateTime(2026, 3, 12, 3, 48, 34, 367, DateTimeKind.Utc).AddTicks(4617),
+                            CreatedDate = new DateTime(2026, 3, 15, 18, 39, 8, 252, DateTimeKind.Utc).AddTicks(8811),
                             Name = "Administrador"
                         },
                         new
                         {
                             RoleId = 2,
                             CreatedBy = "System",
-                            CreatedDate = new DateTime(2026, 3, 12, 3, 48, 34, 367, DateTimeKind.Utc).AddTicks(4619),
+                            CreatedDate = new DateTime(2026, 3, 15, 18, 39, 8, 252, DateTimeKind.Utc).AddTicks(8813),
                             Name = "Cliente"
+                        },
+                        new
+                        {
+                            RoleId = 3,
+                            CreatedBy = "System",
+                            CreatedDate = new DateTime(2026, 3, 15, 18, 39, 8, 252, DateTimeKind.Utc).AddTicks(8815),
+                            Name = "SuperAdmin"
                         });
                 });
 
@@ -1299,6 +1633,9 @@ namespace transport.infraestructure.Migrations
                     b.Property<int>("Status")
                         .HasColumnType("int");
 
+                    b.Property<int>("TenantId")
+                        .HasColumnType("int");
+
                     b.HasKey("UserId");
 
                     b.HasIndex("CustomerId")
@@ -1306,6 +1643,8 @@ namespace transport.infraestructure.Migrations
                         .HasFilter("[CustomerId] IS NOT NULL");
 
                     b.HasIndex("RoleId");
+
+                    b.HasIndex("TenantId");
 
                     b.ToTable("User", (string)null);
                 });
@@ -1340,6 +1679,11 @@ namespace transport.infraestructure.Migrations
                     b.Property<int>("Status")
                         .HasColumnType("int");
 
+                    b.Property<int>("TenantId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(1);
+
                     b.Property<string>("UpdatedBy")
                         .HasColumnType("VARCHAR(256)");
 
@@ -1350,6 +1694,8 @@ namespace transport.infraestructure.Migrations
                         .HasColumnType("int");
 
                     b.HasKey("VehicleId");
+
+                    b.HasIndex("TenantId");
 
                     b.HasIndex("VehicleTypeId");
 
@@ -1389,6 +1735,11 @@ namespace transport.infraestructure.Migrations
                     b.Property<int>("Status")
                         .HasColumnType("int");
 
+                    b.Property<int>("TenantId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(1);
+
                     b.Property<string>("UpdatedBy")
                         .HasColumnType("VARCHAR(256)");
 
@@ -1399,6 +1750,8 @@ namespace transport.infraestructure.Migrations
 
                     b.HasIndex("Name")
                         .IsUnique();
+
+                    b.HasIndex("TenantId");
 
                     b.ToTable("VehicleType", (string)null);
                 });
@@ -1454,11 +1807,35 @@ namespace transport.infraestructure.Migrations
                         .HasForeignKey("ReserveId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("Transport.Domain.Tenants.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.Navigation("ClosedByUser");
 
                     b.Navigation("OpenedByUser");
 
                     b.Navigation("Reserve");
+                });
+
+            modelBuilder.Entity("Transport.Domain.Cities.City", b =>
+                {
+                    b.HasOne("Transport.Domain.Tenants.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Transport.Domain.Customers.Customer", b =>
+                {
+                    b.HasOne("Transport.Domain.Tenants.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Transport.Domain.Customers.CustomerAccountTransaction", b =>
@@ -1479,6 +1856,12 @@ namespace transport.infraestructure.Migrations
                         .HasForeignKey("ReservePaymentId")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("Transport.Domain.Tenants.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.Navigation("Customer");
 
                     b.Navigation("RelatedReserve");
@@ -1494,7 +1877,31 @@ namespace transport.infraestructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("Transport.Domain.Tenants.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.Navigation("City");
+                });
+
+            modelBuilder.Entity("Transport.Domain.Drivers.Driver", b =>
+                {
+                    b.HasOne("Transport.Domain.Tenants.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Transport.Domain.Holiday", b =>
+                {
+                    b.HasOne("Transport.Domain.Tenants.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Transport.Domain.Passengers.Passenger", b =>
@@ -1533,6 +1940,12 @@ namespace transport.infraestructure.Migrations
                         .HasForeignKey("ReserveRelatedId")
                         .OnDelete(DeleteBehavior.NoAction);
 
+                    b.HasOne("Transport.Domain.Tenants.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.Navigation("Customer");
 
                     b.Navigation("DropoffLocation");
@@ -1560,6 +1973,12 @@ namespace transport.infraestructure.Migrations
                         .WithMany()
                         .HasForeignKey("ServiceScheduleId")
                         .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Transport.Domain.Tenants.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
 
                     b.HasOne("Transport.Domain.Trips.Trip", "Trip")
                         .WithMany()
@@ -1598,6 +2017,12 @@ namespace transport.infraestructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("Transport.Domain.Tenants.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.Navigation("Direction");
 
                     b.Navigation("Reserve");
@@ -1623,6 +2048,12 @@ namespace transport.infraestructure.Migrations
                     b.HasOne("Transport.Domain.Reserves.Reserve", "Reserve")
                         .WithMany()
                         .HasForeignKey("ReserveId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Transport.Domain.Tenants.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
@@ -1653,6 +2084,12 @@ namespace transport.infraestructure.Migrations
                         .HasForeignKey("ReturnReserveId")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("Transport.Domain.Tenants.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.Navigation("Customer");
 
                     b.Navigation("OutboundReserve");
@@ -1662,6 +2099,12 @@ namespace transport.infraestructure.Migrations
 
             modelBuilder.Entity("Transport.Domain.Services.Service", b =>
                 {
+                    b.HasOne("Transport.Domain.Tenants.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("Transport.Domain.Trips.Trip", "Trip")
                         .WithMany()
                         .HasForeignKey("TripId")
@@ -1693,6 +2136,12 @@ namespace transport.infraestructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("Transport.Domain.Tenants.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.Navigation("Customer");
 
                     b.Navigation("Service");
@@ -1712,6 +2161,12 @@ namespace transport.infraestructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("Transport.Domain.Tenants.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.Navigation("Direction");
 
                     b.Navigation("Service");
@@ -1725,7 +2180,35 @@ namespace transport.infraestructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("Transport.Domain.Tenants.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.Navigation("Service");
+                });
+
+            modelBuilder.Entity("Transport.Domain.Tenants.TenantConfig", b =>
+                {
+                    b.HasOne("Transport.Domain.Tenants.Tenant", "Tenant")
+                        .WithOne("Config")
+                        .HasForeignKey("Transport.Domain.Tenants.TenantConfig", "TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Tenant");
+                });
+
+            modelBuilder.Entity("Transport.Domain.Tenants.TenantPaymentConfig", b =>
+                {
+                    b.HasOne("Transport.Domain.Tenants.Tenant", "Tenant")
+                        .WithOne("PaymentConfig")
+                        .HasForeignKey("Transport.Domain.Tenants.TenantPaymentConfig", "TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Tenant");
                 });
 
             modelBuilder.Entity("Transport.Domain.Trips.Trip", b =>
@@ -1742,6 +2225,12 @@ namespace transport.infraestructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("Transport.Domain.Tenants.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.Navigation("DestinationCity");
 
                     b.Navigation("OriginCity");
@@ -1752,6 +2241,12 @@ namespace transport.infraestructure.Migrations
                     b.HasOne("Transport.Domain.Directions.Direction", "Direction")
                         .WithMany()
                         .HasForeignKey("DirectionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Transport.Domain.Tenants.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
@@ -1778,6 +2273,12 @@ namespace transport.infraestructure.Migrations
                         .WithMany()
                         .HasForeignKey("DirectionId")
                         .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Transport.Domain.Tenants.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
 
                     b.HasOne("Transport.Domain.Trips.Trip", "Trip")
                         .WithMany("Prices")
@@ -1815,13 +2316,27 @@ namespace transport.infraestructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("Transport.Domain.Tenants.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.Navigation("Customer");
 
                     b.Navigation("Role");
+
+                    b.Navigation("Tenant");
                 });
 
             modelBuilder.Entity("Transport.Domain.Vehicles.Vehicle", b =>
                 {
+                    b.HasOne("Transport.Domain.Tenants.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("Transport.Domain.Vehicles.VehicleType", "VehicleType")
                         .WithMany("Vehicles")
                         .HasForeignKey("VehicleTypeId")
@@ -1829,6 +2344,15 @@ namespace transport.infraestructure.Migrations
                         .IsRequired();
 
                     b.Navigation("VehicleType");
+                });
+
+            modelBuilder.Entity("Transport.Domain.Vehicles.VehicleType", b =>
+                {
+                    b.HasOne("Transport.Domain.Tenants.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Transport.Domain.CashBoxes.CashBox", b =>
@@ -1885,6 +2409,13 @@ namespace transport.infraestructure.Migrations
                     b.Navigation("Reserves");
 
                     b.Navigation("Schedules");
+                });
+
+            modelBuilder.Entity("Transport.Domain.Tenants.Tenant", b =>
+                {
+                    b.Navigation("Config");
+
+                    b.Navigation("PaymentConfig");
                 });
 
             modelBuilder.Entity("Transport.Domain.Trips.Trip", b =>

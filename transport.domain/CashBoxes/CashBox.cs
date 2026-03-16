@@ -4,9 +4,10 @@ using Transport.SharedKernel;
 
 namespace Transport.Domain.CashBoxes;
 
-public class CashBox : Entity, IAuditable
+public class CashBox : Entity, IAuditable, ITenantScoped
 {
     public int CashBoxId { get; set; }
+    public int TenantId { get; set; }
     public string? Description { get; set; }
     public DateTime OpenedAt { get; set; }
     public DateTime? ClosedAt { get; set; }
