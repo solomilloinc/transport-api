@@ -8,4 +8,5 @@ public record CustomerReportFilterRequestDto(
     string? Phone1,
     string? Phone2,
     DateTime? CreatedFrom,
-    DateTime? CreatedTo);
+    DateTime? CreatedTo,
+    EntityStatusEnum? Status = null);

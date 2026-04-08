@@ -55,6 +55,14 @@ public class CityBusiness : ICityBusiness
             return Result.Failure<bool>(CityError.CityNotFound);
         }
 
+        var hasDirections = await _context.Directions
+            .AnyAsync(d => d.CityId == cityId && d.Status == EntityStatusEnum.Active);
+
+        if (hasDirections)
+        {
+            return Result.Failure<bool>(CityError.HasDirections);
+        }
+
         city.Status = EntityStatusEnum.Deleted;
 
         await _context.SaveChangesWithOutboxAsync();
@@ -82,6 +90,8 @@ public class CityBusiness : ICityBusiness
 
         if (requestDto.Filters?.Status is not null)
             query = query.Where(v => v.Status == requestDto.Filters.Status);
+        else
+            query = query.Where(v => v.Status == EntityStatusEnum.Active);
 
         var sortMappings = new Dictionary<string, Expression<Func<City, object>>>
         {

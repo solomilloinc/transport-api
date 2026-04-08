@@ -8,6 +8,7 @@ using System.Linq.Expressions;
 using Transport.SharedKernel.Contracts.City;
 using Transport.Domain.Vehicles;
 using Transport.Domain.Cities;
+using Transport.Domain.Reserves;
 
 namespace Transport.Business.DriverBusiness;
 
@@ -57,6 +58,17 @@ public class DriverBusiness : IDriverBusiness
             return Result.Failure<bool>(DriverError.DriverNotFound);
         }
 
+        var today = DateTime.UtcNow.Date;
+        var hasFutureReserves = await _context.Reserves
+            .AnyAsync(r => r.DriverId == driverId
+                        && r.ReserveDate >= today
+                        && r.Status != ReserveStatusEnum.Cancelled);
+
+        if (hasFutureReserves)
+        {
+            return Result.Failure<bool>(DriverError.HasFutureReserves);
+        }
+
         driver.Status = EntityStatusEnum.Deleted;
 
         _context.Drivers.Update(driver);
@@ -81,6 +93,11 @@ public class DriverBusiness : IDriverBusiness
 
         if (!string.IsNullOrWhiteSpace(requestDto.Filters?.DocumentNumber))
             query = query.Where(x => x.DocumentNumber.Contains(requestDto.Filters.DocumentNumber));
+
+        if (requestDto.Filters?.Status is not null)
+            query = query.Where(x => x.Status == requestDto.Filters.Status);
+        else
+            query = query.Where(x => x.Status == EntityStatusEnum.Active);
 
         var sortMappings = new Dictionary<string, Expression<Func<Driver, object>>>
         {
@@ -118,6 +135,19 @@ public class DriverBusiness : IDriverBusiness
         if (driver is null)
         {
             return Result.Failure<bool>(DriverError.DriverNotFound);
+        }
+
+        if (driver.DocumentNumber != dto.DocumentNumber)
+        {
+            var duplicate = await _context.Drivers
+                .AnyAsync(x => x.DocumentNumber == dto.DocumentNumber && x.DriverId != driverId);
+
+            if (duplicate)
+            {
+                return Result.Failure<bool>(DriverError.DriverAlreadyExist);
+            }
+
+            driver.DocumentNumber = dto.DocumentNumber;
         }
 
         driver.FirstName = dto.FirstName;

@@ -145,6 +145,8 @@ public class TripBusiness : ITripBusiness
 
         if (request.Filters?.Status is not null)
             query = query.Where(t => t.Status == request.Filters.Status);
+        else
+            query = query.Where(t => t.Status == EntityStatusEnum.Active);
 
         var sortMappings = new Dictionary<string, Expression<Func<Trip, object>>>
         {

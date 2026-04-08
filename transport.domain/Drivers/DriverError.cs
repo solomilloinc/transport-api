@@ -16,4 +16,8 @@ public static class DriverError
     public static readonly Error DriverAlreadyExist = Error.Validation(
         "Driver.Document",
         "Hay un chofer que ya éxiste con este documento");
+
+    public static readonly Error HasFutureReserves = Error.Conflict(
+        "Driver.HasFutureReserves",
+        "No se puede eliminar un chofer con viajes futuros asignados.");
 }

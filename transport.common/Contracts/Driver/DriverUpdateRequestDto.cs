@@ -1,3 +1,3 @@
 ﻿namespace Transport.SharedKernel.Contracts.Driver;
 
-public record DriverUpdateRequestDto(string FirstName, string LastName);
+public record DriverUpdateRequestDto(string FirstName, string LastName, string DocumentNumber);

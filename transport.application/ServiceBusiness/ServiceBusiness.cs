@@ -112,6 +112,8 @@ public class ServiceBusiness : IServiceBusiness
 
         if (requestDto.Filters?.Status is not null)
             query = query.Where(s => s.Status == requestDto.Filters.Status);
+        else
+            query = query.Where(s => s.Status == EntityStatusEnum.Active);
 
         var sortMappings = new Dictionary<string, Expression<Func<Service, object>>>
         {

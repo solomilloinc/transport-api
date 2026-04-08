@@ -111,12 +111,32 @@ public class VehicleTypeBusinessTests : TestBase
         var vehicleType = new VehicleType { VehicleTypeId = 1, Status = EntityStatusEnum.Active };
         _contextMock.Setup(x => x.VehicleTypes)
             .Returns(GetQueryableMockDbSet(new List<VehicleType> { vehicleType }));
+        _contextMock.Setup(x => x.Vehicles)
+            .Returns(GetQueryableMockDbSet(new List<Vehicle>()));
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
         var result = await _vehicleTypeBusiness.Delete(1);
 
         result.IsSuccess.Should().BeTrue();
         vehicleType.Status.Should().Be(EntityStatusEnum.Deleted);
+    }
+
+    [Fact]
+    public async Task Delete_ShouldFail_WhenVehicleTypeHasActiveVehicles()
+    {
+        var vehicleType = new VehicleType { VehicleTypeId = 1, Status = EntityStatusEnum.Active };
+        var vehicle = new Vehicle { VehicleId = 1, VehicleTypeId = 1, Status = EntityStatusEnum.Active };
+
+        _contextMock.Setup(x => x.VehicleTypes)
+            .Returns(GetQueryableMockDbSet(new List<VehicleType> { vehicleType }));
+        _contextMock.Setup(x => x.Vehicles)
+            .Returns(GetQueryableMockDbSet(new List<Vehicle> { vehicle }));
+
+        var result = await _vehicleTypeBusiness.Delete(1);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Be(VehicleTypeError.InUse);
+        vehicleType.Status.Should().Be(EntityStatusEnum.Active);
     }
 
     [Fact]

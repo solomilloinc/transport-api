@@ -99,6 +99,11 @@ public class CustomerBusiness : ICustomerBusiness
         if (!string.IsNullOrWhiteSpace(requestDto.Filters?.DocumentNumber))
             query = query.Where(x => x.DocumentNumber.Contains(requestDto.Filters.DocumentNumber));
 
+        if (requestDto.Filters?.Status is not null)
+            query = query.Where(x => x.Status == requestDto.Filters.Status);
+        else
+            query = query.Where(x => x.Status == EntityStatusEnum.Active);
+
         var sortMappings = new Dictionary<string, Expression<Func<Customer, object>>>
         {
             ["firstname"] = c => c.FirstName,
