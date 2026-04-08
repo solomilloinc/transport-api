@@ -25,6 +25,8 @@ public class DriverCreateRequestValidator : AbstractValidator<DriverCreateReques
         RuleFor(p => p.documentNumber)
             .NotEmpty()
             .WithMessage("Document number is required")
+            .MaximumLength(20)
+            .WithMessage("Document number must not exceed 20 characters")
             .Matches(@"^\d{8,10}$")
             .WithMessage("Document number must be between 8 and 10 digits");
     }

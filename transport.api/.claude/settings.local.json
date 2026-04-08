@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/x/Documents/GitHub/transport-api/**)",
+      "Bash(dotnet build:*)",
+      "Bash(dotnet test:*)"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\x\\Documents\\GitHub\\transport-api\\transport.application\\CityBusiness",
+      "c:\\Users\\x\\Documents\\GitHub\\transport-api\\transport.application\\TripBusiness",
+      "c:\\Users\\x\\Documents\\GitHub\\transport-api\\transport.application\\ServiceBusiness",
+      "c:\\Users\\x\\Documents\\GitHub\\transport-api\\transport.common\\Contracts\\Driver",
+      "c:\\Users\\x\\Documents\\GitHub\\transport-api\\transport.common\\Contracts\\Customer",
+      "c:\\Users\\x\\Documents\\GitHub\\transport-api\\transport.application\\DriverBusiness",
+      "c:\\Users\\x\\Documents\\GitHub\\transport-api\\transport.application\\CustomerBusiness",
+      "c:\\Users\\x\\Documents\\GitHub\\transport-api\\transport.domain\\Cities",
+      "c:\\Users\\x\\Documents\\GitHub\\transport-api\\transport.domain\\Drivers",
+      "c:\\Users\\x\\Documents\\GitHub\\transport-api\\transport.domain\\Vehicles",
+      "c:\\Users\\x\\Documents\\GitHub\\transport-api\\transport.application\\VehicleTypeBusiness",
+      "c:\\Users\\x\\Documents\\GitHub\\transport-api\\Transport.Tests"
+    ]
+  }
+}

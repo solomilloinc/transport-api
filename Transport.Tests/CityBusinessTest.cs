@@ -73,12 +73,32 @@ public class CityBusinessTests : TestBase
         var city = new City { CityId = 1, Status = EntityStatusEnum.Active };
         _contextMock.Setup(x => x.Cities)
             .Returns(GetQueryableMockDbSet(new List<City> { city }));
+        _contextMock.Setup(x => x.Directions)
+            .Returns(GetQueryableMockDbSet(new List<Direction>()));
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
         var result = await _CityBusiness.Delete(1);
 
         result.IsSuccess.Should().BeTrue();
         city.Status.Should().Be(EntityStatusEnum.Deleted);
+    }
+
+    [Fact]
+    public async Task Delete_ShouldFail_WhenCityHasActiveDirections()
+    {
+        var city = new City { CityId = 1, Status = EntityStatusEnum.Active };
+        var direction = new Direction { DirectionId = 1, CityId = 1, Status = EntityStatusEnum.Active };
+
+        _contextMock.Setup(x => x.Cities)
+            .Returns(GetQueryableMockDbSet(new List<City> { city }));
+        _contextMock.Setup(x => x.Directions)
+            .Returns(GetQueryableMockDbSet(new List<Direction> { direction }));
+
+        var result = await _CityBusiness.Delete(1);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Be(CityError.HasDirections);
+        city.Status.Should().Be(EntityStatusEnum.Active);
     }
 
     [Fact]

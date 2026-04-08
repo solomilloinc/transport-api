@@ -60,6 +60,14 @@ public class VehicleTypeBusiness : IVehicleTypeBusiness
             return Result.Failure<bool>(VehicleError.VehicleNotFound);
         }
 
+        var inUse = await _context.Vehicles
+            .AnyAsync(v => v.VehicleTypeId == vehicleTypeId && v.Status == EntityStatusEnum.Active);
+
+        if (inUse)
+        {
+            return Result.Failure<bool>(VehicleTypeError.InUse);
+        }
+
         vehicleType.Status = EntityStatusEnum.Deleted;
         await _context.SaveChangesWithOutboxAsync();
 

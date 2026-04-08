@@ -11,4 +11,8 @@ public static class CityError
     public static readonly Error CityAlreadyExist = Error.Validation(
         "City.Code",
         "Hay una Ciudad que ya éxiste con esta información");
+
+    public static readonly Error HasDirections = Error.Conflict(
+        "City.HasDirections",
+        "No se puede eliminar una ciudad con direcciones asociadas.");
 }

@@ -104,6 +104,55 @@ public class DriverBusinessTests : TestBase
         var drivers = new List<Driver> { driver };
 
         _contextMock.Setup(x => x.Drivers).Returns(GetQueryableMockDbSet(drivers));
+        _contextMock.Setup(x => x.Reserves).Returns(GetQueryableMockDbSet(new List<Reserve>()));
+        SetupSaveChangesWithOutboxAsync(_contextMock);
+
+        // Act
+        var result = await _driverBusiness.Delete(1);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        driver.Status.Should().Be(EntityStatusEnum.Deleted);
+    }
+
+    [Fact]
+    public async Task Delete_ShouldFail_WhenDriverHasFutureReserves()
+    {
+        // Arrange
+        var driver = new Driver { DriverId = 1, Status = EntityStatusEnum.Active };
+        var futureReserve = new Reserve
+        {
+            DriverId = 1,
+            ReserveDate = DateTime.UtcNow.Date.AddDays(3),
+            Status = ReserveStatusEnum.Confirmed
+        };
+
+        _contextMock.Setup(x => x.Drivers).Returns(GetQueryableMockDbSet(new List<Driver> { driver }));
+        _contextMock.Setup(x => x.Reserves).Returns(GetQueryableMockDbSet(new List<Reserve> { futureReserve }));
+
+        // Act
+        var result = await _driverBusiness.Delete(1);
+
+        // Assert
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Be(DriverError.HasFutureReserves);
+        driver.Status.Should().Be(EntityStatusEnum.Active);
+    }
+
+    [Fact]
+    public async Task Delete_ShouldSucceed_WhenDriverHasOnlyPastReserves()
+    {
+        // Arrange
+        var driver = new Driver { DriverId = 1, Status = EntityStatusEnum.Active };
+        var pastReserve = new Reserve
+        {
+            DriverId = 1,
+            ReserveDate = DateTime.UtcNow.Date.AddDays(-5),
+            Status = ReserveStatusEnum.Completed
+        };
+
+        _contextMock.Setup(x => x.Drivers).Returns(GetQueryableMockDbSet(new List<Driver> { driver }));
+        _contextMock.Setup(x => x.Reserves).Returns(GetQueryableMockDbSet(new List<Reserve> { pastReserve }));
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
         // Act
@@ -120,7 +169,7 @@ public class DriverBusinessTests : TestBase
         var drivers = new List<Driver>();
         _contextMock.Setup(x => x.Drivers).Returns(GetQueryableMockDbSet(drivers));
 
-        var dto = new DriverUpdateRequestDto("NuevoNombre", "NuevoApellido");
+        var dto = new DriverUpdateRequestDto("NuevoNombre", "NuevoApellido", "12345678");
 
         var result = await _driverBusiness.Update(42, dto);
 
@@ -131,18 +180,76 @@ public class DriverBusinessTests : TestBase
     [Fact]
     public async Task Update_ShouldModifyDriver_WhenExists()
     {
-        var driver = new Driver { DriverId = 1, FirstName = "Original", LastName = "Original" };
+        var driver = new Driver { DriverId = 1, FirstName = "Original", LastName = "Original", DocumentNumber = "11111111" };
         var drivers = new List<Driver> { driver };
         _contextMock.Setup(x => x.Drivers).Returns(GetQueryableMockDbSet(drivers));
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
-        var dto = new DriverUpdateRequestDto("Editado", "ApellidoEditado");
+        var dto = new DriverUpdateRequestDto("Editado", "ApellidoEditado", "11111111");
 
         var result = await _driverBusiness.Update(1, dto);
 
         result.IsSuccess.Should().BeTrue();
         driver.FirstName.Should().Be("Editado");
         driver.LastName.Should().Be("ApellidoEditado");
+    }
+
+    [Fact]
+    public async Task Update_ShouldUpdateDocumentNumber_WhenChanged()
+    {
+        var driver = new Driver { DriverId = 1, FirstName = "Juan", LastName = "Perez", DocumentNumber = "11111111" };
+        _contextMock.Setup(x => x.Drivers).Returns(GetQueryableMockDbSet(new List<Driver> { driver }));
+        SetupSaveChangesWithOutboxAsync(_contextMock);
+
+        var dto = new DriverUpdateRequestDto("Juan", "Perez", "22222222");
+
+        var result = await _driverBusiness.Update(1, dto);
+
+        result.IsSuccess.Should().BeTrue();
+        driver.DocumentNumber.Should().Be("22222222");
+    }
+
+    [Fact]
+    public async Task Update_ShouldFail_WhenDocumentNumberAlreadyUsedByAnotherDriver()
+    {
+        var target = new Driver { DriverId = 1, FirstName = "Juan", LastName = "Perez", DocumentNumber = "11111111" };
+        var other = new Driver { DriverId = 2, FirstName = "Ana", LastName = "Lopez", DocumentNumber = "22222222" };
+        _contextMock.Setup(x => x.Drivers).Returns(GetQueryableMockDbSet(new List<Driver> { target, other }));
+
+        var dto = new DriverUpdateRequestDto("Juan", "Perez", "22222222");
+
+        var result = await _driverBusiness.Update(1, dto);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Be(DriverError.DriverAlreadyExist);
+        target.DocumentNumber.Should().Be("11111111");
+    }
+
+    [Fact]
+    public async Task GetDriverReport_ShouldExcludeDeleted_WhenStatusNotProvided()
+    {
+        var drivers = new List<Driver>
+        {
+            new Driver { DriverId = 1, FirstName = "Active", LastName = "One", DocumentNumber = "11111111", Status = EntityStatusEnum.Active, Reserves = new List<Reserve>() },
+            new Driver { DriverId = 2, FirstName = "Deleted", LastName = "Two", DocumentNumber = "22222222", Status = EntityStatusEnum.Deleted, Reserves = new List<Reserve>() }
+        };
+
+        _contextMock.Setup(x => x.Drivers).Returns(GetQueryableMockDbSet(drivers));
+
+        var requestDto = new PagedReportRequestDto<DriverReportFilterRequestDto>
+        {
+            PageNumber = 1,
+            PageSize = 10,
+            Filters = new DriverReportFilterRequestDto(),
+            SortBy = "firstname",
+            SortDescending = false
+        };
+
+        var result = await _driverBusiness.GetDriverReport(requestDto);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Items.Should().HaveCount(1);
+        result.Value.Items.First().DriverId.Should().Be(1);
     }
 
     [Fact]

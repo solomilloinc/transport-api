@@ -22,5 +22,13 @@ public class DriverUpdateRequestValidator : AbstractValidator<DriverUpdateReques
             .WithMessage("Last name must be at least 2 characters long")
             .MaximumLength(50)
             .WithMessage("Last name must not exceed 50 characters");
+
+        RuleFor(p => p.DocumentNumber)
+            .NotEmpty()
+            .WithMessage("Document number is required")
+            .MaximumLength(20)
+            .WithMessage("Document number must not exceed 20 characters")
+            .Matches(@"^\d{8,10}$")
+            .WithMessage("Document number must be between 8 and 10 digits");
     }
 }

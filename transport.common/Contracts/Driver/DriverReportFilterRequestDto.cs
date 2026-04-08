@@ -6,4 +6,5 @@ public class DriverReportFilterRequestDto
     public string FirstName { get; set; } = null!;
     public string LastName { get; set; } = null!;
     public string DocumentNumber { get; set; } = null!;
+    public EntityStatusEnum? Status { get; set; }
 }
