@@ -16,6 +16,19 @@ public static class ServiceError
             ErrorType.NotFound
         );
 
+    /// <summary>
+    /// Usado por <c>ServiceBusiness.SyncSchedules</c> cuando el payload incluye un
+    /// <c>ServiceScheduleId</c> que no pertenece al servicio indicado en la ruta.
+    /// Señal de bug en el frontend o intento de manipulación; se rechaza la operación
+    /// completa (no se hace fallback a "crear") para no corromper schedules de otro servicio.
+    /// </summary>
+    public static Error ScheduleNotInService(int scheduleId, int serviceId) =>
+          new Error(
+              "Service.ScheduleNotInService",
+              $"El schedule {scheduleId} no pertenece al servicio {serviceId}.",
+              ErrorType.Validation
+          );
+
     public static readonly Error InvalidDayRange = new(
             "Service.InvalidDayRange",
             "La fecha desde no puede ser mayor a la fecha hasta",

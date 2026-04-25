@@ -48,6 +48,11 @@ public class ServiceBusiness : IServiceBusiness
             TripId = requestDto.TripId,
             EstimatedDuration = requestDto.EstimatedDuration,
             VehicleId = requestDto.VehicleId,
+            // StartDay/EndDay vienen del DTO (obligatorios — ver ServiceCreateRequestDto).
+            // Antes de exponerlos, ambos quedaban con el default de DayOfWeek (Sunday=0)
+            // y los servicios solo generaban reservas los domingos.
+            StartDay = requestDto.StartDay,
+            EndDay = requestDto.EndDay,
             Status = EntityStatusEnum.Active
         };
 
@@ -163,49 +168,62 @@ public class ServiceBusiness : IServiceBusiness
         return Result.Success(pagedResult);
     }
 
-    public async Task<Result<bool>> Update(int serviceId, ServiceCreateRequestDto dto)
+    /// <summary>
+    /// Actualiza los datos editables de un Service. Los campos que se pueden cambiar
+    /// están definidos en <see cref="ServiceUpdateRequestDto"/>.
+    /// </summary>
+    /// <remarks>
+    /// Cambios respecto a la versión anterior:
+    /// <list type="bullet">
+    ///   <item>Recibe <see cref="ServiceUpdateRequestDto"/> (antes aceptaba
+    ///     <c>ServiceCreateRequestDto</c>, lo que era un desalineo con la OpenAPI).</item>
+    ///   <item>Se agregan <see cref="Service.StartDay"/> y <see cref="Service.EndDay"/>
+    ///     al set de campos actualizables — antes no había forma de corregirlos
+    ///     desde la API y quedaban permanentemente en el default (0,0 = solo Domingo).</item>
+    ///   <item><c>TripId</c> es editable. Se valida que el Trip destino exista y esté
+    ///     Active (mismo criterio que en <see cref="Create"/>). Las reservas ya
+    ///     generadas conservan su <c>TripId</c> propio — solo las reservas futuras que
+    ///     genere el batch tomarán el TripId nuevo. Ver XML doc del DTO para los casos
+    ///     de uso (corrección de configuración, ajuste de ruta, migración de Trip).</item>
+    ///   <item>Se quitó el soft-delete + recreación de <c>Schedules</c>: los schedules
+    ///     tienen endpoints propios (<c>service-schedule-create</c>,
+    ///     <c>service-schedule-update</c>, <c>service-schedule-delete</c>,
+    ///     <c>service-schedule-status</c>). Gestionarlos acá invalidaba reservas ya
+    ///     ligadas a un <c>ServiceScheduleId</c> cada vez que se editaba el servicio.</item>
+    /// </list>
+    /// </remarks>
+    public async Task<Result<bool>> Update(int serviceId, ServiceUpdateRequestDto dto)
     {
         var service = await _context.Services
-            .Include(s => s.Schedules)
             .Include(s => s.AllowedDirections)
             .SingleOrDefaultAsync(s => s.ServiceId == serviceId);
 
         if (service == null)
             return Result.Failure<bool>(ServiceError.ServiceNotFound);
 
-        var trip = await _context.Trips.Where(x => x.TripId == dto.TripId).FirstOrDefaultAsync();
-        if (trip is null)
-            return Result.Failure<bool>(TripError.TripNotFound);
+        // Validar el Trip solo si cambió — evita un roundtrip innecesario a DB
+        // en el caso común de editar solo Name/EstimatedDuration/días de operación.
+        if (service.TripId != dto.TripId)
+        {
+            var trip = await _context.Trips
+                .Where(x => x.TripId == dto.TripId)
+                .FirstOrDefaultAsync();
 
-        if (trip.Status != EntityStatusEnum.Active)
-            return Result.Failure<bool>(TripError.TripNotActive);
+            if (trip is null)
+                return Result.Failure<bool>(TripError.TripNotFound);
+
+            if (trip.Status != EntityStatusEnum.Active)
+                return Result.Failure<bool>(TripError.TripNotActive);
+
+            service.TripId = dto.TripId;
+        }
 
         service.Name = dto.Name;
-        service.TripId = dto.TripId;
         service.EstimatedDuration = dto.EstimatedDuration;
         service.VehicleId = dto.VehicleId;
-
-        if (dto.Schedules?.Any() == true)
-        {
-            // Soft delete existing schedules (can't hard delete due to FK from Reserves)
-            foreach (var existingSchedule in service.Schedules)
-            {
-                existingSchedule.Status = EntityStatusEnum.Deleted;
-            }
-
-            foreach (var scheduleDto in dto.Schedules)
-            {
-                var newSchedule = new ServiceSchedule
-                {
-                    ServiceId = serviceId,
-                    DepartureHour = scheduleDto.DepartureHour,
-                    IsHoliday = scheduleDto.IsHoliday,
-                    Status = EntityStatusEnum.Active,
-                };
-
-                _context.ServiceSchedules.Add(newSchedule);
-            }
-        }
+        // StartDay/EndDay: ver Service.StartDay para la semántica del rango + wraparound.
+        service.StartDay = dto.StartDay;
+        service.EndDay = dto.EndDay;
 
         // Update allowed directions whitelist (replace all)
         if (dto.AllowedDirectionIds is not null)
@@ -405,6 +423,100 @@ public class ServiceBusiness : IServiceBusiness
         _context.ServiceSchedules.Update(schedule);
         await _context.SaveChangesWithOutboxAsync();
 
+        return Result.Success(true);
+    }
+
+    /// <summary>
+    /// Sincroniza de forma declarativa la lista completa de schedules de un servicio.
+    /// Implementa un "diff" contra DB y aplica Create / Update / soft-Delete en una
+    /// única llamada a <c>SaveChangesWithOutboxAsync</c>, que EF Core envuelve en
+    /// transacción implícita — o pasan todas las operaciones o ninguna.
+    /// </summary>
+    /// <remarks>
+    /// Clasificación de cada item del payload:
+    /// <list type="bullet">
+    ///   <item><c>ServiceScheduleId == null</c> → se crea un schedule nuevo.</item>
+    ///   <item><c>ServiceScheduleId</c> presente y existente en este servicio →
+    ///     se actualizan <c>DepartureHour</c> / <c>IsHoliday</c>. Si además el schedule
+    ///     estaba <c>Deleted</c>, se reactiva (<c>Status = Active</c>) — permite "undo"
+    ///     desde el frontend mientras el ID siga siendo conocido.</item>
+    ///   <item><c>ServiceScheduleId</c> presente en DB pero ausente del payload →
+    ///     se hace soft-delete (<c>Status = Deleted</c>). No se hace hard-delete para
+    ///     preservar la integridad de reservas históricas que lo referencien.</item>
+    /// </list>
+    ///
+    /// Se rechaza con error toda la operación si el payload incluye un scheduleId
+    /// que no pertenece al servicio indicado — evita que un bug/manipulación del
+    /// frontend afecte schedules de otros servicios.
+    /// </remarks>
+    public async Task<Result<bool>> SyncSchedules(int serviceId, ServiceSchedulesSyncRequestDto request)
+    {
+        var service = await _context.Services
+            .Include(s => s.Schedules)
+            .FirstOrDefaultAsync(s => s.ServiceId == serviceId);
+
+        if (service is null)
+            return Result.Failure<bool>(ServiceError.ServiceNotFound);
+
+        // Schedules actualmente persistidos (incluye Deleted — permite reactivación
+        // si el frontend manda un Id que estaba soft-deleteado).
+        var existingById = service.Schedules.ToDictionary(s => s.ServiceScheduleId);
+
+        // Validación previa: todos los IDs del payload deben pertenecer al servicio.
+        // Se hace ANTES de mutar nada para garantizar el "todo o nada" sin depender
+        // del rollback transaccional.
+        foreach (var item in request.Schedules.Where(i => i.ServiceScheduleId.HasValue))
+        {
+            if (!existingById.ContainsKey(item.ServiceScheduleId!.Value))
+                return Result.Failure<bool>(
+                    ServiceError.ScheduleNotInService(item.ServiceScheduleId.Value, serviceId));
+        }
+
+        var payloadIds = request.Schedules
+            .Where(i => i.ServiceScheduleId.HasValue)
+            .Select(i => i.ServiceScheduleId!.Value)
+            .ToHashSet();
+
+        // 1) Soft-delete: schedules activos en DB que no aparecen en el payload.
+        foreach (var existing in service.Schedules)
+        {
+            if (existing.Status == EntityStatusEnum.Deleted)
+                continue; // ya estaba borrado — si el payload no lo trae, no hay cambio
+
+            if (!payloadIds.Contains(existing.ServiceScheduleId))
+            {
+                existing.Status = EntityStatusEnum.Deleted;
+                _context.ServiceSchedules.Update(existing);
+            }
+        }
+
+        // 2) Updates y creates.
+        foreach (var item in request.Schedules)
+        {
+            if (item.ServiceScheduleId.HasValue)
+            {
+                var existing = existingById[item.ServiceScheduleId.Value];
+                existing.DepartureHour = item.DepartureHour;
+                existing.IsHoliday = item.IsHoliday;
+                // Reactivación si estaba borrado — ver <remarks> del método.
+                if (existing.Status == EntityStatusEnum.Deleted)
+                    existing.Status = EntityStatusEnum.Active;
+
+                _context.ServiceSchedules.Update(existing);
+            }
+            else
+            {
+                _context.ServiceSchedules.Add(new ServiceSchedule
+                {
+                    ServiceId = serviceId,
+                    DepartureHour = item.DepartureHour,
+                    IsHoliday = item.IsHoliday,
+                    Status = EntityStatusEnum.Active
+                });
+            }
+        }
+
+        await _context.SaveChangesWithOutboxAsync();
         return Result.Success(true);
     }
 

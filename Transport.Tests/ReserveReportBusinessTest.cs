@@ -42,7 +42,7 @@ public class ReserveReportBusinessTest : TestBase
         _cashBoxBusinessMock.Setup(x => x.GetOpenCashBoxEntity())
             .ReturnsAsync(Result.Success(openCashBox));
 
-        _reserveBusiness = new ReserveBusiness(_contextMock.Object, _unitOfWorkMock.Object, _userContextMock.Object, _mercadoPagoPaymentGatewayMock.Object, _customerBusinessMock.Object, new FakeReserveOption(), _cashBoxBusinessMock.Object);
+        _reserveBusiness = new ReserveBusiness(_contextMock.Object, _unitOfWorkMock.Object, _userContextMock.Object, _mercadoPagoPaymentGatewayMock.Object, _customerBusinessMock.Object, new FakeReserveOption(), _cashBoxBusinessMock.Object, BuildTenantReserveConfigProviderMock().Object);
     }
 
     [Fact]

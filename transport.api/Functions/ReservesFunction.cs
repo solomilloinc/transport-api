@@ -73,6 +73,27 @@ public class ReservesFunction : FunctionBase
         return await MatchResultAsync(req, result);
     }
 
+    [Function("QuoteReserve")]
+    [AllowAnonymous]
+    [OpenApiOperation(
+        operationId: "reserve-quote",
+        tags: new[] { "Reserve" },
+        Summary = "Quote a reservation cart",
+        Description = "Calculates totals for a (potential) reserve cart applying server-side pricing rules, including the per-tenant 'IdaVuelta combo only on the same day' rule. Returns the price the user will actually pay and any discounts that were lost.",
+        Visibility = OpenApiVisibilityType.Important)]
+    [OpenApiRequestBody("application/json", typeof(ReserveQuoteRequestDto), Required = true)]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(ReserveQuoteResponseDto), Summary = "Quote computed successfully.")]
+    public async Task<HttpResponseData> QuoteReserve(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "reserves/quote")] HttpRequestData req)
+    {
+        var dto = await req.ReadFromJsonAsync<ReserveQuoteRequestDto>();
+
+        var result = await ValidateAndMatchAsync(req, dto, GetValidator<ReserveQuoteRequestDto>())
+                        .BindAsync(_reserveBusiness.QuoteAsync);
+
+        return await MatchResultAsync(req, result);
+    }
+
     [Function("GetReserveReport")]
     [Authorize("Admin")]
     [OpenApiOperation(operationId: "reserve-report", tags: new[] { "Reserve" }, Summary = "Get Reserve Report", Description = "Returns paginated list of reserve", Visibility = OpenApiVisibilityType.Important)]

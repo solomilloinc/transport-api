@@ -5,6 +5,8 @@ using Transport.SharedKernel;
 using Transport.Business.Authentication;
 using Transport.Business.Data;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
+using Transport.Domain.Tenants;
+using Transport.Domain.Tenants.Abstraction;
 using Transport.SharedKernel.Configuration;
 
 namespace Transport.Tests;
@@ -58,4 +60,20 @@ public abstract class TestBase
         public string? TenantCode { get; set; } = "default";
     }
 
+    /// <summary>
+    /// Builds a default mock for the tenant reserve config provider, returning
+    /// the safe defaults (RoundTripSameDayOnly = true) so existing tests keep
+    /// the historical IdaVuelta behavior when both legs are on the same day.
+    /// </summary>
+    protected static Mock<ITenantReserveConfigProvider> BuildTenantReserveConfigProviderMock(bool roundTripSameDayOnly = true)
+    {
+        var mock = new Mock<ITenantReserveConfigProvider>();
+        mock.Setup(x => x.GetCurrentAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new TenantReserveConfig
+            {
+                TenantId = 1,
+                RoundTripSameDayOnly = roundTripSameDayOnly
+            });
+        return mock;
+    }
 }

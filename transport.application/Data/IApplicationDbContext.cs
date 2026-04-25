@@ -45,6 +45,7 @@ public interface IApplicationDbContext
     DbSet<Tenant> Tenants { get; }
     DbSet<TenantConfig> TenantConfigs { get; }
     DbSet<TenantPaymentConfig> TenantPaymentConfigs { get; }
+    DbSet<TenantReserveConfig> TenantReserveConfigs { get; }
     DbSet<OutboxMessage> OutboxMessages { get; }
     EntityEntry<TEntity> Entry<TEntity>(TEntity entity) where TEntity : class;
     Task<int> SaveChangesWithOutboxAsync(CancellationToken cancellationToken = default);

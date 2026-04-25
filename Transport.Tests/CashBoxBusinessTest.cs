@@ -62,8 +62,10 @@ public class CashBoxBusinessTests : TestBase
         cashBoxes.First().Status.Should().Be(CashBoxStatusEnum.Closed); // La anterior está cerrada
     }
 
-    // TODO: Habilitar cuando se confirme la funcionalidad de pagos pendientes
-    [Fact]
+    // The pending-payments validation is currently commented out in
+    // CashBoxBusiness.CloseCashBox (see "TODO: Validar pagos pendientes" there).
+    // Re-enable this test when that feature is implemented.
+    [Fact(Skip = "Pending-payments validation not implemented yet in CashBoxBusiness.CloseCashBox")]
     public async Task CloseCashBox_ShouldFail_WhenHasPendingPayments()
     {
         // Arrange

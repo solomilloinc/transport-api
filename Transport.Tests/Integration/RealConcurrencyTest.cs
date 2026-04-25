@@ -15,6 +15,8 @@ using Transport.Domain.Services;
 using Transport.Domain.Cities;
 using Transport.Domain.Directions;
 using Transport.Domain.Passengers;
+using Transport.Domain.Tenants;
+using Transport.Domain.Tenants.Abstraction;
 using Transport.Domain.Trips;
 using Transport.Domain.Vehicles;
 using Transport.Infraestructure.Database;
@@ -93,7 +95,8 @@ public class RealConcurrencyTest : IDisposable
             _paymentGatewayMock.Object,
             _customerBusinessMock.Object,
             reserveOptions,
-            _cashBoxBusinessMock.Object);
+            _cashBoxBusinessMock.Object,
+            BuildTenantReserveConfigProviderMock().Object);
 
         // Seed data mínimo necesario
         SeedMinimalTestData();
@@ -264,9 +267,22 @@ public class RealConcurrencyTest : IDisposable
             paymentGatewayMock.Object,
             customerBusinessMock.Object,
             reserveOptions,
-            cashBoxBusinessMock.Object);
+            cashBoxBusinessMock.Object,
+            BuildTenantReserveConfigProviderMock().Object);
 
         return (serviceProvider, reserveBusiness);
+    }
+
+    private static Mock<ITenantReserveConfigProvider> BuildTenantReserveConfigProviderMock(bool roundTripSameDayOnly = true)
+    {
+        var mock = new Mock<ITenantReserveConfigProvider>();
+        mock.Setup(x => x.GetCurrentAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new TenantReserveConfig
+            {
+                TenantId = 1,
+                RoundTripSameDayOnly = roundTripSameDayOnly
+            });
+        return mock;
     }
 
     [Fact]

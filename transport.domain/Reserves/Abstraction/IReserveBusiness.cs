@@ -8,6 +8,7 @@ public interface IReserveBusiness
 {
     Task<Result<int>> CreateReserve(ReserveCreateDto dto);
     Task<Result<bool>> CreatePassengerReserves(PassengerReserveCreateRequestWrapperDto dto);
+    Task<Result<ReserveQuoteResponseDto>> QuoteAsync(ReserveQuoteRequestDto request);
 
     Task<Result<PagedReportResponseDto<ReserveReportResponseDto>>>
     GetReserveReport(DateTime reserveDate, PagedReportRequestDto<ReserveReportFilterRequestDto> requestDto);

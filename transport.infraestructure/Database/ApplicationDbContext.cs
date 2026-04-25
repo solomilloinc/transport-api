@@ -54,6 +54,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<Tenant> Tenants { get; set; }
     public DbSet<TenantConfig> TenantConfigs { get; set; }
     public DbSet<TenantPaymentConfig> TenantPaymentConfigs { get; set; }
+    public DbSet<TenantReserveConfig> TenantReserveConfigs { get; set; }
 
     private readonly IUserContext _userContext;
     private readonly ITenantContext _tenantContext;

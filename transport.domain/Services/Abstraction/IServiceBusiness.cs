@@ -9,12 +9,13 @@ public interface IServiceBusiness
     Task<Result<PagedReportResponseDto<ServiceReportResponseDto>>> GetServiceReport(PagedReportRequestDto<ServiceReportFilterRequestDto> requestDto);
     Task<Result<bool>> UpdateStatus(int serviceId, EntityStatusEnum status);
     Task<Result<bool>> Delete(int serviceId);
-    Task<Result<bool>> Update(int serviceId, ServiceCreateRequestDto dto);
+    Task<Result<bool>> Update(int serviceId, ServiceUpdateRequestDto dto);
     Task<Result<bool>> GenerateFutureReservesAsync();
     Task<Result<int>> CreateSchedule(int serviceId, ServiceScheduleCreateDto request);
     Task<Result<bool>> UpdateScheduleStatus(int scheduleId, EntityStatusEnum status);
     Task<Result<bool>> DeleteSchedule(int scheduleId);
     Task<Result<bool>> UpdateSchedule(int scheduleId, ServiceScheduleUpdateDto request);
     Task<Result<List<ServiceSchedule>>> GetSchedulesByServiceId(int serviceId);
+    Task<Result<bool>> SyncSchedules(int serviceId, ServiceSchedulesSyncRequestDto request);
     Task<Result<List<ServiceIdNameDto>>> GetActiveServicesListAsync();
 }

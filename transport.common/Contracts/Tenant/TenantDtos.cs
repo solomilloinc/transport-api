@@ -27,3 +27,7 @@ public record TenantConfigUpdateRequestDto(
     // Style (raw JSON: theme, typography, images, landing, seo, contact.schedule)
     string? StyleConfigJson
 );
+
+public record TenantReserveConfigResponseDto(int TenantId, bool RoundTripSameDayOnly);
+
+public record TenantReserveConfigUpdateRequestDto(bool RoundTripSameDayOnly);

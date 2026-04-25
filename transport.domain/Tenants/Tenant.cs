@@ -17,4 +17,5 @@ public class Tenant : IAuditable
 
     public TenantConfig? Config { get; set; }
     public TenantPaymentConfig? PaymentConfig { get; set; }
+    public TenantReserveConfig? ReserveConfig { get; set; }
 }

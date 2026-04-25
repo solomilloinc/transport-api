@@ -63,7 +63,8 @@ public class ReserveBusinessTests : TestBase
             _paymentGatewayMock.Object,
             _customerBusinessMock.Object,
             new FakeReserveOption(),
-            _cashBoxBusinessMock.Object);
+            _cashBoxBusinessMock.Object,
+            BuildTenantReserveConfigProviderMock().Object);
     }
 
     [Fact]
@@ -173,7 +174,14 @@ public class ReserveBusinessTests : TestBase
             ServiceId = 1,
             Trip = trip
         };
-        var trips = new List<Trip> { new Trip { TripId = 1, OriginCityId = 1, DestinationCityId = 2, Status = EntityStatusEnum.Active, Prices = new List<TripPrice> { new TripPrice { ReserveTypeId = ReserveTypeIdEnum.IdaVuelta, CityId = 2, Price = 100, Status = EntityStatusEnum.Active } } } };
+        // Both Ida and IdaVuelta prices are present so the test is robust to the
+        // "round-trip same day only" rule (when reserveCount=1 there is no related leg
+        // in the cart, so the price resolution degrades from IdaVuelta to Ida).
+        var trips = new List<Trip> { new Trip { TripId = 1, OriginCityId = 1, DestinationCityId = 2, Status = EntityStatusEnum.Active, Prices = new List<TripPrice>
+        {
+            new TripPrice { ReserveTypeId = ReserveTypeIdEnum.IdaVuelta, CityId = 2, Price = 100, Status = EntityStatusEnum.Active },
+            new TripPrice { ReserveTypeId = ReserveTypeIdEnum.Ida, CityId = 2, Price = 100, Status = EntityStatusEnum.Active }
+        } } };
 
 
         var customer = new Customer
@@ -414,7 +422,8 @@ public class ReserveBusinessTests : TestBase
             paymentGatewayMock.Object,
             _customerBusinessMock.Object,
             new FakeReserveOption(),
-            _cashBoxBusinessMock.Object);
+            _cashBoxBusinessMock.Object,
+            BuildTenantReserveConfigProviderMock().Object);
 
         // 1 pasajero con ida/vuelta = 2 items (1 para ida con tipo Ida, 1 para vuelta con tipo IdaVuelta)
         // La validación requiere exactamente Ida + IdaVuelta para 2 reservas
@@ -1736,7 +1745,7 @@ public class ReserveBusinessTests : TestBase
                 It.IsAny<IsolationLevel>()))
             .Returns<Func<Task<Result<bool>>>, IsolationLevel>((func, _) => func());
 
-        // Múltiples reservas Ida del mismo día - el pago usa First().Price
+        // Múltiples reservas Ida del mismo día - el pago debe cubrir el total de las 3 patas
         var passengerItems = new List<PassengerReserveCreateRequestDto>
         {
             new PassengerReserveCreateRequestDto(
@@ -1773,7 +1782,7 @@ public class ReserveBusinessTests : TestBase
 
         var paymentItems = new List<CreatePaymentRequestDto>
         {
-            new CreatePaymentRequestDto(100, (int)PaymentMethodEnum.Cash) // Usa First().Price
+            new CreatePaymentRequestDto(300, (int)PaymentMethodEnum.Cash) // 3 reservas Ida × 100
         };
 
         var request = new PassengerReserveCreateRequestWrapperDto(paymentItems, passengerItems);
@@ -1791,7 +1800,7 @@ public class ReserveBusinessTests : TestBase
 
         // Con CashBox: el pago va a la reserva principal (mainReserveId) con CashBoxId
         parentPayment.ReserveId.Should().Be(1, "El pago va a la reserva principal");
-        parentPayment.Amount.Should().Be(100, "Usa First().Price");
+        parentPayment.Amount.Should().Be(300, "Suma de las 3 patas Ida");
         parentPayment.Status.Should().Be(StatusPaymentEnum.Paid);
         parentPayment.CashBoxId.Should().Be(1, "El pago debe estar en la caja abierta");
 

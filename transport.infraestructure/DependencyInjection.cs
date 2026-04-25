@@ -18,8 +18,10 @@ using Transport.Infraestructure.Authentication;
 using Transport.Infraestructure.Authorization;
 using Transport.Infraestructure.Database;
 using Transport.Infraestructure.Messaging;
+using Transport.Domain.Tenants.Abstraction;
 using Transport.Infraestructure.Services.Email;
 using Transport.Infraestructure.Services.Payment;
+using Transport.Infraestructure.Tenants;
 using Transport.Infraestructure.Time;
 using Transport.SharedKernel;
 using Transport.SharedKernel.Configuration;
@@ -123,6 +125,7 @@ public static class DependencyInjection
         services.AddSingleton<ITokenProvider, TokenProvider>();
         services.AddScoped<IUserContext, UserContext>();
         services.AddScoped<ITenantContext, TenantContext>();
+        services.AddScoped<ITenantReserveConfigProvider, TenantReserveConfigProvider>();
 
         return services;
     }

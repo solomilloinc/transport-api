@@ -33,6 +33,7 @@ public static class DependencyInjection
         services.AddScoped<ICashBoxBusiness, CashBoxBusiness.CashBoxBusiness>();
         services.AddScoped<ITripBusiness, TripBusiness.TripBusiness>();
         services.AddScoped<ITenantBusiness, TenantBusiness.TenantBusiness>();
+        services.AddScoped<ITenantReserveConfigBusiness, TenantReserveConfigBusiness.TenantReserveConfigBusiness>();
         services.AddScoped<ISendReservationEmailTask, SendReservationEmailTask>();
 
         return services;
