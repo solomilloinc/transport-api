@@ -414,6 +414,29 @@ public class MultiTenantTests : TestBase
     }
 
     [Fact]
+    public async Task GetTenantConfig_ShouldExposeRoundTripRequiresSameDay_InBusinessRulesSection()
+    {
+        var config = new TenantConfig
+        {
+            TenantConfigId = 1,
+            TenantId = 1,
+            CompanyName = "Empresa 1",
+            RoundTripRequiresSameDay = false,
+            StyleConfigJson = "{}"
+        };
+        var contextMock = new Mock<IApplicationDbContext>();
+        contextMock.Setup(x => x.TenantConfigs)
+            .Returns(GetQueryableMockDbSet(new List<TenantConfig> { config }));
+
+        var business = new TenantBusiness(contextMock.Object, new FakeTenantContext { TenantId = 1 });
+
+        var result = await business.GetTenantConfig();
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().Contain("\"businessRules\":{\"roundTripRequiresSameDay\":false}");
+    }
+
+    [Fact]
     public async Task GetTenantConfig_ShouldFail_WhenTenantNotFound()
     {
         var contextMock = new Mock<IApplicationDbContext>();

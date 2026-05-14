@@ -29,6 +29,7 @@ using Transport.Domain.Customers.Abstraction;
 using Transport.Domain.Passengers;
 using Transport.Domain.Trips;
 using Transport.SharedKernel.Contracts.Passenger;
+using Transport.SharedKernel.Contracts.Payment;
 using Transport.SharedKernel.Configuration;
 
 namespace Transport.Tests.ReserveBusinessTests;
@@ -60,6 +61,7 @@ public class ReserveBusinessTests : TestBase
         _reserveBusiness = new ReserveBusiness(_contextMock.Object,
             _unitOfWorkMock.Object,
             _userContextMock.Object,
+            new FakeTenantContext(),
             _paymentGatewayMock.Object,
             _customerBusinessMock.Object,
             new FakeReserveOption(),
@@ -173,7 +175,10 @@ public class ReserveBusinessTests : TestBase
             ServiceId = 1,
             Trip = trip
         };
-        var trips = new List<Trip> { new Trip { TripId = 1, OriginCityId = 1, DestinationCityId = 2, Status = EntityStatusEnum.Active, Prices = new List<TripPrice> { new TripPrice { ReserveTypeId = ReserveTypeIdEnum.IdaVuelta, CityId = 2, Price = 100, Status = EntityStatusEnum.Active } } } };
+        var trips = new List<Trip> { new Trip { TripId = 1, OriginCityId = 1, DestinationCityId = 2, Status = EntityStatusEnum.Active, Prices = new List<TripPrice> {
+            new TripPrice { ReserveTypeId = ReserveTypeIdEnum.Ida, CityId = 2, Price = 100, Status = EntityStatusEnum.Active },
+            new TripPrice { ReserveTypeId = ReserveTypeIdEnum.IdaVuelta, CityId = 2, Price = 100, Status = EntityStatusEnum.Active }
+        } } };
 
 
         var customer = new Customer
@@ -208,6 +213,7 @@ public class ReserveBusinessTests : TestBase
         _contextMock.Setup(c => c.Passengers).Returns(GetMockDbSetWithIdentity(passengers));
         _contextMock.Setup(c => c.Users).Returns(GetQueryableMockDbSet(users));
         _contextMock.Setup(c => c.Trips).Returns(GetQueryableMockDbSet(trips));
+        _contextMock.Setup(c => c.TenantConfigs).Returns(GetQueryableMockDbSet(new List<Transport.Domain.Tenants.TenantConfig>()));
 
         // TestDbSet handles Update() - no mock needed
 
@@ -219,21 +225,22 @@ public class ReserveBusinessTests : TestBase
                 It.IsAny<IsolationLevel>()))
             .Returns<Func<Task<Result<bool>>>, IsolationLevel>((func, _) => func());
 
-        var passengersList = Enumerable.Range(1, reserveCount).Select(i =>
-            new PassengerReserveCreateRequestDto(
-                ReserveId: i,
-                ReserveTypeId: (int)ReserveTypeIdEnum.IdaVuelta,
+        // New shape: a single passenger booking per "passenger". For 2 reserves => IdaVuelta with Outbound+Return legs.
+        // For 1 reserve => Ida only with Outbound leg.
+        var isRoundTrip = reserveCount == 2;
+        var passengersList = new List<PassengerBookingDto>
+        {
+            new(
                 CustomerId: 1,
                 IsPayment: true,
-                PickupLocationId: 1,
-                DropoffLocationId: 2,
                 HasTraveled: false,
-                Price: 100
-            )
-        ).ToList();
+                Outbound: new LegInfoDto(PickupLocationId: 1, DropoffLocationId: 2, Price: 100),
+                Return: isRoundTrip ? new LegInfoDto(PickupLocationId: 2, DropoffLocationId: 1, Price: 100) : null)
+        };
 
-        // IdaVuelta: si hay 2 reservas, el precio ya incluye ida y vuelta (no se duplica)
-        var totalAmount = reserveCount == 2 ? 100m : 100m * reserveCount;
+        // Total = sum(outbound + return?) per passenger. With 1 passenger:
+        // Ida (reserveCount=1) => 100; IdaVuelta (reserveCount=2) => 200.
+        var totalAmount = 100m * reserveCount;
         var payments = new List<CreatePaymentRequestDto>();
 
         if (paymentCount == 1)
@@ -249,7 +256,12 @@ public class ReserveBusinessTests : TestBase
             }
         }
 
-        var request = new PassengerReserveCreateRequestWrapperDto(payments, passengersList);
+        var request = new PassengerReserveCreateRequestWrapperDto(
+            ReserveTypeId: isRoundTrip ? (int)ReserveTypeIdEnum.IdaVuelta : (int)ReserveTypeIdEnum.Ida,
+            OutboundReserveId: 1,
+            ReturnReserveId: isRoundTrip ? 2 : (int?)null,
+            Payments: payments,
+            Passengers: passengersList);
 
         // Act
         var result = await _reserveBusiness.CreatePassengerReserves(request);
@@ -371,6 +383,7 @@ public class ReserveBusinessTests : TestBase
         _contextMock.Setup(c => c.Reserves).Returns(GetMockDbSetWithIdentity(reservesList));
         _contextMock.Setup(c => c.Customers).Returns(GetMockDbSetWithIdentity(new List<Customer> { customer }));
         _contextMock.Setup(c => c.Trips).Returns(GetQueryableMockDbSet(trips));
+        _contextMock.Setup(c => c.TenantConfigs).Returns(GetQueryableMockDbSet(new List<Transport.Domain.Tenants.TenantConfig>()));
 
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
@@ -411,50 +424,32 @@ public class ReserveBusinessTests : TestBase
             _contextMock.Object,
             _unitOfWorkMock.Object,
             _userContextMock.Object,
+            new FakeTenantContext(),
             paymentGatewayMock.Object,
             _customerBusinessMock.Object,
             new FakeReserveOption(),
             _cashBoxBusinessMock.Object);
 
-        // 1 pasajero con ida/vuelta = 2 items (1 para ida con tipo Ida, 1 para vuelta con tipo IdaVuelta)
-        // La validación requiere exactamente Ida + IdaVuelta para 2 reservas
-        var passengerList = new List<PassengerReserveExternalCreateRequestDto>
+        // 1 pasajero IdaVuelta: un PassengerBookingExternalDto con Outbound + Return.
+        var passengerList = new List<PassengerBookingExternalDto>
         {
-        new(
-            ReserveId: 1,
-            ReserveTypeId: (int)ReserveTypeIdEnum.Ida,
-            CustomerId: null,
-            IsPayment: true,
-            PickupLocationId: 1,
-            DropoffLocationId: 2,
-            HasTraveled: false,
-            Price: 100m,
-            FirstName: "Pepe",
-            LastName: "Argento",
-            Email: "pepe@example.com",
-            Phone1: "32145678",
-            DocumentNumber: "32145678"
-        ),
-        new(
-            ReserveId: 2,
-            ReserveTypeId: (int)ReserveTypeIdEnum.IdaVuelta,
-            CustomerId: null,
-            IsPayment: true,
-            PickupLocationId: 1,
-            DropoffLocationId: 2,
-            HasTraveled: false,
-            Price: 100m,
-            FirstName: "Pepe",
-            LastName: "Argento",
-            Email: "pepe@example.com",
-            Phone1: "32145678",
-            DocumentNumber: "32145678"
-        )
+            new(
+                CustomerId: null,
+                IsPayment: true,
+                HasTraveled: false,
+                FirstName: "Pepe",
+                LastName: "Argento",
+                Email: "pepe@example.com",
+                Phone1: "32145678",
+                DocumentNumber: "32145678",
+                Outbound: new LegInfoDto(PickupLocationId: 1, DropoffLocationId: 2, Price: 100m),
+                Return:   new LegInfoDto(PickupLocationId: 1, DropoffLocationId: 2, Price: 100m)
+            )
         };
 
-        // 1 pasajero IdaVuelta = precio 100 (no 200)
+        // 1 pasajero IdaVuelta: ahora el total es la suma de Outbound + Return = 200
         var paymentDto = new CreatePaymentExternalRequestDto(
-            TransactionAmount: 100m,
+            TransactionAmount: 200m,
             Token: "token",
             Description: "Reserva de ida y vuelta",
             Installments: 1,
@@ -464,7 +459,12 @@ public class ReserveBusinessTests : TestBase
             IdentificationNumber: "32145678"
         );
 
-        var request = new PassengerReserveCreateRequestWrapperExternalDto(paymentDto, passengerList);
+        var request = new PassengerReserveCreateRequestWrapperExternalDto(
+            ReserveTypeId: (int)ReserveTypeIdEnum.IdaVuelta,
+            OutboundReserveId: 1,
+            ReturnReserveId: 2,
+            Payment: paymentDto,
+            Passengers: passengerList);
 
         _unitOfWorkMock
     .Setup(u => u.ExecuteInTransactionAsync(
@@ -488,8 +488,8 @@ public class ReserveBusinessTests : TestBase
 
         var parentPayment = reservePaymentsList[0];
 
-        // Verificar pago padre (1 pasajero IdaVuelta = precio 100, no 200)
-        Assert.Equal(100m, parentPayment.Amount);
+        // Verificar pago padre (1 pasajero IdaVuelta = suma de Outbound + Return = 200)
+        Assert.Equal(200m, parentPayment.Amount);
         Assert.Null(parentPayment.ParentReservePaymentId);
         Assert.Equal(987654321, parentPayment.PaymentExternalId);
         Assert.Equal(StatusPaymentEnum.Paid, parentPayment.Status);
@@ -520,7 +520,12 @@ public class ReserveBusinessTests : TestBase
         });
 
         // Act - Prueba con wallet (sin pago directo)
-        var walletRequest = new PassengerReserveCreateRequestWrapperExternalDto(null, passengerList);
+        var walletRequest = new PassengerReserveCreateRequestWrapperExternalDto(
+            ReserveTypeId: (int)ReserveTypeIdEnum.IdaVuelta,
+            OutboundReserveId: 1,
+            ReturnReserveId: 2,
+            Payment: null,
+            Passengers: passengerList);
         var walletResult = await reserveBusiness.CreatePassengerReservesExternal(walletRequest);
 
         // Assert - Verificaciones para wallet
@@ -529,8 +534,8 @@ public class ReserveBusinessTests : TestBase
 
         var walletParentPayment = reservePaymentsList[0];
 
-        // Verificar pago padre (1 pasajero con precio 100)
-        Assert.Equal(100m, walletParentPayment.Amount);
+        // Verificar pago padre (1 pasajero IdaVuelta = suma de Outbound + Return = 200)
+        Assert.Equal(200m, walletParentPayment.Amount);
         Assert.Null(walletParentPayment.ParentReservePaymentId);
         Assert.Null(walletParentPayment.PaymentExternalId); // Aun no tiene ID externo
         Assert.Equal(StatusPaymentEnum.Pending, walletParentPayment.Status);
@@ -1046,29 +1051,29 @@ public class ReserveBusinessTests : TestBase
             .Returns<Func<Task<Result<CreateReserveExternalResult>>>, IsolationLevel>((func, _) => func());
 
         _paymentGatewayMock
-            .Setup(x => x.CreatePreferenceAsync(It.IsAny<string>(), It.IsAny<decimal>(), It.IsAny<List<PassengerReserveExternalCreateRequestDto>>()))
+            .Setup(x => x.CreatePreferenceAsync(It.IsAny<string>(), It.IsAny<decimal>(), It.IsAny<List<PaymentPreferenceItemDto>>()))
             .ReturnsAsync("preference-id");
 
-        var passengerItem = new PassengerReserveExternalCreateRequestDto(
-            ReserveId: 1,
-            ReserveTypeId: (int)ReserveTypeIdEnum.Ida,
+        var passengerItem = new PassengerBookingExternalDto(
             CustomerId: null,
             IsPayment: false,
-            PickupLocationId: 1,
-            DropoffLocationId: 1,
             HasTraveled: false,
-            Price: 100,
             FirstName: "John",
             LastName: "Doe",
             Email: "john@example.com",
             Phone1: "123456789",
-            DocumentNumber: "12345678"
+            DocumentNumber: "12345678",
+            Outbound: new LegInfoDto(PickupLocationId: 1, DropoffLocationId: 1, Price: 100),
+            Return: null
         );
 
         var request = new CreateReserveWithLockRequestDto(
-            lockToken,
-            new List<PassengerReserveExternalCreateRequestDto> { passengerItem },
-            null // Sin pago directo, usar wallet
+            LockToken: lockToken,
+            ReserveTypeId: (int)ReserveTypeIdEnum.Ida,
+            OutboundReserveId: 1,
+            ReturnReserveId: null,
+            Passengers: new List<PassengerBookingExternalDto> { passengerItem },
+            Payment: null // Sin pago directo, usar wallet
         );
 
         // Act
@@ -1112,26 +1117,26 @@ public class ReserveBusinessTests : TestBase
             .Setup(u => u.ExecuteInTransactionAsync(It.IsAny<Func<Task<Result<CreateReserveExternalResult>>>>(), It.IsAny<IsolationLevel>()))
             .Returns<Func<Task<Result<CreateReserveExternalResult>>>, IsolationLevel>((func, _) => func());
 
-        var passengerItem = new PassengerReserveExternalCreateRequestDto(
-            ReserveId: 1,
-            ReserveTypeId: (int)ReserveTypeIdEnum.Ida,
+        var passengerItem = new PassengerBookingExternalDto(
             CustomerId: null,
             IsPayment: false,
-            PickupLocationId: 1,
-            DropoffLocationId: 1,
             HasTraveled: false,
-            Price: 100,
             FirstName: "John",
             LastName: "Doe",
             Email: "john@example.com",
             Phone1: "123456789",
-            DocumentNumber: "12345678"
+            DocumentNumber: "12345678",
+            Outbound: new LegInfoDto(PickupLocationId: 1, DropoffLocationId: 1, Price: 100),
+            Return: null
         );
 
         var request = new CreateReserveWithLockRequestDto(
-            lockToken,
-            new List<PassengerReserveExternalCreateRequestDto> { passengerItem },
-            null
+            LockToken: lockToken,
+            ReserveTypeId: (int)ReserveTypeIdEnum.Ida,
+            OutboundReserveId: 1,
+            ReturnReserveId: null,
+            Passengers: new List<PassengerBookingExternalDto> { passengerItem },
+            Payment: null
         );
 
         // Act
@@ -1298,25 +1303,25 @@ public class ReserveBusinessTests : TestBase
     private PassengerReserveCreateRequestWrapperExternalDto CreateExternalReserveRequest(
         string firstName, string lastName, string email, string documentNumber)
     {
-        var passengerItem = new PassengerReserveExternalCreateRequestDto(
-            ReserveId: 1,
-            ReserveTypeId: (int)ReserveTypeIdEnum.Ida,
+        var passengerItem = new PassengerBookingExternalDto(
             CustomerId: null,
             IsPayment: false,
-            PickupLocationId: 1,
-            DropoffLocationId: 1,
             HasTraveled: false,
-            Price: 100,
             FirstName: firstName,
             LastName: lastName,
             Email: email,
             Phone1: "123456789",
-            DocumentNumber: documentNumber
+            DocumentNumber: documentNumber,
+            Outbound: new LegInfoDto(PickupLocationId: 1, DropoffLocationId: 1, Price: 100),
+            Return: null
         );
 
         return new PassengerReserveCreateRequestWrapperExternalDto(
-            null, // Sin pago directo
-            new List<PassengerReserveExternalCreateRequestDto> { passengerItem }
+            ReserveTypeId: (int)ReserveTypeIdEnum.Ida,
+            OutboundReserveId: 1,
+            ReturnReserveId: null,
+            Payment: null, // Sin pago directo
+            Passengers: new List<PassengerBookingExternalDto> { passengerItem }
         );
     }
 
@@ -1419,21 +1424,21 @@ public class ReserveBusinessTests : TestBase
                 It.IsAny<IsolationLevel>()))
             .Returns<Func<Task<Result<bool>>>, IsolationLevel>((func, _) => func());
 
-        var passengerItem = new PassengerReserveCreateRequestDto(
-            ReserveId: 1,
-            ReserveTypeId: (int)ReserveTypeIdEnum.Ida,
+        var passengerItem = new PassengerBookingDto(
             CustomerId: 1,
             IsPayment: true,
-            PickupLocationId: 1,
-            DropoffLocationId: 1,
             HasTraveled: false,
-            Price: 100
+            Outbound: new LegInfoDto(PickupLocationId: 1, DropoffLocationId: 1, Price: 100),
+            Return: null
         );
 
         var paymentItem = new CreatePaymentRequestDto(100, (int)PaymentMethodEnum.Cash);
         var request = new PassengerReserveCreateRequestWrapperDto(
-            new List<CreatePaymentRequestDto> { paymentItem },
-            new List<PassengerReserveCreateRequestDto> { passengerItem }
+            ReserveTypeId: (int)ReserveTypeIdEnum.Ida,
+            OutboundReserveId: 1,
+            ReturnReserveId: null,
+            Payments: new List<CreatePaymentRequestDto> { paymentItem },
+            Passengers: new List<PassengerBookingDto> { passengerItem }
         );
 
         // Act
@@ -1563,6 +1568,7 @@ public class ReserveBusinessTests : TestBase
         _contextMock.Setup(c => c.ReservePayments).Returns(GetMockDbSetWithIdentity(paymentsDb));
         _contextMock.Setup(c => c.CustomerAccountTransactions).Returns(GetMockDbSetWithIdentity(accountTransactions));
         _contextMock.Setup(c => c.Users).Returns(GetQueryableMockDbSet(users));
+        _contextMock.Setup(c => c.TenantConfigs).Returns(GetQueryableMockDbSet(new List<Transport.Domain.Tenants.TenantConfig>()));
 
         // TestDbSet handles Update() - no mock needed
 
@@ -1574,37 +1580,30 @@ public class ReserveBusinessTests : TestBase
                 It.IsAny<IsolationLevel>()))
             .Returns<Func<Task<Result<bool>>>, IsolationLevel>((func, _) => func());
 
-        // IdaVuelta: ambos items con el mismo tipo y precio (el precio ya incluye ida y vuelta)
-        var passengerItems = new List<PassengerReserveCreateRequestDto>
+        // IdaVuelta: 1 PassengerBookingDto con Outbound + Return.
+        // Total esperado = Outbound.Price + Return.Price = 200.
+        var passengerItems = new List<PassengerBookingDto>
         {
-            new PassengerReserveCreateRequestDto(
-                ReserveId: 1, // Ida
-                ReserveTypeId: (int)ReserveTypeIdEnum.IdaVuelta,
+            new PassengerBookingDto(
                 CustomerId: 1,
                 IsPayment: true,
-                PickupLocationId: 1,
-                DropoffLocationId: 1,
                 HasTraveled: false,
-                Price: 100
-            ),
-            new PassengerReserveCreateRequestDto(
-                ReserveId: 2, // Vuelta
-                ReserveTypeId: (int)ReserveTypeIdEnum.IdaVuelta,
-                CustomerId: 1,
-                IsPayment: true,
-                PickupLocationId: 1,
-                DropoffLocationId: 1,
-                HasTraveled: false,
-                Price: 100
+                Outbound: new LegInfoDto(PickupLocationId: 1, DropoffLocationId: 1, Price: 100),
+                Return:   new LegInfoDto(PickupLocationId: 1, DropoffLocationId: 1, Price: 100)
             )
         };
 
         var paymentItems = new List<CreatePaymentRequestDto>
         {
-            new CreatePaymentRequestDto(100, (int)PaymentMethodEnum.Cash) // IdaVuelta: precio del primer item
+            new CreatePaymentRequestDto(200, (int)PaymentMethodEnum.Cash) // IdaVuelta: suma de ambas piernas
         };
 
-        var request = new PassengerReserveCreateRequestWrapperDto(paymentItems, passengerItems);
+        var request = new PassengerReserveCreateRequestWrapperDto(
+            ReserveTypeId: (int)ReserveTypeIdEnum.IdaVuelta,
+            OutboundReserveId: 1,
+            ReturnReserveId: 2,
+            Payments: paymentItems,
+            Passengers: passengerItems);
 
         // Act
         var result = await _reserveBusiness.CreatePassengerReserves(request);
@@ -1619,7 +1618,7 @@ public class ReserveBusinessTests : TestBase
 
         // El pago va a la reserva principal seleccionada (no a "la mas proxima")
         parentPayment.ReserveId.Should().Be(1, "El pago va a la reserva de ida");
-        parentPayment.Amount.Should().Be(100, "IdaVuelta: el precio del primer item ya incluye ida y vuelta");
+        parentPayment.Amount.Should().Be(200, "IdaVuelta: total = Outbound.Price + Return.Price");
         parentPayment.Status.Should().Be(StatusPaymentEnum.Paid);
         parentPayment.CashBoxId.Should().Be(1, "El pago debe estar en la caja abierta");
 
@@ -1736,47 +1735,44 @@ public class ReserveBusinessTests : TestBase
                 It.IsAny<IsolationLevel>()))
             .Returns<Func<Task<Result<bool>>>, IsolationLevel>((func, _) => func());
 
-        // Múltiples reservas Ida del mismo día - el pago usa First().Price
-        var passengerItems = new List<PassengerReserveCreateRequestDto>
+        // En el nuevo modelo, una sola request apunta a un Outbound (y opcionalmente Return).
+        // Para mantener "3 pasajeros" en la misma reserva principal (ReserveId=1) usamos 3 bookings Ida.
+        var passengerItems = new List<PassengerBookingDto>
         {
-            new PassengerReserveCreateRequestDto(
-                ReserveId: 1,
-                ReserveTypeId: (int)ReserveTypeIdEnum.Ida,
+            new PassengerBookingDto(
                 CustomerId: 1,
                 IsPayment: true,
-                PickupLocationId: 1,
-                DropoffLocationId: 1,
                 HasTraveled: false,
-                Price: 100
+                Outbound: new LegInfoDto(PickupLocationId: 1, DropoffLocationId: 1, Price: 100),
+                Return: null
             ),
-            new PassengerReserveCreateRequestDto(
-                ReserveId: 2,
-                ReserveTypeId: (int)ReserveTypeIdEnum.Ida,
+            new PassengerBookingDto(
                 CustomerId: 1,
                 IsPayment: true,
-                PickupLocationId: 1,
-                DropoffLocationId: 1,
                 HasTraveled: false,
-                Price: 100
+                Outbound: new LegInfoDto(PickupLocationId: 1, DropoffLocationId: 1, Price: 100),
+                Return: null
             ),
-            new PassengerReserveCreateRequestDto(
-                ReserveId: 3,
-                ReserveTypeId: (int)ReserveTypeIdEnum.Ida,
+            new PassengerBookingDto(
                 CustomerId: 1,
                 IsPayment: true,
-                PickupLocationId: 1,
-                DropoffLocationId: 1,
                 HasTraveled: false,
-                Price: 100
+                Outbound: new LegInfoDto(PickupLocationId: 1, DropoffLocationId: 1, Price: 100),
+                Return: null
             )
         };
 
         var paymentItems = new List<CreatePaymentRequestDto>
         {
-            new CreatePaymentRequestDto(100, (int)PaymentMethodEnum.Cash) // Usa First().Price
+            new CreatePaymentRequestDto(300, (int)PaymentMethodEnum.Cash) // Total = 3 pasajeros x 100
         };
 
-        var request = new PassengerReserveCreateRequestWrapperDto(paymentItems, passengerItems);
+        var request = new PassengerReserveCreateRequestWrapperDto(
+            ReserveTypeId: (int)ReserveTypeIdEnum.Ida,
+            OutboundReserveId: 1,
+            ReturnReserveId: null,
+            Payments: paymentItems,
+            Passengers: passengerItems);
 
         // Act
         var result = await _reserveBusiness.CreatePassengerReserves(request);
@@ -1791,7 +1787,7 @@ public class ReserveBusinessTests : TestBase
 
         // Con CashBox: el pago va a la reserva principal (mainReserveId) con CashBoxId
         parentPayment.ReserveId.Should().Be(1, "El pago va a la reserva principal");
-        parentPayment.Amount.Should().Be(100, "Usa First().Price");
+        parentPayment.Amount.Should().Be(300, "Total = 3 pasajeros x 100");
         parentPayment.Status.Should().Be(StatusPaymentEnum.Paid);
         parentPayment.CashBoxId.Should().Be(1, "El pago debe estar en la caja abierta");
 
@@ -2204,11 +2200,18 @@ public class ReserveBusinessTests : TestBase
             .Setup(uow => uow.ExecuteInTransactionAsync<bool>(It.IsAny<Func<Task<Result<bool>>>>(), It.IsAny<IsolationLevel>()))
             .Returns<Func<Task<Result<bool>>>, IsolationLevel>((func, _) => func());
 
-        var items = new List<PassengerReserveCreateRequestDto>
+        var items = new List<PassengerBookingDto>
         {
-            new(ReserveId: 1, ReserveTypeId: (int)ReserveTypeIdEnum.Ida, CustomerId: 1, IsPayment: true, PickupLocationId: 1, DropoffLocationId: 2, HasTraveled: false, Price: 100)
+            new(CustomerId: 1, IsPayment: true, HasTraveled: false,
+                Outbound: new LegInfoDto(PickupLocationId: 1, DropoffLocationId: 2, Price: 100),
+                Return: null)
         };
-        var request = new PassengerReserveCreateRequestWrapperDto(new List<CreatePaymentRequestDto>(), items);
+        var request = new PassengerReserveCreateRequestWrapperDto(
+            ReserveTypeId: (int)ReserveTypeIdEnum.Ida,
+            OutboundReserveId: 1,
+            ReturnReserveId: null,
+            Payments: new List<CreatePaymentRequestDto>(),
+            Passengers: items);
 
         // Act
         var result = await _reserveBusiness.CreatePassengerReserves(request);
@@ -2253,12 +2256,19 @@ public class ReserveBusinessTests : TestBase
             .Setup(uow => uow.ExecuteInTransactionAsync<bool>(It.IsAny<Func<Task<Result<bool>>>>(), It.IsAny<IsolationLevel>()))
             .Returns<Func<Task<Result<bool>>>, IsolationLevel>((func, _) => func());
 
-        var items = new List<PassengerReserveCreateRequestDto>
+        var items = new List<PassengerBookingDto>
         {
-            new(ReserveId: 1, ReserveTypeId: (int)ReserveTypeIdEnum.Ida, CustomerId: 1, IsPayment: true, PickupLocationId: 1, DropoffLocationId: 2, HasTraveled: false, Price: 100)
+            new(CustomerId: 1, IsPayment: true, HasTraveled: false,
+                Outbound: new LegInfoDto(PickupLocationId: 1, DropoffLocationId: 2, Price: 100),
+                Return: null)
         };
         var payments = new List<CreatePaymentRequestDto> { new(50, 1) };
-        var request = new PassengerReserveCreateRequestWrapperDto(payments, items);
+        var request = new PassengerReserveCreateRequestWrapperDto(
+            ReserveTypeId: (int)ReserveTypeIdEnum.Ida,
+            OutboundReserveId: 1,
+            ReturnReserveId: null,
+            Payments: payments,
+            Passengers: items);
 
         // Act
         var result = await _reserveBusiness.CreatePassengerReserves(request);
@@ -2303,12 +2313,19 @@ public class ReserveBusinessTests : TestBase
             .Setup(uow => uow.ExecuteInTransactionAsync<bool>(It.IsAny<Func<Task<Result<bool>>>>(), It.IsAny<IsolationLevel>()))
             .Returns<Func<Task<Result<bool>>>, IsolationLevel>((func, _) => func());
 
-        var items = new List<PassengerReserveCreateRequestDto>
+        var items = new List<PassengerBookingDto>
         {
-            new(ReserveId: 1, ReserveTypeId: (int)ReserveTypeIdEnum.Ida, CustomerId: 1, IsPayment: true, PickupLocationId: 1, DropoffLocationId: 2, HasTraveled: false, Price: 100)
+            new(CustomerId: 1, IsPayment: true, HasTraveled: false,
+                Outbound: new LegInfoDto(PickupLocationId: 1, DropoffLocationId: 2, Price: 100),
+                Return: null)
         };
         var payments = new List<CreatePaymentRequestDto> { new(100, 1) };
-        var request = new PassengerReserveCreateRequestWrapperDto(payments, items);
+        var request = new PassengerReserveCreateRequestWrapperDto(
+            ReserveTypeId: (int)ReserveTypeIdEnum.Ida,
+            OutboundReserveId: 1,
+            ReturnReserveId: null,
+            Payments: payments,
+            Passengers: items);
 
         // Act
         var result = await _reserveBusiness.CreatePassengerReserves(request);
@@ -2519,6 +2536,336 @@ public class ReserveBusinessTests : TestBase
         // Assert
         result.IsSuccess.Should().BeFalse();
         result.Error.Code.Should().Be("Reserve.NoDebtToSettle");
+    }
+
+    #endregion
+
+    #region IdaVuelta same-day rule (RoundTripRequiresSameDay)
+
+    private (Trip trip, Vehicle vehicle, Service service, Customer customer, Direction dropoffDest, Direction pickupOrigin)
+        BuildIdaVueltaFixture()
+    {
+        var trip = new Trip
+        {
+            TripId = 1,
+            OriginCityId = 1,
+            DestinationCityId = 2,
+            OriginCity = new City { CityId = 1, Name = "Origin" },
+            DestinationCity = new City { CityId = 2, Name = "Dest" }
+        };
+        var vehicle = new Vehicle { VehicleId = 1, AvailableQuantity = 10 };
+        var service = new Service { ServiceId = 1, Trip = trip };
+        var customer = new Customer
+        {
+            CustomerId = 1,
+            FirstName = "John",
+            LastName = "Doe",
+            DocumentNumber = "11111111",
+            Email = "john@test.com",
+            CurrentBalance = 0
+        };
+        var pickupOrigin = new Direction { DirectionId = 1, Name = "Pickup", CityId = 1 };
+        var dropoffDest = new Direction { DirectionId = 2, Name = "Dropoff", CityId = 2 };
+        return (trip, vehicle, service, customer, dropoffDest, pickupOrigin);
+    }
+
+    private Reserve BuildReserve(int id, DateTime date, Trip trip) => new Reserve
+    {
+        ReserveId = id,
+        ReserveDate = date,
+        DepartureHour = TimeSpan.FromHours(9),
+        Status = ReserveStatusEnum.Confirmed,
+        Passengers = new List<Passenger>(),
+        VehicleId = 1,
+        ServiceId = 1,
+        TripId = 1,
+        Trip = trip,
+        Driver = new Driver { FirstName = "D", LastName = "D" },
+        ServiceName = "S",
+        OriginName = "Origin",
+        DestinationName = "Dest"
+    };
+
+    private List<Trip> BuildTripsWithBothPrices() => new()
+    {
+        new Trip
+        {
+            TripId = 1, OriginCityId = 1, DestinationCityId = 2, Status = EntityStatusEnum.Active,
+            Prices = new List<TripPrice>
+            {
+                new TripPrice { ReserveTypeId = ReserveTypeIdEnum.Ida, CityId = 2, Price = 100, Status = EntityStatusEnum.Active },
+                new TripPrice { ReserveTypeId = ReserveTypeIdEnum.IdaVuelta, CityId = 2, Price = 80, Status = EntityStatusEnum.Active }
+            }
+        }
+    };
+
+    private void SetupCommonMocks(List<Reserve> reserves, Trip trip, Vehicle vehicle, Service service,
+        Customer customer, Direction dropoff, Direction pickup, List<Trip> trips,
+        List<Transport.Domain.Tenants.TenantConfig>? tenantConfigs = null)
+    {
+        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(reserves));
+        _contextMock.Setup(c => c.Vehicles).Returns(GetQueryableMockDbSet(new List<Vehicle> { vehicle }));
+        _contextMock.Setup(c => c.Services).Returns(GetQueryableMockDbSet(new List<Service> { service }));
+        _contextMock.Setup(c => c.Customers).Returns(GetQueryableMockDbSet(new List<Customer> { customer }));
+        _contextMock.Setup(c => c.Directions).Returns(GetQueryableMockDbSet(new List<Direction> { pickup, dropoff }));
+        _contextMock.Setup(c => c.Trips).Returns(GetQueryableMockDbSet(trips));
+        _contextMock.Setup(c => c.Passengers).Returns(GetMockDbSetWithIdentity(new List<Passenger>()));
+        _contextMock.Setup(c => c.ReservePayments).Returns(GetMockDbSetWithIdentity(new List<ReservePayment>()));
+        _contextMock.Setup(c => c.CustomerAccountTransactions).Returns(GetMockDbSetWithIdentity(new List<CustomerAccountTransaction>()));
+        _contextMock.Setup(c => c.Users).Returns(GetQueryableMockDbSet(new List<User>()));
+        _contextMock.Setup(c => c.TenantConfigs).Returns(GetQueryableMockDbSet(tenantConfigs ?? new List<Transport.Domain.Tenants.TenantConfig>()));
+
+        SetupSaveChangesWithOutboxAsync(_contextMock);
+        _unitOfWorkMock
+            .Setup(uow => uow.ExecuteInTransactionAsync<bool>(It.IsAny<Func<Task<Result<bool>>>>(), It.IsAny<IsolationLevel>()))
+            .Returns<Func<Task<Result<bool>>>, IsolationLevel>((func, _) => func());
+    }
+
+    [Fact]
+    public async Task CreatePassengerReserves_IdaVueltaSameDate_UsesIdaVueltaTariff()
+    {
+        // Arrange — outbound y vuelta el MISMO día, tenant exige same-day.
+        // Frontend manda precio IdaVuelta ($80). Debe pasar y guardar Price=80 en cada Passenger.
+        var (trip, vehicle, service, customer, dropoff, pickup) = BuildIdaVueltaFixture();
+        var sameDay = new DateTime(2026, 5, 13);
+        var outbound = BuildReserve(1, sameDay, trip);
+        var ret = BuildReserve(2, sameDay, trip);
+
+        var tenantConfigs = new List<Transport.Domain.Tenants.TenantConfig>
+        {
+            new() { TenantConfigId = 1, TenantId = 1, RoundTripRequiresSameDay = true }
+        };
+
+        var passengersList = new List<Passenger>();
+        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(new List<Reserve> { outbound, ret }));
+        _contextMock.Setup(c => c.Vehicles).Returns(GetQueryableMockDbSet(new List<Vehicle> { vehicle }));
+        _contextMock.Setup(c => c.Services).Returns(GetQueryableMockDbSet(new List<Service> { service }));
+        _contextMock.Setup(c => c.Customers).Returns(GetQueryableMockDbSet(new List<Customer> { customer }));
+        _contextMock.Setup(c => c.Directions).Returns(GetQueryableMockDbSet(new List<Direction> { pickup, dropoff }));
+        _contextMock.Setup(c => c.Trips).Returns(GetQueryableMockDbSet(BuildTripsWithBothPrices()));
+        _contextMock.Setup(c => c.Passengers).Returns(GetMockDbSetWithIdentity(passengersList));
+        _contextMock.Setup(c => c.ReservePayments).Returns(GetMockDbSetWithIdentity(new List<ReservePayment>()));
+        _contextMock.Setup(c => c.CustomerAccountTransactions).Returns(GetMockDbSetWithIdentity(new List<CustomerAccountTransaction>()));
+        _contextMock.Setup(c => c.Users).Returns(GetQueryableMockDbSet(new List<User>()));
+        _contextMock.Setup(c => c.TenantConfigs).Returns(GetQueryableMockDbSet(tenantConfigs));
+        SetupSaveChangesWithOutboxAsync(_contextMock);
+        _unitOfWorkMock
+            .Setup(uow => uow.ExecuteInTransactionAsync<bool>(It.IsAny<Func<Task<Result<bool>>>>(), It.IsAny<IsolationLevel>()))
+            .Returns<Func<Task<Result<bool>>>, IsolationLevel>((func, _) => func());
+
+        var passengers = new List<PassengerBookingDto>
+        {
+            new(CustomerId: 1, IsPayment: true, HasTraveled: false,
+                Outbound: new LegInfoDto(PickupLocationId: 1, DropoffLocationId: 2, Price: 80),
+                Return:   new LegInfoDto(PickupLocationId: 1, DropoffLocationId: 2, Price: 80))
+        };
+
+        var request = new PassengerReserveCreateRequestWrapperDto(
+            ReserveTypeId: (int)ReserveTypeIdEnum.IdaVuelta,
+            OutboundReserveId: 1,
+            ReturnReserveId: 2,
+            Payments: new List<CreatePaymentRequestDto> { new(160, (int)PaymentMethodEnum.Cash) },
+            Passengers: passengers);
+
+        // Act
+        var result = await _reserveBusiness.CreatePassengerReserves(request);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        passengersList.Should().HaveCount(2);
+        passengersList.Should().AllSatisfy(p => p.Price.Should().Be(80m));
+    }
+
+    [Fact]
+    public async Task CreatePassengerReserves_IdaVueltaDifferentDates_TenantRequiresSameDay_FailsWhenFrontendSendsIdaVueltaPrices()
+    {
+        // Arrange — outbound y vuelta en DÍAS distintos, tenant exige same-day.
+        // El frontend manda precio IdaVuelta ($80). El server debe degradar a Ida ($100)
+        // y rechazar con PriceNotAvailable.
+        var (trip, vehicle, service, customer, dropoff, pickup) = BuildIdaVueltaFixture();
+        var outbound = BuildReserve(1, new DateTime(2026, 5, 13), trip);
+        var ret = BuildReserve(2, new DateTime(2026, 5, 14), trip);
+
+        var tenantConfigs = new List<Transport.Domain.Tenants.TenantConfig>
+        {
+            new() { TenantConfigId = 1, TenantId = 1, RoundTripRequiresSameDay = true }
+        };
+
+        SetupCommonMocks(new List<Reserve> { outbound, ret }, trip, vehicle, service, customer,
+            dropoff, pickup, BuildTripsWithBothPrices(), tenantConfigs);
+
+        var passengers = new List<PassengerBookingDto>
+        {
+            new(CustomerId: 1, IsPayment: true, HasTraveled: false,
+                Outbound: new LegInfoDto(PickupLocationId: 1, DropoffLocationId: 2, Price: 80),
+                Return:   new LegInfoDto(PickupLocationId: 1, DropoffLocationId: 2, Price: 80))
+        };
+
+        var request = new PassengerReserveCreateRequestWrapperDto(
+            ReserveTypeId: (int)ReserveTypeIdEnum.IdaVuelta,
+            OutboundReserveId: 1,
+            ReturnReserveId: 2,
+            Payments: new List<CreatePaymentRequestDto> { new(160, (int)PaymentMethodEnum.Cash) },
+            Passengers: passengers);
+
+        // Act
+        var result = await _reserveBusiness.CreatePassengerReserves(request);
+
+        // Assert
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Be(ReserveError.PriceNotAvailable);
+    }
+
+    [Fact]
+    public async Task CreatePassengerReserves_IdaVueltaDifferentDates_TenantDoesNotRequireSameDay_UsesIdaVueltaTariff()
+    {
+        // Arrange — fechas distintas pero tenant tiene la regla DESACTIVADA.
+        // El descuento IdaVuelta sigue aplicando.
+        var (trip, vehicle, service, customer, dropoff, pickup) = BuildIdaVueltaFixture();
+        var outbound = BuildReserve(1, new DateTime(2026, 5, 13), trip);
+        var ret = BuildReserve(2, new DateTime(2026, 5, 14), trip);
+
+        var tenantConfigs = new List<Transport.Domain.Tenants.TenantConfig>
+        {
+            new() { TenantConfigId = 1, TenantId = 1, RoundTripRequiresSameDay = false }
+        };
+
+        var passengersList = new List<Passenger>();
+        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(new List<Reserve> { outbound, ret }));
+        _contextMock.Setup(c => c.Vehicles).Returns(GetQueryableMockDbSet(new List<Vehicle> { vehicle }));
+        _contextMock.Setup(c => c.Services).Returns(GetQueryableMockDbSet(new List<Service> { service }));
+        _contextMock.Setup(c => c.Customers).Returns(GetQueryableMockDbSet(new List<Customer> { customer }));
+        _contextMock.Setup(c => c.Directions).Returns(GetQueryableMockDbSet(new List<Direction> { pickup, dropoff }));
+        _contextMock.Setup(c => c.Trips).Returns(GetQueryableMockDbSet(BuildTripsWithBothPrices()));
+        _contextMock.Setup(c => c.Passengers).Returns(GetMockDbSetWithIdentity(passengersList));
+        _contextMock.Setup(c => c.ReservePayments).Returns(GetMockDbSetWithIdentity(new List<ReservePayment>()));
+        _contextMock.Setup(c => c.CustomerAccountTransactions).Returns(GetMockDbSetWithIdentity(new List<CustomerAccountTransaction>()));
+        _contextMock.Setup(c => c.Users).Returns(GetQueryableMockDbSet(new List<User>()));
+        _contextMock.Setup(c => c.TenantConfigs).Returns(GetQueryableMockDbSet(tenantConfigs));
+        SetupSaveChangesWithOutboxAsync(_contextMock);
+        _unitOfWorkMock
+            .Setup(uow => uow.ExecuteInTransactionAsync<bool>(It.IsAny<Func<Task<Result<bool>>>>(), It.IsAny<IsolationLevel>()))
+            .Returns<Func<Task<Result<bool>>>, IsolationLevel>((func, _) => func());
+
+        var passengers = new List<PassengerBookingDto>
+        {
+            new(CustomerId: 1, IsPayment: true, HasTraveled: false,
+                Outbound: new LegInfoDto(PickupLocationId: 1, DropoffLocationId: 2, Price: 80),
+                Return:   new LegInfoDto(PickupLocationId: 1, DropoffLocationId: 2, Price: 80))
+        };
+
+        var request = new PassengerReserveCreateRequestWrapperDto(
+            ReserveTypeId: (int)ReserveTypeIdEnum.IdaVuelta,
+            OutboundReserveId: 1,
+            ReturnReserveId: 2,
+            Payments: new List<CreatePaymentRequestDto> { new(160, (int)PaymentMethodEnum.Cash) },
+            Passengers: passengers);
+
+        // Act
+        var result = await _reserveBusiness.CreatePassengerReserves(request);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        passengersList.Should().HaveCount(2);
+        passengersList.Should().AllSatisfy(p => p.Price.Should().Be(80m));
+    }
+
+    [Fact]
+    public async Task CreatePassengerReserves_IdaVueltaDifferentDates_TenantRequiresSameDay_SucceedsWhenFrontendSendsIdaPrices()
+    {
+        // Arrange — fechas distintas, regla activa. El frontend hace su parte y manda
+        // precios Ida ($100). El server resuelve effectiveType=Ida y acepta.
+        var (trip, vehicle, service, customer, dropoff, pickup) = BuildIdaVueltaFixture();
+        var outbound = BuildReserve(1, new DateTime(2026, 5, 13), trip);
+        var ret = BuildReserve(2, new DateTime(2026, 5, 14), trip);
+
+        var tenantConfigs = new List<Transport.Domain.Tenants.TenantConfig>
+        {
+            new() { TenantConfigId = 1, TenantId = 1, RoundTripRequiresSameDay = true }
+        };
+
+        var passengersList = new List<Passenger>();
+        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(new List<Reserve> { outbound, ret }));
+        _contextMock.Setup(c => c.Vehicles).Returns(GetQueryableMockDbSet(new List<Vehicle> { vehicle }));
+        _contextMock.Setup(c => c.Services).Returns(GetQueryableMockDbSet(new List<Service> { service }));
+        _contextMock.Setup(c => c.Customers).Returns(GetQueryableMockDbSet(new List<Customer> { customer }));
+        _contextMock.Setup(c => c.Directions).Returns(GetQueryableMockDbSet(new List<Direction> { pickup, dropoff }));
+        _contextMock.Setup(c => c.Trips).Returns(GetQueryableMockDbSet(BuildTripsWithBothPrices()));
+        _contextMock.Setup(c => c.Passengers).Returns(GetMockDbSetWithIdentity(passengersList));
+        _contextMock.Setup(c => c.ReservePayments).Returns(GetMockDbSetWithIdentity(new List<ReservePayment>()));
+        _contextMock.Setup(c => c.CustomerAccountTransactions).Returns(GetMockDbSetWithIdentity(new List<CustomerAccountTransaction>()));
+        _contextMock.Setup(c => c.Users).Returns(GetQueryableMockDbSet(new List<User>()));
+        _contextMock.Setup(c => c.TenantConfigs).Returns(GetQueryableMockDbSet(tenantConfigs));
+        SetupSaveChangesWithOutboxAsync(_contextMock);
+        _unitOfWorkMock
+            .Setup(uow => uow.ExecuteInTransactionAsync<bool>(It.IsAny<Func<Task<Result<bool>>>>(), It.IsAny<IsolationLevel>()))
+            .Returns<Func<Task<Result<bool>>>, IsolationLevel>((func, _) => func());
+
+        var passengers = new List<PassengerBookingDto>
+        {
+            new(CustomerId: 1, IsPayment: true, HasTraveled: false,
+                Outbound: new LegInfoDto(PickupLocationId: 1, DropoffLocationId: 2, Price: 100),
+                Return:   new LegInfoDto(PickupLocationId: 1, DropoffLocationId: 2, Price: 100))
+        };
+
+        var request = new PassengerReserveCreateRequestWrapperDto(
+            ReserveTypeId: (int)ReserveTypeIdEnum.IdaVuelta,
+            OutboundReserveId: 1,
+            ReturnReserveId: 2,
+            Payments: new List<CreatePaymentRequestDto> { new(200, (int)PaymentMethodEnum.Cash) },
+            Passengers: passengers);
+
+        // Act
+        var result = await _reserveBusiness.CreatePassengerReserves(request);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        passengersList.Should().HaveCount(2);
+        passengersList.Should().AllSatisfy(p => p.Price.Should().Be(100m));
+    }
+
+    [Fact]
+    public void Validator_RejectsIdaVuelta_WhenReturnReserveIdMissing()
+    {
+        var validator = new Transport.Business.ReserveBusiness.Validation.PassengerReserveCreateRequestWrapperValidator();
+        var dto = new PassengerReserveCreateRequestWrapperDto(
+            ReserveTypeId: (int)ReserveTypeIdEnum.IdaVuelta,
+            OutboundReserveId: 1,
+            ReturnReserveId: null,
+            Payments: new List<CreatePaymentRequestDto> { new(160, (int)PaymentMethodEnum.Cash) },
+            Passengers: new List<PassengerBookingDto>
+            {
+                new(CustomerId: 1, IsPayment: true, HasTraveled: false,
+                    Outbound: new LegInfoDto(1, 2, 80),
+                    Return: new LegInfoDto(1, 2, 80))
+            });
+
+        var result = validator.Validate(dto);
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(e => e.ErrorMessage.Contains("ReturnReserveId es obligatorio"));
+    }
+
+    [Fact]
+    public void Validator_RejectsIda_WhenReturnReserveIdProvided()
+    {
+        var validator = new Transport.Business.ReserveBusiness.Validation.PassengerReserveCreateRequestWrapperValidator();
+        var dto = new PassengerReserveCreateRequestWrapperDto(
+            ReserveTypeId: (int)ReserveTypeIdEnum.Ida,
+            OutboundReserveId: 1,
+            ReturnReserveId: 2,
+            Payments: new List<CreatePaymentRequestDto> { new(100, (int)PaymentMethodEnum.Cash) },
+            Passengers: new List<PassengerBookingDto>
+            {
+                new(CustomerId: 1, IsPayment: true, HasTraveled: false,
+                    Outbound: new LegInfoDto(1, 2, 100),
+                    Return: null)
+            });
+
+        var result = validator.Validate(dto);
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(e => e.ErrorMessage.Contains("ReturnReserveId no debe enviarse"));
     }
 
     #endregion

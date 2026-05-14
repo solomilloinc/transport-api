@@ -34,6 +34,11 @@ public class TenantConfigConfiguration : IEntityTypeConfiguration<TenantConfig>
             .IsRequired()
             .HasColumnType("nvarchar(max)");
 
+        // Business rules
+        builder.Property(tc => tc.RoundTripRequiresSameDay)
+            .IsRequired()
+            .HasDefaultValue(true);
+
         builder.HasIndex(tc => tc.TenantId).IsUnique();
 
         builder.HasOne(tc => tc.Tenant)

@@ -1,6 +1,11 @@
-﻿using Transport.SharedKernel.Contracts.Reserve;
+using Transport.SharedKernel.Contracts.Reserve;
 
 namespace Transport.SharedKernel.Contracts.Passenger;
 
 //Admin
-public record PassengerReserveCreateRequestWrapperDto(List<CreatePaymentRequestDto> Payments, List<PassengerReserveCreateRequestDto> Items);
+public record PassengerReserveCreateRequestWrapperDto(
+    int ReserveTypeId,
+    int OutboundReserveId,
+    int? ReturnReserveId,
+    List<CreatePaymentRequestDto> Payments,
+    List<PassengerBookingDto> Passengers);

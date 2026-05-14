@@ -7,7 +7,7 @@ using Transport.Business.Data;
 using Transport.Business.Services.Payment;
 using Transport.Domain.Tenants;
 using Transport.SharedKernel.Configuration;
-using Transport.SharedKernel.Contracts.Reserve;
+using Transport.SharedKernel.Contracts.Payment;
 
 namespace Transport.Infraestructure.Services.Payment;
 
@@ -35,19 +35,19 @@ public class MercadoPagoPaymentGateway : IMercadoPagoPaymentGateway
         return await client.CreateAsync(request);
     }
 
-    public async Task<string> CreatePreferenceAsync(string externalReference, decimal totalAmount, List<PassengerReserveExternalCreateRequestDto> passengers)
+    public async Task<string> CreatePreferenceAsync(string externalReference, decimal totalAmount, List<PaymentPreferenceItemDto> items)
     {
         MercadoPagoConfig.AccessToken = await ResolveAccessTokenAsync();
 
         var preferenceRequest = new PreferenceRequest
         {
-            Items = passengers.Select((p, i) => new PreferenceItemRequest
+            Items = items.Select((item, i) => new PreferenceItemRequest
             {
                 Id = i.ToString(),
-                Title = $"Pasaje de {p.FirstName} {p.LastName}",
+                Title = item.Title,
                 Quantity = 1,
-                UnitPrice = p.Price,
-                Description = $"Reserva {p.ReserveId}"
+                UnitPrice = item.UnitPrice,
+                Description = item.Description
             }).ToList(),
 
             ExternalReference = externalReference,

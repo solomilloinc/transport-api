@@ -1,7 +1,11 @@
-﻿using Transport.SharedKernel.Contracts.Customer;
-using Transport.SharedKernel.Contracts.Reserve;
+using Transport.SharedKernel.Contracts.Customer;
 
 namespace Transport.SharedKernel.Contracts.Passenger;
 
 //Usuario
-public record PassengerReserveCreateRequestWrapperExternalDto(CreatePaymentExternalRequestDto? Payment, List<PassengerReserveExternalCreateRequestDto> Items);
+public record PassengerReserveCreateRequestWrapperExternalDto(
+    int ReserveTypeId,
+    int OutboundReserveId,
+    int? ReturnReserveId,
+    CreatePaymentExternalRequestDto? Payment,
+    List<PassengerBookingExternalDto> Passengers);

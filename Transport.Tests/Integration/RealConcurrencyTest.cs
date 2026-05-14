@@ -90,6 +90,7 @@ public class RealConcurrencyTest : IDisposable
             _context,
             _unitOfWork,
             userContext,
+            new FakeTenantContext(),
             _paymentGatewayMock.Object,
             _customerBusinessMock.Object,
             reserveOptions,
@@ -261,6 +262,7 @@ public class RealConcurrencyTest : IDisposable
             context,
             unitOfWork,
             userContext,
+            new FakeTenantContext(),
             paymentGatewayMock.Object,
             customerBusinessMock.Object,
             reserveOptions,
@@ -468,5 +470,11 @@ public class RealConcurrencyTest : IDisposable
         public int SlotLockTimeoutMinutes { get; set; } = 10;
         public int SlotLockCleanupIntervalMinutes { get; set; } = 1;
         public int MaxSimultaneousLocksPerUser { get; set; } = 5;
+    }
+
+    private class FakeTenantContext : ITenantContext
+    {
+        public int TenantId { get; set; } = 1;
+        public string? TenantCode { get; set; } = "default";
     }
 }

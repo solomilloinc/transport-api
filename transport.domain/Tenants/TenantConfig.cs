@@ -28,6 +28,9 @@ public class TenantConfig : IAuditable
     // Visual/style config (theme, typography, images, landing, seo, contact.schedule)
     public string StyleConfigJson { get; set; } = "{}";
 
+    // Business rules
+    public bool RoundTripRequiresSameDay { get; set; } = true;
+
     public string CreatedBy { get; set; } = null!;
     public string? UpdatedBy { get; set; }
     public DateTime CreatedDate { get; set; } = DateTime.UtcNow;
