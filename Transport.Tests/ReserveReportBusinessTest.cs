@@ -5,6 +5,7 @@ using Transport.Domain.CashBoxes;
 using Transport.Domain.CashBoxes.Abstraction;
 using Transport.Domain.Customers;
 using Transport.Domain.Reserves;
+using Transport.Domain.Reserves.Abstraction;
 using Transport.Domain.Services;
 using Transport.SharedKernel;
 using Transport.SharedKernel.Contracts.Reserve;
@@ -42,7 +43,7 @@ public class ReserveReportBusinessTest : TestBase
         _cashBoxBusinessMock.Setup(x => x.GetOpenCashBoxEntity())
             .ReturnsAsync(Result.Success(openCashBox));
 
-        _reserveBusiness = new ReserveBusiness(_contextMock.Object, _unitOfWorkMock.Object, _userContextMock.Object, new FakeTenantContext(), _mercadoPagoPaymentGatewayMock.Object, _customerBusinessMock.Object, new FakeReserveOption(), _cashBoxBusinessMock.Object);
+        _reserveBusiness = new ReserveBusiness(_contextMock.Object, _unitOfWorkMock.Object, _userContextMock.Object, new FakeTenantContext(), _mercadoPagoPaymentGatewayMock.Object, _customerBusinessMock.Object, new FakeReserveOption(), _cashBoxBusinessMock.Object, new Mock<IReserveSlotLockBusiness>().Object);
     }
 
     [Fact]

@@ -4,6 +4,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Transport.Business.ReserveBusiness;
+using Transport.Business.ReserveSlotLockBusiness;
 using Transport.Business.Services.Payment;
 using Transport.Business.Authentication;
 using Transport.Business.Data;
@@ -32,7 +33,7 @@ namespace Transport.Tests.Integration;
 public class RealConcurrencyTest : IDisposable
 {
     private readonly ApplicationDbContext _context;
-    private readonly ReserveBusiness _reserveBusiness;
+    private readonly ReserveSlotLockBusiness _slotLockBusiness;
     private readonly Mock<IMercadoPagoPaymentGateway> _paymentGatewayMock;
     private readonly Mock<ICustomerBusiness> _customerBusinessMock;
     private readonly Mock<ICashBoxBusiness> _cashBoxBusinessMock;
@@ -86,15 +87,11 @@ public class RealConcurrencyTest : IDisposable
         var userContext = serviceProvider.GetRequiredService<IUserContext>();
         var reserveOptions = new TestReserveOption();
 
-        _reserveBusiness = new ReserveBusiness(
+        _slotLockBusiness = new ReserveSlotLockBusiness(
             _context,
             _unitOfWork,
             userContext,
-            new FakeTenantContext(),
-            _paymentGatewayMock.Object,
-            _customerBusinessMock.Object,
-            reserveOptions,
-            _cashBoxBusinessMock.Object);
+            reserveOptions);
 
         // Seed data mínimo necesario
         SeedMinimalTestData();
@@ -215,7 +212,7 @@ public class RealConcurrencyTest : IDisposable
         _context.SaveChanges();
     }
 
-    private (ServiceProvider serviceProvider, ReserveBusiness reserveBusiness) CreateReserveBusinessInstance()
+    private (ServiceProvider serviceProvider, ReserveSlotLockBusiness slotLockBusiness) CreateSlotLockBusinessInstance()
     {
         // Crear nueva configuración y servicios para cada instancia
         var configuration = new ConfigurationBuilder()
@@ -247,28 +244,15 @@ public class RealConcurrencyTest : IDisposable
         var unitOfWork = serviceProvider.GetRequiredService<IUnitOfWork>();
         var userContext = serviceProvider.GetRequiredService<IUserContext>();
 
-        // Setup mocks para esta instancia
-        var paymentGatewayMock = new Mock<IMercadoPagoPaymentGateway>();
-        var customerBusinessMock = new Mock<ICustomerBusiness>();
-        var cashBoxBusinessMock = new Mock<ICashBoxBusiness>();
-
-        var openCashBox = new CashBox { CashBoxId = 1, Status = CashBoxStatusEnum.Open };
-        cashBoxBusinessMock.Setup(x => x.GetOpenCashBoxEntity())
-            .ReturnsAsync(Result.Success(openCashBox));
-
         var reserveOptions = new TestReserveOption();
 
-        var reserveBusiness = new ReserveBusiness(
+        var slotLockBusiness = new ReserveSlotLockBusiness(
             context,
             unitOfWork,
             userContext,
-            new FakeTenantContext(),
-            paymentGatewayMock.Object,
-            customerBusinessMock.Object,
-            reserveOptions,
-            cashBoxBusinessMock.Object);
+            reserveOptions);
 
-        return (serviceProvider, reserveBusiness);
+        return (serviceProvider, slotLockBusiness);
     }
 
     [Fact]
@@ -294,10 +278,10 @@ public class RealConcurrencyTest : IDisposable
                 await Task.Delay(Random.Shared.Next(1, 100));
 
                 // Cada llamada usa su propia instancia de ReserveBusiness y DbContext
-                var (serviceProvider, reserveBusiness) = CreateReserveBusinessInstance();
+                var (serviceProvider, slotLockBusiness) = CreateSlotLockBusinessInstance();
                 try
                 {
-                    return await reserveBusiness.LockReserveSlots(request);
+                    return await slotLockBusiness.AcquireAsync(request);
                 }
                 finally
                 {
@@ -364,10 +348,10 @@ public class RealConcurrencyTest : IDisposable
                 await Task.Delay(Random.Shared.Next(1, 200));
 
                 // Cada llamada usa su propia instancia de ReserveBusiness y DbContext
-                var (serviceProvider, reserveBusiness) = CreateReserveBusinessInstance();
+                var (serviceProvider, slotLockBusiness) = CreateSlotLockBusinessInstance();
                 try
                 {
-                    return await reserveBusiness.LockReserveSlots(request);
+                    return await slotLockBusiness.AcquireAsync(request);
                 }
                 finally
                 {
@@ -419,11 +403,11 @@ public class RealConcurrencyTest : IDisposable
             deadlockTasks.Add(Task.Run(async () =>
             {
                 // Cada llamada usa su propia instancia de ReserveBusiness y DbContext
-                var (serviceProvider, reserveBusiness) = CreateReserveBusinessInstance();
+                var (serviceProvider, slotLockBusiness) = CreateSlotLockBusinessInstance();
                 try
                 {
                     // Sin delay para maximizar posibilidad de deadlock
-                    return await reserveBusiness.LockReserveSlots(request);
+                    return await slotLockBusiness.AcquireAsync(request);
                 }
                 catch (Exception ex) when (ex.Message.Contains("deadlock"))
                 {

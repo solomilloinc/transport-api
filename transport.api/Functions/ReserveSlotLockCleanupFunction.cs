@@ -14,20 +14,20 @@ namespace transport_api.Functions;
 public class ReserveSlotLockCleanupFunction
 {
     private readonly ILogger<ReserveSlotLockCleanupFunction> _logger;
-    private readonly IReserveBusiness _reserveBusiness;
+    private readonly IReserveSlotLockBusiness _slotLockBusiness;
     private readonly IReserveOption _reserveOptions;
     private readonly IApplicationDbContext _dbContext;
     private readonly ITenantContext _tenantContext;
 
     public ReserveSlotLockCleanupFunction(
         ILogger<ReserveSlotLockCleanupFunction> logger,
-        IReserveBusiness reserveBusiness,
+        IReserveSlotLockBusiness slotLockBusiness,
         IReserveOption reserveOptions,
         IApplicationDbContext dbContext,
         ITenantContext tenantContext)
     {
         _logger = logger;
-        _reserveBusiness = reserveBusiness;
+        _slotLockBusiness = slotLockBusiness;
         _reserveOptions = reserveOptions;
         _dbContext = dbContext;
         _tenantContext = tenantContext;
@@ -55,7 +55,7 @@ public class ReserveSlotLockCleanupFunction
                     tc.TenantCode = tenant.Code;
                 }
 
-                var result = await _reserveBusiness.CleanupExpiredReserveSlotLocks();
+                var result = await _slotLockBusiness.CleanupExpiredAsync();
 
                 if (result.IsSuccess)
                 {
@@ -97,7 +97,7 @@ public class ReserveSlotLockCleanupFunction
                     tc.TenantCode = tenant.Code;
                 }
 
-                await _reserveBusiness.CleanupExpiredReserveSlotLocks();
+                await _slotLockBusiness.CleanupExpiredAsync();
             }
 
             var response = req.CreateResponse(System.Net.HttpStatusCode.OK);

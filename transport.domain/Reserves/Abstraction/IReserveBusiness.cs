@@ -33,9 +33,5 @@ public interface IReserveBusiness
     Task<Result<bool>> SettleCustomerDebtAsync(SettleCustomerDebtRequestDto request);
     Task<Result<List<CustomerPendingReserveDto>>> GetCustomerPendingReservesAsync(int customerId);
 
-    // Métodos para bloqueo de cupos
-    Task<Result<LockReserveSlotsResponseDto>> LockReserveSlots(LockReserveSlotsRequestDto request);
     Task<Result<CreateReserveExternalResult>> CreatePassengerReservesWithLock(CreateReserveWithLockRequestDto request);
-    Task<Result<bool>> CancelReserveSlotLock(string lockToken);
-    Task<Result<bool>> CleanupExpiredReserveSlotLocks();
 }

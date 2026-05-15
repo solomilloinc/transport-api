@@ -27,6 +27,7 @@ using Transport.Domain.CashBoxes;
 using Transport.Domain.CashBoxes.Abstraction;
 using Transport.Domain.Customers.Abstraction;
 using Transport.Domain.Passengers;
+using Transport.Domain.Reserves.Abstraction;
 using Transport.Domain.Trips;
 using Transport.SharedKernel.Contracts.Passenger;
 using Transport.SharedKernel.Contracts.Payment;
@@ -42,6 +43,7 @@ public class ReserveBusinessTests : TestBase
     private readonly Mock<IMercadoPagoPaymentGateway> _paymentGatewayMock;
     private readonly Mock<ICustomerBusiness> _customerBusinessMock;
     private readonly Mock<ICashBoxBusiness> _cashBoxBusinessMock;
+    private readonly Mock<IReserveSlotLockBusiness> _slotLockBusinessMock;
     private readonly ReserveBusiness _reserveBusiness;
 
     public ReserveBusinessTests()
@@ -52,6 +54,7 @@ public class ReserveBusinessTests : TestBase
         _paymentGatewayMock = new Mock<IMercadoPagoPaymentGateway>();
         _customerBusinessMock = new Mock<ICustomerBusiness>();
         _cashBoxBusinessMock = new Mock<ICashBoxBusiness>();
+        _slotLockBusinessMock = new Mock<IReserveSlotLockBusiness>();
 
         // Setup default open CashBox
         var openCashBox = new CashBox { CashBoxId = 1, Status = CashBoxStatusEnum.Open };
@@ -65,7 +68,8 @@ public class ReserveBusinessTests : TestBase
             _paymentGatewayMock.Object,
             _customerBusinessMock.Object,
             new FakeReserveOption(),
-            _cashBoxBusinessMock.Object);
+            _cashBoxBusinessMock.Object,
+            _slotLockBusinessMock.Object);
     }
 
     [Fact]
@@ -428,7 +432,8 @@ public class ReserveBusinessTests : TestBase
             paymentGatewayMock.Object,
             _customerBusinessMock.Object,
             new FakeReserveOption(),
-            _cashBoxBusinessMock.Object);
+            _cashBoxBusinessMock.Object,
+            _slotLockBusinessMock.Object);
 
         // 1 pasajero IdaVuelta: un PassengerBookingExternalDto con Outbound + Return.
         var passengerList = new List<PassengerBookingExternalDto>
@@ -820,157 +825,7 @@ public class ReserveBusinessTests : TestBase
         result.Error.Code.Should().Be("Reserve.AlreadyFullyPaid");
     }
 
-    #region Lock Tests
-
-    [Fact]
-    public async Task LockReserveSlots_ShouldSucceed_WhenValidRequest()
-    {
-        // Arrange
-        var vehicle = new Vehicle { AvailableQuantity = 10 };
-        var reserves = new List<Reserve>
-        {
-            new Reserve
-            {
-                ReserveId = 1,
-                Status = ReserveStatusEnum.Confirmed,
-                Passengers = new List<Passenger>(),
-                Vehicle = vehicle,
-                Service = new Service { Vehicle = vehicle }
-            }
-        };
-
-        var locks = new List<ReserveSlotLock>();
-        var users = new List<User>();
-
-        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(reserves));
-        _contextMock.Setup(c => c.ReserveSlotLocks).Returns(GetMockDbSetWithIdentity(locks));
-        _contextMock.Setup(c => c.Users).Returns(GetQueryableMockDbSet(users));
-
-        _userContextMock.Setup(x => x.Email).Returns("test@example.com");
-        _userContextMock.Setup(x => x.UserId).Returns(1);
-
-        SetupSaveChangesWithOutboxAsync(_contextMock);
-
-        _unitOfWorkMock
-            .Setup(u => u.ExecuteInTransactionAsync(It.IsAny<Func<Task<Result<LockReserveSlotsResponseDto>>>>(), It.IsAny<IsolationLevel>()))
-            .Returns<Func<Task<Result<LockReserveSlotsResponseDto>>>, IsolationLevel>((func, _) => func());
-
-        var request = new LockReserveSlotsRequestDto(1, null, 2);
-
-        // Act
-        var result = await _reserveBusiness.LockReserveSlots(request);
-
-        // Assert
-        result.IsSuccess.Should().BeTrue();
-        result.Value.LockToken.Should().NotBeNullOrEmpty();
-        result.Value.TimeoutMinutes.Should().Be(10); // From FakeReserveOption
-        locks.Should().HaveCount(1);
-        locks[0].OutboundReserveId.Should().Be(1);
-        locks[0].SlotsLocked.Should().Be(2);
-        locks[0].Status.Should().Be(ReserveSlotLockStatus.Active);
-        locks[0].UserEmail.Should().Be("test@example.com");
-    }
-
-    [Fact]
-    public async Task LockReserveSlots_ShouldFail_WhenInsufficientSlots()
-    {
-        // Arrange - Reserva con pocos cupos disponibles
-        var vehicle = new Vehicle { AvailableQuantity = 10 };
-        var reserves = new List<Reserve>
-        {
-            new Reserve
-            {
-                ReserveId = 1,
-                Status = ReserveStatusEnum.Confirmed,
-                Passengers = new List<Passenger>
-                {
-                    new Passenger { Status = PassengerStatusEnum.Confirmed },
-                    new Passenger { Status = PassengerStatusEnum.Confirmed },
-                    new Passenger { Status = PassengerStatusEnum.Confirmed },
-                    new Passenger { Status = PassengerStatusEnum.Confirmed },
-                    new Passenger { Status = PassengerStatusEnum.Confirmed },
-                    new Passenger { Status = PassengerStatusEnum.Confirmed },
-                    new Passenger { Status = PassengerStatusEnum.Confirmed },
-                    new Passenger { Status = PassengerStatusEnum.Confirmed },
-                    new Passenger { Status = PassengerStatusEnum.Confirmed },
-                    new Passenger { Status = PassengerStatusEnum.Confirmed }
-                }, // 10 pasajeros confirmados
-                Vehicle = vehicle,
-                Service = new Service { Vehicle = vehicle } // Solo 10 cupos en total
-            }
-        };
-
-        var locks = new List<ReserveSlotLock>();
-        var users = new List<User>();
-
-        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(reserves));
-        _contextMock.Setup(c => c.ReserveSlotLocks).Returns(GetQueryableMockDbSet(locks));
-        _contextMock.Setup(c => c.Users).Returns(GetQueryableMockDbSet(users));
-
-        _userContextMock.Setup(x => x.Email).Returns("test@example.com");
-        _userContextMock.Setup(x => x.UserId).Returns(1);
-
-        _unitOfWorkMock
-            .Setup(u => u.ExecuteInTransactionAsync(It.IsAny<Func<Task<Result<LockReserveSlotsResponseDto>>>>(), It.IsAny<IsolationLevel>()))
-            .Returns<Func<Task<Result<LockReserveSlotsResponseDto>>>, IsolationLevel>((func, _) => func());
-
-        var request = new LockReserveSlotsRequestDto(1, null, 2); // Solicita 2 cupos pero no hay disponibles
-
-        // Act
-        var result = await _reserveBusiness.LockReserveSlots(request);
-
-        // Assert
-        result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Be(ReserveSlotLockError.InsufficientSlots);
-        locks.Should().BeEmpty();
-    }
-
-    [Fact]
-    public async Task LockReserveSlots_ShouldFail_WhenMaxSimultaneousLocksExceeded()
-    {
-        // Arrange - Usuario ya tiene 5 locks activos (máximo según FakeReserveOption)
-        var reserves = new List<Reserve>
-        {
-            new Reserve
-            {
-                ReserveId = 1,
-                Status = ReserveStatusEnum.Confirmed,
-                Passengers = new List<Passenger>(),
-                Service = new Service { Vehicle = new Vehicle { AvailableQuantity = 10 } }
-            }
-        };
-
-        var existingLocks = Enumerable.Range(1, 5).Select(i => new ReserveSlotLock
-        {
-            ReserveSlotLockId = i,
-            UserEmail = "test@example.com",
-            Status = ReserveSlotLockStatus.Active,
-            ExpiresAt = DateTime.UtcNow.AddMinutes(10),
-            OutboundReserveId = i + 10
-        }).ToList();
-
-        var users = new List<User>();
-
-        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(reserves));
-        _contextMock.Setup(c => c.ReserveSlotLocks).Returns(GetQueryableMockDbSet(existingLocks));
-        _contextMock.Setup(c => c.Users).Returns(GetQueryableMockDbSet(users));
-
-        _userContextMock.Setup(x => x.Email).Returns("test@example.com");
-        _userContextMock.Setup(x => x.UserId).Returns(1);
-
-        _unitOfWorkMock
-            .Setup(u => u.ExecuteInTransactionAsync(It.IsAny<Func<Task<Result<LockReserveSlotsResponseDto>>>>(), It.IsAny<IsolationLevel>()))
-            .Returns<Func<Task<Result<LockReserveSlotsResponseDto>>>, IsolationLevel>((func, _) => func());
-
-        var request = new LockReserveSlotsRequestDto(1, null, 1);
-
-        // Act
-        var result = await _reserveBusiness.LockReserveSlots(request);
-
-        // Assert
-        result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Be(ReserveSlotLockError.MaxSimultaneousLocksExceeded);
-    }
+    #region CreatePassengerReservesWithLock Tests
 
     [Fact]
     public async Task CreatePassengerReservesWithLock_ShouldSucceed_WithValidLock()
@@ -1011,7 +866,6 @@ public class ReserveBusinessTests : TestBase
             UserEmail = "test@example.com"
         };
 
-        var locks = new List<ReserveSlotLock> { activeLock };
         var passengers = new List<Passenger>();
         var payments = new List<ReservePayment>();
         var vehicle = new Vehicle { VehicleId = 1, AvailableQuantity = 10 };
@@ -1034,7 +888,6 @@ public class ReserveBusinessTests : TestBase
 
         var direction = new Direction { DirectionId = 1, Name = "Location", CityId = 1 };
 
-        _contextMock.Setup(c => c.ReserveSlotLocks).Returns(GetQueryableMockDbSet(locks));
         _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(reserves));
         _contextMock.Setup(c => c.Passengers).Returns(GetMockDbSetWithIdentity(passengers));
         _contextMock.Setup(c => c.ReservePayments).Returns(GetMockDbSetWithIdentity(payments));
@@ -1049,6 +902,15 @@ public class ReserveBusinessTests : TestBase
         _unitOfWorkMock
             .Setup(u => u.ExecuteInTransactionAsync(It.IsAny<Func<Task<Result<CreateReserveExternalResult>>>>(), It.IsAny<IsolationLevel>()))
             .Returns<Func<Task<Result<CreateReserveExternalResult>>>, IsolationLevel>((func, _) => func());
+
+        _slotLockBusinessMock
+            .Setup(x => x.ValidateAsync(lockToken, 1, null, 1))
+            .ReturnsAsync(Result.Success(activeLock));
+
+        _slotLockBusinessMock
+            .Setup(x => x.MarkAsUsedAsync(activeLock))
+            .Callback<ReserveSlotLock>(l => { l.Status = ReserveSlotLockStatus.Used; l.UpdatedDate = DateTime.UtcNow; })
+            .ReturnsAsync(Result.Success(true));
 
         _paymentGatewayMock
             .Setup(x => x.CreatePreferenceAsync(It.IsAny<string>(), It.IsAny<decimal>(), It.IsAny<List<PaymentPreferenceItemDto>>()))
@@ -1084,8 +946,9 @@ public class ReserveBusinessTests : TestBase
         result.Value.Status.Should().Be("pending");
         result.Value.PreferenceId.Should().Be("preference-id");
 
-        // Verificar que el lock fue marcado como usado
+        // Verificar que el lock fue marcado como usado (via Manager)
         activeLock.Status.Should().Be(ReserveSlotLockStatus.Used);
+        _slotLockBusinessMock.Verify(x => x.MarkAsUsedAsync(activeLock), Times.Once);
 
         // Verificar que se creó el pasajero
         passengers.Should().HaveCount(1);
@@ -1098,24 +961,14 @@ public class ReserveBusinessTests : TestBase
     {
         // Arrange
         var lockToken = Guid.NewGuid().ToString();
-        var expiredLock = new ReserveSlotLock
-        {
-            ReserveSlotLockId = 1,
-            LockToken = lockToken,
-            OutboundReserveId = 1,
-            SlotsLocked = 1,
-            Status = ReserveSlotLockStatus.Active,
-            ExpiresAt = DateTime.UtcNow.AddMinutes(-5), // Expirado hace 5 minutos
-            UserEmail = "test@example.com"
-        };
-
-        var locks = new List<ReserveSlotLock> { expiredLock };
-
-        _contextMock.Setup(c => c.ReserveSlotLocks).Returns(GetQueryableMockDbSet(locks));
 
         _unitOfWorkMock
             .Setup(u => u.ExecuteInTransactionAsync(It.IsAny<Func<Task<Result<CreateReserveExternalResult>>>>(), It.IsAny<IsolationLevel>()))
             .Returns<Func<Task<Result<CreateReserveExternalResult>>>, IsolationLevel>((func, _) => func());
+
+        _slotLockBusinessMock
+            .Setup(x => x.ValidateAsync(lockToken, 1, null, 1))
+            .ReturnsAsync(Result.Failure<ReserveSlotLock>(ReserveSlotLockError.InvalidOrExpiredLock));
 
         var passengerItem = new PassengerBookingExternalDto(
             CustomerId: null,
@@ -1145,184 +998,7 @@ public class ReserveBusinessTests : TestBase
         // Assert
         result.IsSuccess.Should().BeFalse();
         result.Error.Should().Be(ReserveSlotLockError.InvalidOrExpiredLock);
-    }
-
-    [Fact]
-    public async Task CancelReserveSlotLock_ShouldSucceed_WithValidLock()
-    {
-        // Arrange
-        var lockToken = Guid.NewGuid().ToString();
-        var activeLock = new ReserveSlotLock
-        {
-            ReserveSlotLockId = 1,
-            LockToken = lockToken,
-            Status = ReserveSlotLockStatus.Active,
-            ExpiresAt = DateTime.UtcNow.AddMinutes(5)
-        };
-
-        var locks = new List<ReserveSlotLock> { activeLock };
-
-        _contextMock.Setup(c => c.ReserveSlotLocks).Returns(GetQueryableMockDbSet(locks));
-        SetupSaveChangesWithOutboxAsync(_contextMock);
-
-        _unitOfWorkMock
-            .Setup(u => u.ExecuteInTransactionAsync(It.IsAny<Func<Task<Result<bool>>>>(), It.IsAny<IsolationLevel>()))
-            .Returns<Func<Task<Result<bool>>>, IsolationLevel>((func, _) => func());
-
-        // Act
-        var result = await _reserveBusiness.CancelReserveSlotLock(lockToken);
-
-        // Assert
-        result.IsSuccess.Should().BeTrue();
-        activeLock.Status.Should().Be(ReserveSlotLockStatus.Cancelled);
-        activeLock.UpdatedDate.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(1));
-    }
-
-    [Fact]
-    public async Task CleanupExpiredReserveSlotLocks_ShouldUpdateExpiredLocks()
-    {
-        // Arrange
-        var activeLock = new ReserveSlotLock
-        {
-            ReserveSlotLockId = 1,
-            Status = ReserveSlotLockStatus.Active,
-            ExpiresAt = DateTime.UtcNow.AddMinutes(5) // No expirado
-        };
-
-        var expiredLock1 = new ReserveSlotLock
-        {
-            ReserveSlotLockId = 2,
-            Status = ReserveSlotLockStatus.Active,
-            ExpiresAt = DateTime.UtcNow.AddMinutes(-5) // Expirado
-        };
-
-        var expiredLock2 = new ReserveSlotLock
-        {
-            ReserveSlotLockId = 3,
-            Status = ReserveSlotLockStatus.Active,
-            ExpiresAt = DateTime.UtcNow.AddMinutes(-10) // Expirado
-        };
-
-        var locks = new List<ReserveSlotLock> { activeLock, expiredLock1, expiredLock2 };
-
-        _contextMock.Setup(c => c.ReserveSlotLocks).Returns(GetQueryableMockDbSet(locks));
-        SetupSaveChangesWithOutboxAsync(_contextMock);
-
-        // Act
-        var result = await _reserveBusiness.CleanupExpiredReserveSlotLocks();
-
-        // Assert
-        result.IsSuccess.Should().BeTrue();
-
-        // El lock activo debe seguir activo
-        activeLock.Status.Should().Be(ReserveSlotLockStatus.Active);
-
-        // Los locks expirados deben cambiar de estado
-        expiredLock1.Status.Should().Be(ReserveSlotLockStatus.Expired);
-        expiredLock2.Status.Should().Be(ReserveSlotLockStatus.Expired);
-
-        // Verificar fechas de actualización
-        expiredLock1.UpdatedDate.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(1));
-        expiredLock2.UpdatedDate.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(1));
-    }
-
-    #endregion
-
-    #region Parallelism Tests
-
-    [Fact]
-    public async Task LockReserveSlots_MultipleRequests_ShouldRespectAvailableSlots()
-    {
-        // Este test está diseñado para verificar la lógica de lockeo sin problemas de concurrencia de EF mock
-        // El test real de concurrencia se maneja en los tests de integración
-
-        // Arrange - Reserve con solo 3 cupos disponibles
-        var vehicle = new Vehicle { AvailableQuantity = 10 };
-        var reserve = new Reserve
-        {
-            ReserveId = 1,
-            Status = ReserveStatusEnum.Confirmed,
-            Passengers = new List<Passenger>
-            {
-                // Ya hay 7 pasajeros confirmados, quedan 3 cupos libres
-                new Passenger { Status = PassengerStatusEnum.Confirmed },
-                new Passenger { Status = PassengerStatusEnum.Confirmed },
-                new Passenger { Status = PassengerStatusEnum.Confirmed },
-                new Passenger { Status = PassengerStatusEnum.Confirmed },
-                new Passenger { Status = PassengerStatusEnum.Confirmed },
-                new Passenger { Status = PassengerStatusEnum.Confirmed },
-                new Passenger { Status = PassengerStatusEnum.Confirmed }
-            },
-            Vehicle = vehicle,
-            Service = new Service { Vehicle = vehicle } // Total 10 cupos
-        };
-        var reserves = new List<Reserve> { reserve };
-
-        var locks = new List<ReserveSlotLock>();
-
-        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(reserves));
-        _contextMock.Setup(c => c.ReserveSlotLocks).Returns(GetMockDbSetWithIdentity(locks));
-        _contextMock.Setup(c => c.Users).Returns(GetQueryableMockDbSet(new List<User>()));
-
-        SetupSaveChangesWithOutboxAsync(_contextMock);
-
-        _unitOfWorkMock
-            .Setup(u => u.ExecuteInTransactionAsync(It.IsAny<Func<Task<Result<LockReserveSlotsResponseDto>>>>(), It.IsAny<IsolationLevel>()))
-            .Returns<Func<Task<Result<LockReserveSlotsResponseDto>>>, IsolationLevel>((func, _) => func());
-
-        // Act - Ejecutar solicitudes secuencialmente
-        var request1 = new LockReserveSlotsRequestDto(1, null, 2); // Primera solicitud: 2 cupos
-        var result1 = await _reserveBusiness.LockReserveSlots(request1);
-
-        var request2 = new LockReserveSlotsRequestDto(1, null, 2); // Segunda solicitud: 2 cupos (debería fallar)
-        var result2 = await _reserveBusiness.LockReserveSlots(request2);
-
-        // Assert
-        result1.IsSuccess.Should().BeTrue("La primera solicitud debería tener éxito con cupos disponibles");
-        result2.IsFailure.Should().BeTrue("La segunda solicitud debería fallar por falta de cupos");
-
-        // Verificar que se creó exactamente un lock
-        locks.Should().HaveCount(1, "Solo se debe crear un lock exitoso");
-        locks[0].SlotsLocked.Should().Be(2, "El lock debe bloquear 2 cupos");
-        locks[0].Status.Should().Be(ReserveSlotLockStatus.Active, "El lock debe estar activo");
-
-        // Verificar el token único
-        result1.Value.LockToken.Should().NotBeNullOrEmpty("Debe generarse un token de lock");
-        result1.Value.ExpiresAt.Should().BeAfter(DateTime.UtcNow, "La fecha de expiración debe ser futura");
-    }
-
-    private Mock<IUserContext> CreateUserContextMock(string email, int userId)
-    {
-        var mock = new Mock<IUserContext>();
-        mock.Setup(x => x.Email).Returns(email);
-        mock.Setup(x => x.UserId).Returns(userId);
-        return mock;
-    }
-
-
-    private PassengerReserveCreateRequestWrapperExternalDto CreateExternalReserveRequest(
-        string firstName, string lastName, string email, string documentNumber)
-    {
-        var passengerItem = new PassengerBookingExternalDto(
-            CustomerId: null,
-            IsPayment: false,
-            HasTraveled: false,
-            FirstName: firstName,
-            LastName: lastName,
-            Email: email,
-            Phone1: "123456789",
-            DocumentNumber: documentNumber,
-            Outbound: new LegInfoDto(PickupLocationId: 1, DropoffLocationId: 1, Price: 100),
-            Return: null
-        );
-
-        return new PassengerReserveCreateRequestWrapperExternalDto(
-            ReserveTypeId: (int)ReserveTypeIdEnum.Ida,
-            OutboundReserveId: 1,
-            ReturnReserveId: null,
-            Payment: null, // Sin pago directo
-            Passengers: new List<PassengerBookingExternalDto> { passengerItem }
-        );
+        _slotLockBusinessMock.Verify(x => x.MarkAsUsedAsync(It.IsAny<ReserveSlotLock>()), Times.Never);
     }
 
     #endregion

@@ -24,11 +24,16 @@ namespace transport_api.Functions;
 public class ReservesFunction : FunctionBase
 {
     private readonly IReserveBusiness _reserveBusiness;
+    private readonly IReserveSlotLockBusiness _slotLockBusiness;
 
-    public ReservesFunction(IReserveBusiness reserveBusiness, IServiceProvider serviceProvider)
+    public ReservesFunction(
+        IReserveBusiness reserveBusiness,
+        IReserveSlotLockBusiness slotLockBusiness,
+        IServiceProvider serviceProvider)
        : base(serviceProvider)
     {
         _reserveBusiness = reserveBusiness;
+        _slotLockBusiness = slotLockBusiness;
     }
 
     [Function("CreateReserve")]
@@ -214,7 +219,7 @@ public class ReservesFunction : FunctionBase
         var dto = await req.ReadFromJsonAsync<LockReserveSlotsRequestDto>();
 
         var result = await ValidateAndMatchAsync(req, dto, GetValidator<LockReserveSlotsRequestDto>())
-                        .BindAsync(_reserveBusiness.LockReserveSlots);
+                        .BindAsync(_slotLockBusiness.AcquireAsync);
 
         return await MatchResultAsync(req, result);
     }
@@ -254,7 +259,7 @@ public class ReservesFunction : FunctionBase
         [HttpTrigger(AuthorizationLevel.Anonymous, "delete", Route = "reserve-slots-lock/{lockToken}")] HttpRequestData req,
         string lockToken)
     {
-        var result = await _reserveBusiness.CancelReserveSlotLock(lockToken);
+        var result = await _slotLockBusiness.CancelAsync(lockToken);
 
         return await MatchResultAsync(req, result);
     }
