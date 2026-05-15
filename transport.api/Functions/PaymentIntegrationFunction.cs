@@ -19,14 +19,14 @@ using Transport.SharedKernel.Contracts.Reserve;
 public class PaymentIntegrationFunction
 {
     private readonly ILogger _logger;
-    private readonly IReserveBusiness _reserveBusiness;
+    private readonly IReservePaymentBusiness _paymentBusiness;
     private readonly IMpIntegrationOption _mpIntegrationOption;
     private readonly IApplicationDbContext _dbContext;
     private readonly ITenantContext _tenantContext;
     private readonly IMercadoPagoPaymentGateway _paymentGateway;
 
     public PaymentIntegrationFunction(ILogger<PaymentIntegrationFunction> logger,
-        IReserveBusiness reserveBusiness,
+        IReservePaymentBusiness paymentBusiness,
         IMpIntegrationOption mpIntegrationOption,
         IApplicationDbContext dbContext,
         ITenantContext tenantContext,
@@ -34,7 +34,7 @@ public class PaymentIntegrationFunction
     {
         _logger = logger;
         _mpIntegrationOption = mpIntegrationOption;
-        _reserveBusiness = reserveBusiness;
+        _paymentBusiness = paymentBusiness;
         _dbContext = dbContext;
         _tenantContext = tenantContext;
         _paymentGateway = paymentGateway;
@@ -121,7 +121,7 @@ public class PaymentIntegrationFunction
             StatusDetail: mpPayment.StatusDetail,
             RawJson: JsonConvert.SerializeObject(mpPayment)
         );
-        var result = await _reserveBusiness.ProcessPaymentFromWebhook(externalPayment);
+        var result = await _paymentBusiness.ProcessPaymentFromWebhook(externalPayment);
 
         if (result.IsSuccess)
         {

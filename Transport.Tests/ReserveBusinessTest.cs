@@ -2,6 +2,7 @@
 using Moq;
 using Transport.Business.Data;
 using Transport.Business.ReserveBusiness;
+using Transport.Business.ReservePaymentBusiness;
 using Transport.Domain.Reserves;
 using Transport.Domain.Vehicles;
 using Transport.Domain.Drivers;
@@ -45,6 +46,7 @@ public class ReserveBusinessTests : TestBase
     private readonly Mock<ICashBoxBusiness> _cashBoxBusinessMock;
     private readonly Mock<IReserveSlotLockBusiness> _slotLockBusinessMock;
     private readonly ReserveBusiness _reserveBusiness;
+    private readonly ReservePaymentBusiness _paymentBusiness;
 
     public ReserveBusinessTests()
     {
@@ -70,6 +72,12 @@ public class ReserveBusinessTests : TestBase
             new FakeReserveOption(),
             _cashBoxBusinessMock.Object,
             _slotLockBusinessMock.Object);
+
+        _paymentBusiness = new ReservePaymentBusiness(
+            _contextMock.Object,
+            _unitOfWorkMock.Object,
+            _paymentGatewayMock.Object,
+            _cashBoxBusinessMock.Object);
     }
 
     [Fact]
@@ -435,6 +443,12 @@ public class ReserveBusinessTests : TestBase
             _cashBoxBusinessMock.Object,
             _slotLockBusinessMock.Object);
 
+        var paymentBusiness = new ReservePaymentBusiness(
+            _contextMock.Object,
+            _unitOfWorkMock.Object,
+            paymentGatewayMock.Object,
+            _cashBoxBusinessMock.Object);
+
         // 1 pasajero IdaVuelta: un PassengerBookingExternalDto con Outbound + Return.
         var passengerList = new List<PassengerBookingExternalDto>
         {
@@ -563,7 +577,7 @@ public class ReserveBusinessTests : TestBase
         });
 
         // Simular notificación de pago para wallet
-        var updateResult = await reserveBusiness.UpdateReservePaymentsByExternalId("987654321");
+        var updateResult = await paymentBusiness.UpdateReservePaymentsByExternalId("987654321");
         Assert.True(updateResult.IsSuccess);
 
         // Verificar actualización después de notificación
@@ -581,7 +595,7 @@ public class ReserveBusinessTests : TestBase
         _unitOfWorkMock.Setup(uow => uow.ExecuteInTransactionAsync(It.IsAny<Func<Task<Result<bool>>>>(), It.IsAny<IsolationLevel>()))
                        .Returns<Func<Task<Result<bool>>>, IsolationLevel>(async (func, _) => await func());
 
-        var result = await _reserveBusiness.CreatePaymentsAsync(1, 1, new List<CreatePaymentRequestDto>
+        var result = await _paymentBusiness.CreatePaymentsAsync(1, 1, new List<CreatePaymentRequestDto>
        {
            new CreatePaymentRequestDto(1000, 1)
        });
@@ -607,7 +621,7 @@ public class ReserveBusinessTests : TestBase
               It.IsAny<IsolationLevel>()))
           .Returns<Func<Task<Result<bool>>>, IsolationLevel>((func, _) => func());
 
-        var result = await _reserveBusiness.CreatePaymentsAsync(1, 1, new List<CreatePaymentRequestDto>());
+        var result = await _paymentBusiness.CreatePaymentsAsync(1, 1, new List<CreatePaymentRequestDto>());
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Code.Should().Be("Payments.Empty");
@@ -629,7 +643,7 @@ public class ReserveBusinessTests : TestBase
              It.IsAny<IsolationLevel>()))
          .Returns<Func<Task<Result<bool>>>, IsolationLevel>((func, _) => func());
 
-        var result = await _reserveBusiness.CreatePaymentsAsync(1, 1, new List<CreatePaymentRequestDto>
+        var result = await _paymentBusiness.CreatePaymentsAsync(1, 1, new List<CreatePaymentRequestDto>
     {
         new CreatePaymentRequestDto(0, 1),
         new CreatePaymentRequestDto(-100, 2)
@@ -656,7 +670,7 @@ public class ReserveBusinessTests : TestBase
             It.IsAny<IsolationLevel>()))
         .Returns<Func<Task<Result<bool>>>, IsolationLevel>((func, _) => func());
 
-        var result = await _reserveBusiness.CreatePaymentsAsync(1, 1, new List<CreatePaymentRequestDto>
+        var result = await _paymentBusiness.CreatePaymentsAsync(1, 1, new List<CreatePaymentRequestDto>
     {
         new CreatePaymentRequestDto(1000, 1),
         new CreatePaymentRequestDto(2000, 1)
@@ -703,7 +717,7 @@ public class ReserveBusinessTests : TestBase
            .Returns<Func<Task<Result<bool>>>, IsolationLevel>((func, _) => func());
 
         // Act
-        var result = await _reserveBusiness.CreatePaymentsAsync(1, 1, new List<CreatePaymentRequestDto>
+        var result = await _paymentBusiness.CreatePaymentsAsync(1, 1, new List<CreatePaymentRequestDto>
         {
             new CreatePaymentRequestDto(50, 1),
             new CreatePaymentRequestDto(50, 2)
@@ -777,7 +791,7 @@ public class ReserveBusinessTests : TestBase
             .Returns<Func<Task<Result<bool>>>, IsolationLevel>((func, _) => func());
 
         // Act - 6000 > 5000 => overpayment
-        var result = await _reserveBusiness.CreatePaymentsAsync(1, reserveId, payments);
+        var result = await _paymentBusiness.CreatePaymentsAsync(1, reserveId, payments);
 
         // Assert
         result.IsSuccess.Should().BeFalse();
@@ -815,7 +829,7 @@ public class ReserveBusinessTests : TestBase
             .Returns<Func<Task<Result<bool>>>, IsolationLevel>((func, _) => func());
 
         // Act
-        var result = await _reserveBusiness.CreatePaymentsAsync(customerId, reserveId, new List<CreatePaymentRequestDto>
+        var result = await _paymentBusiness.CreatePaymentsAsync(customerId, reserveId, new List<CreatePaymentRequestDto>
         {
             new CreatePaymentRequestDto(50, 1)
         });
@@ -1667,7 +1681,7 @@ public class ReserveBusinessTests : TestBase
             .Returns<Func<Task<Result<bool>>>, IsolationLevel>((func, _) => func());
 
         // Act - Partial payment: 60 of 100
-        var result = await _reserveBusiness.CreatePaymentsAsync(1, 1, new List<CreatePaymentRequestDto> { new(60, 1) });
+        var result = await _paymentBusiness.CreatePaymentsAsync(1, 1, new List<CreatePaymentRequestDto> { new(60, 1) });
 
         // Assert
         result.IsSuccess.Should().BeTrue();
@@ -1706,7 +1720,7 @@ public class ReserveBusinessTests : TestBase
             .Returns<Func<Task<Result<bool>>>, IsolationLevel>((func, _) => func());
 
         // Act - Pay remaining 40
-        var result = await _reserveBusiness.CreatePaymentsAsync(1, 1, new List<CreatePaymentRequestDto> { new(40, 1) });
+        var result = await _paymentBusiness.CreatePaymentsAsync(1, 1, new List<CreatePaymentRequestDto> { new(40, 1) });
 
         // Assert
         result.IsSuccess.Should().BeTrue();
@@ -1742,7 +1756,7 @@ public class ReserveBusinessTests : TestBase
         var request = new SettleCustomerDebtRequestDto(1, new List<int> { 1, 2 }, new List<CreatePaymentRequestDto> { new(200, 1) });
 
         // Act
-        var result = await _reserveBusiness.SettleCustomerDebtAsync(request);
+        var result = await _paymentBusiness.SettleCustomerDebtAsync(request);
 
         // Assert
         result.IsSuccess.Should().BeTrue();
@@ -1779,7 +1793,7 @@ public class ReserveBusinessTests : TestBase
         var request = new SettleCustomerDebtRequestDto(1, new List<int> { 1, 2 }, new List<CreatePaymentRequestDto> { new(150, 1) });
 
         // Act
-        var result = await _reserveBusiness.SettleCustomerDebtAsync(request);
+        var result = await _paymentBusiness.SettleCustomerDebtAsync(request);
 
         // Assert
         result.IsSuccess.Should().BeTrue();
@@ -1808,7 +1822,7 @@ public class ReserveBusinessTests : TestBase
         var request = new SettleCustomerDebtRequestDto(1, new List<int> { 1 }, new List<CreatePaymentRequestDto> { new(150, 1) });
 
         // Act
-        var result = await _reserveBusiness.SettleCustomerDebtAsync(request);
+        var result = await _paymentBusiness.SettleCustomerDebtAsync(request);
 
         // Assert
         result.IsSuccess.Should().BeFalse();
@@ -1838,7 +1852,7 @@ public class ReserveBusinessTests : TestBase
         var request = new SettleCustomerDebtRequestDto(1, new List<int> { 1 }, new List<CreatePaymentRequestDto> { new(50, 1) });
 
         // Act
-        var result = await _reserveBusiness.SettleCustomerDebtAsync(request);
+        var result = await _paymentBusiness.SettleCustomerDebtAsync(request);
 
         // Assert
         result.IsSuccess.Should().BeFalse();

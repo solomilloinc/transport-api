@@ -26,17 +26,20 @@ public class ReservesFunction : FunctionBase
     private readonly IReserveBusiness _reserveBusiness;
     private readonly IReserveSlotLockBusiness _slotLockBusiness;
     private readonly IReserveReportBusiness _reportBusiness;
+    private readonly IReservePaymentBusiness _paymentBusiness;
 
     public ReservesFunction(
         IReserveBusiness reserveBusiness,
         IReserveSlotLockBusiness slotLockBusiness,
         IReserveReportBusiness reportBusiness,
+        IReservePaymentBusiness paymentBusiness,
         IServiceProvider serviceProvider)
        : base(serviceProvider)
     {
         _reserveBusiness = reserveBusiness;
         _slotLockBusiness = slotLockBusiness;
         _reportBusiness = reportBusiness;
+        _paymentBusiness = paymentBusiness;
     }
 
     [Function("CreateReserve")]
@@ -178,7 +181,7 @@ public class ReservesFunction : FunctionBase
         if (payments == null || !payments.Any())
             return req.CreateResponse(HttpStatusCode.BadRequest);
 
-        var result = await _reserveBusiness.CreatePaymentsAsync(customerId, reserveId, payments);
+        var result = await _paymentBusiness.CreatePaymentsAsync(customerId, reserveId, payments);
         return await MatchResultAsync(req, result);
     }
 
@@ -302,7 +305,7 @@ public class ReservesFunction : FunctionBase
         var dto = await req.ReadFromJsonAsync<SettleCustomerDebtRequestDto>();
 
         var result = await ValidateAndMatchAsync(req, dto, GetValidator<SettleCustomerDebtRequestDto>())
-                        .BindAsync(_reserveBusiness.SettleCustomerDebtAsync);
+                        .BindAsync(_paymentBusiness.SettleCustomerDebtAsync);
 
         return await MatchResultAsync(req, result);
     }
