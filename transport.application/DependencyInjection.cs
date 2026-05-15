@@ -30,6 +30,7 @@ public static class DependencyInjection
         services.AddScoped<ICustomerBusiness, CustomerBusiness.CustomerBusiness>();
         services.AddScoped<IReserveBusiness, ReserveBusiness.ReserveBusiness>();
         services.AddScoped<IReserveSlotLockBusiness, ReserveSlotLockBusiness.ReserveSlotLockBusiness>();
+        services.AddScoped<IReserveReportBusiness, ReserveReportBusiness.ReserveReportBusiness>();
         services.AddScoped<IDirectionBusiness, DirectionBusiness.DirectionBusiness>();
         services.AddScoped<ICashBoxBusiness, CashBoxBusiness.CashBoxBusiness>();
         services.AddScoped<ITripBusiness, TripBusiness.TripBusiness>();

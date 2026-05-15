@@ -9,11 +9,6 @@ public interface IReserveBusiness
     Task<Result<int>> CreateReserve(ReserveCreateDto dto);
     Task<Result<bool>> CreatePassengerReserves(PassengerReserveCreateRequestWrapperDto dto);
 
-    Task<Result<PagedReportResponseDto<ReserveReportResponseDto>>>
-    GetReserveReport(DateTime reserveDate, PagedReportRequestDto<ReserveReportFilterRequestDto> requestDto);
-
-    Task<Result<PagedReportResponseDto<PassengerReserveReportResponseDto>>> GetReservePassengerReport(int reserveId, PagedReportRequestDto<PassengerReserveReportFilterRequestDto> requestDto);
-
     Task<Result<bool>> UpdateReserveAsync(int reserveId, ReserveUpdateRequestDto request);
     Task<Result<bool>> CreatePaymentsAsync(
     int customerId,
@@ -23,12 +18,6 @@ public interface IReserveBusiness
     Task<Result<bool>> UpdatePassengerReserveAsync(int customerReserveId, PassengerReserveUpdateRequestDto request);
     Task<Result<bool>> UpdateReservePaymentsByExternalId(string externalId);
     Task<Result<bool>> ProcessPaymentFromWebhook(ExternalPaymentResultDto externalPayment);
-    Task<Result<ReserveGroupedPagedReportResponseDto>> GetReserveReport(PagedReportRequestDto<ReserveReportFilterRequestDto> requestDto);
-
-    // Resumen de pagos por reserva
-    Task<Result<PagedReportResponseDto<ReservePaymentSummaryResponseDto>>> GetReservePaymentSummary(
-        int reserveId,
-        PagedReportRequestDto<ReservePaymentSummaryFilterRequestDto> requestDto);
 
     Task<Result<bool>> SettleCustomerDebtAsync(SettleCustomerDebtRequestDto request);
     Task<Result<List<CustomerPendingReserveDto>>> GetCustomerPendingReservesAsync(int customerId);
