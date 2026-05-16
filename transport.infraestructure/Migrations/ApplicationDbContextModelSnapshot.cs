@@ -1214,6 +1214,11 @@ namespace transport.infraestructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
+                    b.Property<bool>("RoundTripRequiresSameDay")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
                     b.Property<string>("StyleConfigJson")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -1589,21 +1594,21 @@ namespace transport.infraestructure.Migrations
                         {
                             RoleId = 1,
                             CreatedBy = "System",
-                            CreatedDate = new DateTime(2026, 3, 15, 18, 39, 8, 252, DateTimeKind.Utc).AddTicks(8811),
+                            CreatedDate = new DateTime(2026, 5, 14, 0, 50, 51, 247, DateTimeKind.Utc).AddTicks(6865),
                             Name = "Administrador"
                         },
                         new
                         {
                             RoleId = 2,
                             CreatedBy = "System",
-                            CreatedDate = new DateTime(2026, 3, 15, 18, 39, 8, 252, DateTimeKind.Utc).AddTicks(8813),
+                            CreatedDate = new DateTime(2026, 5, 14, 0, 50, 51, 247, DateTimeKind.Utc).AddTicks(6867),
                             Name = "Cliente"
                         },
                         new
                         {
                             RoleId = 3,
                             CreatedBy = "System",
-                            CreatedDate = new DateTime(2026, 3, 15, 18, 39, 8, 252, DateTimeKind.Utc).AddTicks(8815),
+                            CreatedDate = new DateTime(2026, 5, 14, 0, 50, 51, 247, DateTimeKind.Utc).AddTicks(6868),
                             Name = "SuperAdmin"
                         });
                 });

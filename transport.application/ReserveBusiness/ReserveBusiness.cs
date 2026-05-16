@@ -4,7 +4,6 @@ using MercadoPago.Resource.Payment;
 using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
 using System.Linq;
-using System.Linq.Expressions;
 using Transport.Business.Authentication;
 using Transport.Business.Data;
 using Transport.Business.Services.Payment;
@@ -39,25 +38,31 @@ public class ReserveBusiness : IReserveBusiness
     private readonly IUnitOfWork _unitOfWork;
     private readonly IMercadoPagoPaymentGateway _paymentGateway;
     private readonly IUserContext _userContext;
+    private readonly ITenantContext _tenantContext;
     private readonly ICustomerBusiness _customerBusiness;
     private readonly IReserveOption _reserveOptions;
     private readonly ICashBoxBusiness _cashBoxBusiness;
+    private readonly IReserveSlotLockBusiness _slotLockBusiness;
 
     public ReserveBusiness(IApplicationDbContext context,
         IUnitOfWork unitOfWork,
         IUserContext userContext,
+        ITenantContext tenantContext,
         IMercadoPagoPaymentGateway paymentGateway,
         ICustomerBusiness customerBusiness,
         IReserveOption reserveOptions,
-        ICashBoxBusiness cashBoxBusiness)
+        ICashBoxBusiness cashBoxBusiness,
+        IReserveSlotLockBusiness slotLockBusiness)
     {
         _context = context;
         _unitOfWork = unitOfWork;
         _userContext = userContext;
+        _tenantContext = tenantContext;
         _paymentGateway = paymentGateway;
         _customerBusiness = customerBusiness;
         _reserveOptions = reserveOptions;
         _cashBoxBusiness = cashBoxBusiness;
+        _slotLockBusiness = slotLockBusiness;
     }
 
     public async Task<Result<int>> CreateReserve(ReserveCreateDto dto)
@@ -125,125 +130,143 @@ public class ReserveBusiness : IReserveBusiness
         return Result.Success(reserve.ReserveId);
     }
 
-    public async Task<Result<bool>> CreatePassengerReserves(PassengerReserveCreateRequestWrapperDto passengerReserves)
+    //TODO: Se puede mejorar sin mandar lista de items por reserva.
+    //Ida: $x
+    //IdaVuelta: $x (sale más barato)
+    //Ida: $x
+
+    public async Task<Result<bool>> CreatePassengerReserves(PassengerReserveCreateRequestWrapperDto request)
     {
-        // 1) Payer (Customer) desde los items
-        var customerId = passengerReserves.Items.FirstOrDefault()?.CustomerId;
-        if (customerId is null || customerId == 0)
+        // 1) Payer (Customer) desde el primer pasajero
+        var payerCustomerId = request.Passengers.FirstOrDefault()?.CustomerId;
+        if (payerCustomerId is null || payerCustomerId == 0)
             return Result.Failure<bool>(Error.Validation(
                 "PassengerReserveCreateRequestWrapperDto.CustomerIdRequired",
-                "CustomerId is required in at least one passenger item."));
+                "CustomerId is required in at least one passenger."));
 
-        var payer = await _context.Customers.Where(x => x.CustomerId == customerId).FirstOrDefaultAsync();
+        var payer = await _context.Customers.Where(x => x.CustomerId == payerCustomerId).FirstOrDefaultAsync();
         if (payer is null)
             return Result.Failure<bool>(CustomerError.NotFound);
 
         return await _unitOfWork.ExecuteInTransactionAsync(async () =>
         {
-            var mainReserveId = passengerReserves.Items.Min(i => i.ReserveId);
-            var servicesCache = new Dictionary<int, Service>();
-            var reserveMap = new Dictionary<int, Reserve>();
+            var requestedType = (ReserveTypeIdEnum)request.ReserveTypeId;
+            var effectiveType = await ResolveEffectiveReserveTypeAsync(
+                requestedType, request.OutboundReserveId, request.ReturnReserveId);
 
-            // Inferir ReserveRelatedId automáticamente si hay exactamente 2 reservas distintas (ida/vuelta)
-            var reserveRelatedMap = new Dictionary<int, int?>();
-            var distinctReserveIds = passengerReserves.Items.Select(i => i.ReserveId).Distinct().ToList();
-            if (distinctReserveIds.Count == 2)
+            var outboundReserve = await _context.Reserves
+                .Include(r => r.Passengers)
+                .Include(r => r.Driver)
+                .Include(r => r.Trip)
+                .SingleOrDefaultAsync(r => r.ReserveId == request.OutboundReserveId);
+
+            if (outboundReserve is null) return Result.Failure<bool>(ReserveError.NotFound);
+            if (outboundReserve.Status != ReserveStatusEnum.Confirmed) return Result.Failure<bool>(ReserveError.NotAvailable);
+
+            Reserve? returnReserve = null;
+            if (request.ReturnReserveId.HasValue)
             {
-                // El primero apunta al segundo y viceversa
-                reserveRelatedMap[distinctReserveIds[0]] = distinctReserveIds[1];
-                reserveRelatedMap[distinctReserveIds[1]] = distinctReserveIds[0];
-            }
-
-            decimal totalExpectedAmount = passengerReserves.Items.First().Price;
-
-            // 2) Alta de pasajeros + validaciones
-            foreach (var dto in passengerReserves.Items)
-            {
-                var reserve = await _context.Reserves
+                returnReserve = await _context.Reserves
                     .Include(r => r.Passengers)
                     .Include(r => r.Driver)
                     .Include(r => r.Trip)
-                    .SingleOrDefaultAsync(r => r.ReserveId == dto.ReserveId);
+                    .SingleOrDefaultAsync(r => r.ReserveId == request.ReturnReserveId.Value);
 
-                if (reserve is null)
-                    return Result.Failure<bool>(ReserveError.NotFound);
+                if (returnReserve is null) return Result.Failure<bool>(ReserveError.NotFound);
+                if (returnReserve.Status != ReserveStatusEnum.Confirmed) return Result.Failure<bool>(ReserveError.NotAvailable);
+            }
 
-                if (reserve.Status != ReserveStatusEnum.Confirmed)
-                    return Result.Failure<bool>(ReserveError.NotAvailable);
+            var reserveMap = new Dictionary<int, Reserve> { [outboundReserve.ReserveId] = outboundReserve };
+            if (returnReserve is not null) reserveMap[returnReserve.ReserveId] = returnReserve;
 
-                reserveMap[reserve.ReserveId] = reserve;
-
-                // Only lookup service if the reserve has one
-                if (reserve.ServiceId.HasValue)
+            var servicesCache = new Dictionary<int, Service>();
+            foreach (var reserve in reserveMap.Values)
+            {
+                if (reserve.ServiceId.HasValue && !servicesCache.ContainsKey(reserve.ServiceId.Value))
                 {
-                    if (!servicesCache.TryGetValue(reserve.ServiceId.Value, out var service))
+                    var service = await _context.Services
+                        .Include(s => s.Trip.OriginCity)
+                        .Include(s => s.Trip.DestinationCity)
+                        .SingleOrDefaultAsync(s => s.ServiceId == reserve.ServiceId.Value);
+                    if (service is null) return Result.Failure<bool>(ServiceError.ServiceNotFound);
+                    servicesCache[reserve.ServiceId.Value] = service;
+                }
+            }
+
+            var passengerCount = request.Passengers.Count;
+            var mainReserveId = outboundReserve.ReserveId;
+
+            foreach (var reserve in reserveMap.Values)
+            {
+                var vehicle = await _context.Vehicles.Where(x => x.VehicleId == reserve.VehicleId).FirstOrDefaultAsync();
+                var existingCount = reserve.Passengers.Count;
+                if (vehicle == null || existingCount + passengerCount > vehicle.AvailableQuantity)
+                    return Result.Failure<bool>(ReserveError.VehicleQuantityNotAvailable(
+                        existingCount, passengerCount, vehicle?.AvailableQuantity ?? 0));
+            }
+
+            decimal totalExpectedAmount = 0m;
+
+            foreach (var pax in request.Passengers)
+            {
+                // Price validation depends on the EFFECTIVE reserve type:
+                // - IdaVuelta (same-day round-trip with discount): the TripPrice IdaVuelta is the
+                //   TOTAL package price; lookup ONCE on the outbound trip and validate that the sum
+                //   Outbound.Price + Return.Price matches. Frontend can split arbitrarily (50/50, etc.).
+                // - Ida (single leg or downgraded round-trip): each leg validates independently
+                //   against the Ida tariff of its own Trip.
+                if (effectiveType == ReserveTypeIdEnum.IdaVuelta && returnReserve is not null && pax.Return is not null)
+                {
+                    var packagePrice = await GetPassengerPriceAsync(
+                        outboundReserve.Trip.OriginCityId, outboundReserve.Trip.DestinationCityId,
+                        ReserveTypeIdEnum.IdaVuelta, pax.Outbound.DropoffLocationId);
+
+                    if (packagePrice is null || pax.Outbound.Price + pax.Return.Price != packagePrice.Value)
+                        return Result.Failure<bool>(ReserveError.PriceNotAvailable);
+
+                    totalExpectedAmount += packagePrice.Value;
+                }
+                else
+                {
+                    var outboundExpected = await GetPassengerPriceAsync(
+                        outboundReserve.Trip.OriginCityId, outboundReserve.Trip.DestinationCityId,
+                        effectiveType, pax.Outbound.DropoffLocationId);
+
+                    if (outboundExpected is null || pax.Outbound.Price != outboundExpected.Value)
+                        return Result.Failure<bool>(ReserveError.PriceNotAvailable);
+
+                    totalExpectedAmount += pax.Outbound.Price;
+
+                    if (returnReserve is not null && pax.Return is not null)
                     {
-                        service = await _context.Services
-                            .Include(s => s.Trip.OriginCity)
-                            .Include(s => s.Trip.DestinationCity)
-                            .SingleOrDefaultAsync(s => s.ServiceId == reserve.ServiceId.Value);
+                        var returnExpected = await GetPassengerPriceAsync(
+                            returnReserve.Trip.OriginCityId, returnReserve.Trip.DestinationCityId,
+                            effectiveType, pax.Return.DropoffLocationId);
 
-                        if (service is null)
-                            return Result.Failure<bool>(ServiceError.ServiceNotFound);
+                        if (returnExpected is null || pax.Return.Price != returnExpected.Value)
+                            return Result.Failure<bool>(ReserveError.PriceNotAvailable);
 
-                        servicesCache[reserve.ServiceId.Value] = service;
+                        totalExpectedAmount += pax.Return.Price;
                     }
                 }
 
-                var vehicle = await _context.Vehicles.Where(x => x.VehicleId == reserve.VehicleId).FirstOrDefaultAsync();
-                var existingPassengerCount = reserve.Passengers.Count;
-                var totalAfterInsert = existingPassengerCount + passengerReserves.Items.Count;
+                var outboundResult = await CreatePassengerAdminEntity(
+                    outboundReserve, returnReserve?.ReserveId, pax, pax.Outbound, payer);
+                if (outboundResult.IsFailure) return Result.Failure<bool>(outboundResult.Error);
 
-                if (vehicle == null || totalAfterInsert > vehicle.AvailableQuantity)
-                    return Result.Failure<bool>(ReserveError.VehicleQuantityNotAvailable(
-                        existingPassengerCount, passengerReserves.Items.Count, vehicle?.AvailableQuantity ?? 0));
-
-                var reservePrice = await GetPassengerPriceAsync(
-                    reserve.Trip.OriginCityId, reserve.Trip.DestinationCityId, (ReserveTypeIdEnum)dto.ReserveTypeId, dto.DropoffLocationId);
-                
-                if (reservePrice is null || dto.Price != reservePrice.Value)
-                    return Result.Failure<bool>(ReserveError.PriceNotAvailable);
-
-                var pickupResult = await GetDirectionAsync(dto.PickupLocationId, "Pickup");
-                if (pickupResult.IsFailure) return Result.Failure<bool>(pickupResult.Error);
-
-                var dropoffResult = await GetDirectionAsync(dto.DropoffLocationId, "Dropoff");
-                if (dropoffResult.IsFailure) return Result.Failure<bool>(dropoffResult.Error);
-                // Usar ReserveRelatedId del DTO si viene, sino inferir del mapa
-                var inferredRelatedId = reserveRelatedMap.TryGetValue(dto.ReserveId, out var relatedId)
-                    ? relatedId
-                    : dto.ReserveRelatedId;
-
-                var passenger = new Passenger
+                if (returnReserve is not null && pax.Return is not null)
                 {
-                    ReserveId = reserve.ReserveId,
-                    ReserveRelatedId = inferredRelatedId,
-                    PickupLocationId = dto.PickupLocationId,
-                    DropoffLocationId = dto.DropoffLocationId,
-                    PickupAddress = pickupResult.Value?.Name,
-                    DropoffAddress = dropoffResult.Value?.Name,
-                    HasTraveled = dto.HasTraveled,
-                    Price = reservePrice.Value,
-                    Status = PassengerStatusEnum.PendingPayment,
-                    CustomerId = payer.CustomerId,
-                    DocumentNumber = payer.DocumentNumber,
-                    FirstName = payer.FirstName,
-                    LastName = payer.LastName,
-                    Phone = $"{payer.Phone1} / {payer.Phone2}",
-                    Email = payer.Email
-                };
-
-                reserve.Passengers.Add(passenger);
-
-                _context.Passengers.Add(passenger);
+                    var returnResult = await CreatePassengerAdminEntity(
+                        returnReserve, outboundReserve.ReserveId, pax, pax.Return, payer);
+                    if (returnResult.IsFailure) return Result.Failure<bool>(returnResult.Error);
+                }
             }
 
             await _context.SaveChangesWithOutboxAsync();
 
-            var reserveIds = passengerReserves.Items.Select(i => i.ReserveId).Distinct().ToList();
-            var description = BuildDescription(reserveIds, reserveMap, servicesCache, passengerReserves);
+            var reserveIds = reserveMap.Keys.OrderBy(x => x).ToList();
+            var description = BuildDescription(reserveIds, reserveMap, servicesCache, requestedType);
 
-            // 3) Siempre CHARGE al payer por el total
             _context.CustomerAccountTransactions.Add(new CustomerAccountTransaction
             {
                 CustomerId = payer.CustomerId,
@@ -256,30 +279,21 @@ public class ReserveBusiness : IReserveBusiness
             payer.CurrentBalance += totalExpectedAmount;
             _context.Customers.Update(payer);
 
-            // 4) Si no hay pagos, guardar y salir
-            if (!passengerReserves.Payments.Any())
+            if (!request.Payments.Any())
             {
                 await _context.SaveChangesWithOutboxAsync();
                 return Result.Success(true);
             }
 
-            var totalProvidedAmount = passengerReserves.Payments.Sum(p => p.TransactionAmount);
-
-            // Rechazar sobrepagos, permitir pagos parciales
+            var totalProvidedAmount = request.Payments.Sum(p => p.TransactionAmount);
             if (totalProvidedAmount > totalExpectedAmount)
                 return Result.Failure<bool>(ReserveError.OverPaymentNotAllowed(totalExpectedAmount, totalProvidedAmount));
 
-            // Obtener la caja abierta
             var cashBoxResult = await _cashBoxBusiness.GetOpenCashBoxEntity();
-            if (cashBoxResult.IsFailure)
-                return Result.Failure<bool>(cashBoxResult.Error);
-
+            if (cashBoxResult.IsFailure) return Result.Failure<bool>(cashBoxResult.Error);
             var cashBox = cashBoxResult.Value;
+            var primaryMethod = (PaymentMethodEnum)request.Payments.First().PaymentMethod;
 
-            // Total efectivamente abonado (uno o varios medios)
-            var primaryMethod = (PaymentMethodEnum)passengerReserves.Payments.First().PaymentMethod;
-
-            // PAGO PADRE - siempre va a la reserva principal (IDA)
             var parentPayment = new ReservePayment
             {
                 ReserveId = mainReserveId,
@@ -294,12 +308,11 @@ public class ReserveBusiness : IReserveBusiness
                 CashBoxId = cashBox.CashBoxId
             };
             _context.ReservePayments.Add(parentPayment);
-            await _context.SaveChangesWithOutboxAsync(); // necesitamos el Id del padre
+            await _context.SaveChangesWithOutboxAsync();
 
-            // Si hay split de medios (>=2), crear hijos de desglose (Breakdown)
-            if (passengerReserves.Payments.Count > 1)
+            if (request.Payments.Count > 1)
             {
-                foreach (var p in passengerReserves.Payments)
+                foreach (var p in request.Payments)
                 {
                     var breakdownChild = new ReservePayment
                     {
@@ -318,7 +331,6 @@ public class ReserveBusiness : IReserveBusiness
                 }
             }
 
-            // Asiento de Payment (negativo) e impacto en saldo
             var paymentDescription = totalProvidedAmount < totalExpectedAmount
                 ? $"Pago parcial aplicado a {description}"
                 : $"Pago aplicado a {description}";
@@ -335,7 +347,6 @@ public class ReserveBusiness : IReserveBusiness
             payer.CurrentBalance -= totalProvidedAmount;
             _context.Customers.Update(payer);
 
-            // Si el pago cubre el total, confirmar todos los pasajeros
             if (totalProvidedAmount >= totalExpectedAmount)
             {
                 foreach (var reserve in reserveMap.Values)
@@ -356,6 +367,68 @@ public class ReserveBusiness : IReserveBusiness
         });
     }
 
+    /// <summary>
+    /// Creates a Passenger entity for a leg. Price validation is performed by the caller
+    /// (CreatePassengerReserves) because the validation strategy differs between Ida (per leg)
+    /// and IdaVuelta (sum of legs against package price).
+    /// </summary>
+    private async Task<Result<Passenger>> CreatePassengerAdminEntity(
+        Reserve reserve, int? relatedReserveId, PassengerBookingDto pax, LegInfoDto leg, Customer payer)
+    {
+        var pickupResult = await GetDirectionAsync(leg.PickupLocationId, "Pickup");
+        if (pickupResult.IsFailure) return Result.Failure<Passenger>(pickupResult.Error);
+
+        var dropoffResult = await GetDirectionAsync(leg.DropoffLocationId, "Dropoff");
+        if (dropoffResult.IsFailure) return Result.Failure<Passenger>(dropoffResult.Error);
+
+        var passenger = new Passenger
+        {
+            ReserveId = reserve.ReserveId,
+            ReserveRelatedId = relatedReserveId,
+            PickupLocationId = leg.PickupLocationId,
+            DropoffLocationId = leg.DropoffLocationId,
+            PickupAddress = pickupResult.Value?.Name,
+            DropoffAddress = dropoffResult.Value?.Name,
+            HasTraveled = pax.HasTraveled,
+            Price = leg.Price,
+            Status = PassengerStatusEnum.PendingPayment,
+            CustomerId = payer.CustomerId,
+            DocumentNumber = payer.DocumentNumber,
+            FirstName = payer.FirstName,
+            LastName = payer.LastName,
+            Phone = $"{payer.Phone1} / {payer.Phone2}",
+            Email = payer.Email
+        };
+
+        reserve.Passengers.Add(passenger);
+        _context.Passengers.Add(passenger);
+        return Result.Success(passenger);
+    }
+
+    private async Task<ReserveTypeIdEnum> ResolveEffectiveReserveTypeAsync(
+        ReserveTypeIdEnum requestedType, int outboundReserveId, int? returnReserveId)
+    {
+        if (requestedType != ReserveTypeIdEnum.IdaVuelta || returnReserveId is null)
+            return requestedType;
+
+        var config = await _context.TenantConfigs
+            .Where(c => c.TenantId == _tenantContext.TenantId)
+            .Select(c => new { c.RoundTripRequiresSameDay })
+            .FirstOrDefaultAsync();
+
+            if (config is null || !config.RoundTripRequiresSameDay)
+            return ReserveTypeIdEnum.IdaVuelta;
+
+        var dates = await _context.Reserves
+            .Where(r => r.ReserveId == outboundReserveId || r.ReserveId == returnReserveId)
+            .Select(r => r.ReserveDate.Date)
+            .ToListAsync();
+
+        return dates.Distinct().Count() == 1
+            ? ReserveTypeIdEnum.IdaVuelta
+            : ReserveTypeIdEnum.Ida;
+    }
+
     public async Task<Result<CreateReserveExternalResult>> CreatePassengerReservesExternal(
         PassengerReserveCreateRequestWrapperExternalDto dto)
     {
@@ -366,11 +439,11 @@ public class ReserveBusiness : IReserveBusiness
     }
 
     private async Task<Result<CreateReserveExternalResult>> CreatePassengerReservesExternalCore(
-        PassengerReserveCreateRequestWrapperExternalDto dto)
+        PassengerReserveCreateRequestWrapperExternalDto request)
     {
-        var validationResult = ValidateUserReserveCombination(dto.Items);
-        if (validationResult.IsFailure)
-            return Result.Failure<CreateReserveExternalResult>(validationResult.Error);
+        if (request.Passengers is null || request.Passengers.Count == 0)
+            return Result.Failure<CreateReserveExternalResult>(
+                ReserveError.InvalidReserveCombination("No hay pasajeros."));
 
         User userLogged = null;
         Customer bookingCustomer = null;
@@ -384,115 +457,124 @@ public class ReserveBusiness : IReserveBusiness
             bookingCustomer = userLogged?.Customer;
         }
 
-        List<Reserve> reserves = new List<Reserve>();
+        var requestedType = (ReserveTypeIdEnum)request.ReserveTypeId;
+        var effectiveType = await ResolveEffectiveReserveTypeAsync(
+            requestedType, request.OutboundReserveId, request.ReturnReserveId);
 
-        // Inferir ReserveRelatedId automáticamente si hay exactamente 2 reservas (ida/vuelta)
-        var reserveRelatedMap = new Dictionary<int, int?>();
-        var reserveIds = dto.Items.Select(i => i.ReserveId).Distinct().OrderBy(id => id).ToList();
-        if (reserveIds.Count == 2)
+        var outboundReserve = await _context.Reserves
+            .Include(r => r.Passengers)
+            .Include(r => r.Trip)
+            .SingleOrDefaultAsync(r => r.ReserveId == request.OutboundReserveId);
+
+        if (outboundReserve is null) return Result.Failure<CreateReserveExternalResult>(ReserveError.NotFound);
+        if (outboundReserve.Status != ReserveStatusEnum.Confirmed)
+            return Result.Failure<CreateReserveExternalResult>(ReserveError.NotAvailable);
+
+        Reserve? returnReserve = null;
+        if (request.ReturnReserveId.HasValue)
         {
-            reserveRelatedMap[reserveIds[0]] = reserveIds[1];
-            reserveRelatedMap[reserveIds[1]] = reserveIds[0];
+            returnReserve = await _context.Reserves
+                .Include(r => r.Passengers)
+                .Include(r => r.Trip)
+                .SingleOrDefaultAsync(r => r.ReserveId == request.ReturnReserveId.Value);
+
+            if (returnReserve is null) return Result.Failure<CreateReserveExternalResult>(ReserveError.NotFound);
+            if (returnReserve.Status != ReserveStatusEnum.Confirmed)
+                return Result.Failure<CreateReserveExternalResult>(ReserveError.NotAvailable);
         }
 
-        // Calcular monto esperado: precio * cantidad de pasajeros (contar solo items de ida)
-        var idaReserveId = reserveIds.First();
-        var passengerCount = dto.Items.Count(i => i.ReserveId == idaReserveId);
-        decimal totalExpectedAmount = dto.Items.First().Price * passengerCount;
+        var reserveList = new List<Reserve> { outboundReserve };
+        if (returnReserve is not null) reserveList.Add(returnReserve);
 
-        foreach (var passengerDto in dto.Items)
+        var passengerCount = request.Passengers.Count;
+
+        foreach (var reserve in reserveList)
         {
-            var reserve = await _context.Reserves
-               .Include(r => r.Passengers)
-               .Include(r => r.Trip)
-               .SingleOrDefaultAsync(r => r.ReserveId == passengerDto.ReserveId);
-
-            if (reserve is null)
-                return Result.Failure<CreateReserveExternalResult>(ReserveError.NotFound);
-
-            if (reserve.Status != ReserveStatusEnum.Confirmed)
-                return Result.Failure<CreateReserveExternalResult>(ReserveError.NotAvailable);
-
-            var service = await _context.Services
-                .Include(s => s.Trip.OriginCity)
-                .Include(s => s.Trip.DestinationCity)
-                .SingleOrDefaultAsync(s => s.ServiceId == reserve.ServiceId);
-
             var vehicle = await _context.Vehicles.Where(x => x.VehicleId == reserve.VehicleId).FirstOrDefaultAsync();
-
-            var existingPassengerCount = reserve.Passengers.Count;
-            var totalAfterInsert = existingPassengerCount + dto.Items.Count;
-
-            if (totalAfterInsert > vehicle.AvailableQuantity)
+            var existingCount = reserve.Passengers.Count;
+            if (vehicle == null || existingCount + passengerCount > vehicle.AvailableQuantity)
                 return Result.Failure<CreateReserveExternalResult>(
-                    ReserveError.VehicleQuantityNotAvailable(existingPassengerCount, dto.Items.Count, vehicle.AvailableQuantity));
+                    ReserveError.VehicleQuantityNotAvailable(existingCount, passengerCount, vehicle?.AvailableQuantity ?? 0));
+        }
 
-            var reservePrice = await GetPassengerPriceAsync(
-                reserve.Trip.OriginCityId, reserve.Trip.DestinationCityId, (ReserveTypeIdEnum)passengerDto.ReserveTypeId, passengerDto.DropoffLocationId);
+        decimal totalExpectedAmount = 0m;
+        var preferenceItems = new List<PaymentPreferenceItemDto>();
 
-            if (reservePrice is null)
-                return Result.Failure<CreateReserveExternalResult>(ReserveError.PriceNotAvailable);
-
-            if (reserve.Passengers.Any(p => p.DocumentNumber == passengerDto.DocumentNumber))
-                return Result.Failure<CreateReserveExternalResult>(
-                    ReserveError.PassengerAlreadyExists(passengerDto.DocumentNumber));
-
-            var pickupResult = await GetDirectionAsync(passengerDto.PickupLocationId, "Pickup");
-            if (pickupResult.IsFailure)
-                return Result.Failure<CreateReserveExternalResult>(pickupResult.Error);
-
-            var dropoffResult = await GetDirectionAsync(passengerDto.DropoffLocationId, "Dropoff");
-            if (dropoffResult.IsFailure)
-                return Result.Failure<CreateReserveExternalResult>(dropoffResult.Error);
-
-            Customer existingCustomer = await _context.Customers
-                    .SingleOrDefaultAsync(c => c.DocumentNumber == passengerDto.DocumentNumber);
-
-            // Usar ReserveRelatedId del DTO si viene, sino inferir del mapa
-            var inferredRelatedId = reserveRelatedMap.TryGetValue(passengerDto.ReserveId, out var relatedId)
-                ? relatedId
-                : passengerDto.ReserveRelatedId;
-
-            var newPassenger = new Passenger
+        foreach (var pax in request.Passengers)
+        {
+            // Same pricing model as the admin flow:
+            // - IdaVuelta (effective): TripPrice is the package total. Validate sum of legs.
+            // - Ida (effective or downgraded): validate each leg against its own Trip's Ida tariff.
+            if (effectiveType == ReserveTypeIdEnum.IdaVuelta && returnReserve is not null && pax.Return is not null)
             {
-                ReserveId = reserve.ReserveId,
-                ReserveRelatedId = inferredRelatedId,
-                FirstName = passengerDto.FirstName,
-                LastName = passengerDto.LastName,
-                DocumentNumber = passengerDto.DocumentNumber,
-                Email = passengerDto.Email,
-                Phone = passengerDto.Phone1,
-                PickupLocationId = passengerDto.PickupLocationId,
-                DropoffLocationId = passengerDto.DropoffLocationId,
-                PickupAddress = pickupResult.Value?.Name,
-                DropoffAddress = dropoffResult.Value?.Name,
-                HasTraveled = false,
-                Price = reservePrice.Value,
-                Status = dto.Payment is null ? PassengerStatusEnum.PendingPayment : PassengerStatusEnum.Confirmed,
-                CustomerId = existingCustomer?.CustomerId,
-            };
+                var packagePrice = await GetPassengerPriceAsync(
+                    outboundReserve.Trip.OriginCityId, outboundReserve.Trip.DestinationCityId,
+                    ReserveTypeIdEnum.IdaVuelta, pax.Outbound.DropoffLocationId);
 
-            reserve.Passengers.Add(newPassenger);
-            _context.Passengers.Add(newPassenger);
+                if (packagePrice is null || pax.Outbound.Price + pax.Return.Price != packagePrice.Value)
+                    return Result.Failure<CreateReserveExternalResult>(ReserveError.PriceNotAvailable);
 
-            if (!reserves.Any(p => p.ReserveId == reserve.ReserveId))
+                totalExpectedAmount += packagePrice.Value;
+            }
+            else
             {
-                reserves.Add(reserve);
+                var outboundExpected = await GetPassengerPriceAsync(
+                    outboundReserve.Trip.OriginCityId, outboundReserve.Trip.DestinationCityId,
+                    effectiveType, pax.Outbound.DropoffLocationId);
+
+                if (outboundExpected is null || pax.Outbound.Price != outboundExpected.Value)
+                    return Result.Failure<CreateReserveExternalResult>(ReserveError.PriceNotAvailable);
+
+                totalExpectedAmount += pax.Outbound.Price;
+
+                if (returnReserve is not null && pax.Return is not null)
+                {
+                    var returnExpected = await GetPassengerPriceAsync(
+                        returnReserve.Trip.OriginCityId, returnReserve.Trip.DestinationCityId,
+                        effectiveType, pax.Return.DropoffLocationId);
+
+                    if (returnExpected is null || pax.Return.Price != returnExpected.Value)
+                        return Result.Failure<CreateReserveExternalResult>(ReserveError.PriceNotAvailable);
+
+                    totalExpectedAmount += pax.Return.Price;
+                }
+            }
+
+            var outboundResult = await CreatePassengerExternalEntity(
+                outboundReserve, returnReserve?.ReserveId, pax, pax.Outbound,
+                isPaid: request.Payment is not null);
+            if (outboundResult.IsFailure) return Result.Failure<CreateReserveExternalResult>(outboundResult.Error);
+            preferenceItems.Add(new PaymentPreferenceItemDto(
+                $"Pasaje de {pax.FirstName} {pax.LastName}",
+                pax.Outbound.Price,
+                $"Reserva {outboundReserve.ReserveId}"));
+
+            if (returnReserve is not null && pax.Return is not null)
+            {
+                var returnResult = await CreatePassengerExternalEntity(
+                    returnReserve, outboundReserve.ReserveId, pax, pax.Return,
+                    isPaid: request.Payment is not null);
+                if (returnResult.IsFailure) return Result.Failure<CreateReserveExternalResult>(returnResult.Error);
+                preferenceItems.Add(new PaymentPreferenceItemDto(
+                    $"Pasaje de {pax.FirstName} {pax.LastName}",
+                    pax.Return.Price,
+                    $"Reserva {returnReserve.ReserveId}"));
             }
         }
 
         await _context.SaveChangesWithOutboxAsync();
 
-        if (dto.Payment is null)
+        if (request.Payment is null)
         {
-            var resultPayment = await CreatePendingPayment(totalExpectedAmount, reserves, dto.Items.First());
+            var firstPax = request.Passengers.First();
+            var resultPayment = await CreatePendingPayment(totalExpectedAmount, reserveList, firstPax);
             if (resultPayment.IsFailure)
                 return Result.Failure<CreateReserveExternalResult>(resultPayment.Error);
 
             string preferenceId = await _paymentGateway.CreatePreferenceAsync(
                 resultPayment.Value.ToString(),
                 totalExpectedAmount,
-                dto.Items
+                preferenceItems
             );
 
             await _context.SaveChangesWithOutboxAsync();
@@ -500,19 +582,18 @@ public class ReserveBusiness : IReserveBusiness
         }
         else
         {
-            var totalProvidedAmount = dto.Payment.TransactionAmount;
+            var totalProvidedAmount = request.Payment.TransactionAmount;
 
             if (totalExpectedAmount != totalProvidedAmount)
                 return Result.Failure<CreateReserveExternalResult>(
                     ReserveError.InvalidPaymentAmount(totalExpectedAmount, totalProvidedAmount));
 
-            var resultPayment = await CreatePayment(dto.Payment, reserves);
+            var resultPayment = await CreatePayment(request.Payment, reserveList);
             if (resultPayment.IsFailure)
                 return Result.Failure<CreateReserveExternalResult>(resultPayment.Error);
 
-            // Lanzar evento para enviar email de confirmacion
-            var mainReserve = reserves.OrderBy(r => r.ReserveId).First();
-            var firstPassenger = dto.Items.First();
+            var mainReserve = reserveList.OrderBy(r => r.ReserveId).First();
+            var firstPassenger = request.Passengers.First();
             var reserveCreatedEvent = new CustomerReserveCreatedEvent(
                 ReserveId: mainReserve.ReserveId,
                 TenantId: mainReserve.TenantId,
@@ -531,6 +612,49 @@ public class ReserveBusiness : IReserveBusiness
             await _context.SaveChangesWithOutboxAsync();
             return Result.Success(new CreateReserveExternalResult(PaymentStatus.Approved, null));
         }
+    }
+
+    /// <summary>
+    /// Creates a Passenger entity for the external (public) flow. Price validation is performed
+    /// by CreatePassengerReservesExternalCore.
+    /// </summary>
+    private async Task<Result<Passenger>> CreatePassengerExternalEntity(
+        Reserve reserve, int? relatedReserveId, PassengerBookingExternalDto pax, LegInfoDto leg, bool isPaid)
+    {
+        if (reserve.Passengers.Any(p => p.DocumentNumber == pax.DocumentNumber))
+            return Result.Failure<Passenger>(ReserveError.PassengerAlreadyExists(pax.DocumentNumber));
+
+        var pickupResult = await GetDirectionAsync(leg.PickupLocationId, "Pickup");
+        if (pickupResult.IsFailure) return Result.Failure<Passenger>(pickupResult.Error);
+
+        var dropoffResult = await GetDirectionAsync(leg.DropoffLocationId, "Dropoff");
+        if (dropoffResult.IsFailure) return Result.Failure<Passenger>(dropoffResult.Error);
+
+        var existingCustomer = await _context.Customers
+            .SingleOrDefaultAsync(c => c.DocumentNumber == pax.DocumentNumber);
+
+        var newPassenger = new Passenger
+        {
+            ReserveId = reserve.ReserveId,
+            ReserveRelatedId = relatedReserveId,
+            FirstName = pax.FirstName,
+            LastName = pax.LastName,
+            DocumentNumber = pax.DocumentNumber,
+            Email = pax.Email,
+            Phone = pax.Phone1,
+            PickupLocationId = leg.PickupLocationId,
+            DropoffLocationId = leg.DropoffLocationId,
+            PickupAddress = pickupResult.Value?.Name,
+            DropoffAddress = dropoffResult.Value?.Name,
+            HasTraveled = false,
+            Price = leg.Price,
+            Status = isPaid ? PassengerStatusEnum.Confirmed : PassengerStatusEnum.PendingPayment,
+            CustomerId = existingCustomer?.CustomerId,
+        };
+
+        reserve.Passengers.Add(newPassenger);
+        _context.Passengers.Add(newPassenger);
+        return Result.Success(newPassenger);
     }
 
     private async Task<Result<bool>> CreatePayment(CreatePaymentExternalRequestDto paymentData, List<Reserve> reserves)
@@ -630,7 +754,7 @@ public class ReserveBusiness : IReserveBusiness
     private async Task<Result<int>> CreatePendingPayment(
       decimal amount,
       List<Reserve> reserves,
-      PassengerReserveExternalCreateRequestDto firstPassenger)
+      PassengerBookingExternalDto firstPassenger)
     {
         // Ordenar reservas para decidir padre/hijos
         var orderedReserves = reserves
@@ -676,7 +800,7 @@ public class ReserveBusiness : IReserveBusiness
 
 
     private string BuildDescription(List<int> reserveIds, Dictionary<int, Reserve> reserveMap,
-        Dictionary<int, Service> servicesCache, PassengerReserveCreateRequestWrapperDto passengerReserves)
+        Dictionary<int, Service> servicesCache, ReserveTypeIdEnum reserveType)
     {
         if (reserveIds.Count == 1)
         {
@@ -686,9 +810,7 @@ public class ReserveBusiness : IReserveBusiness
                 ? svc.Trip.OriginCity.Name : reserve.OriginName;
             var destName = reserve.ServiceId.HasValue && servicesCache.TryGetValue(reserve.ServiceId.Value, out svc)
                 ? svc.Trip.DestinationCity.Name : reserve.DestinationName;
-            var type = passengerReserves.Items.First(i => i.ReserveId == rid).ReserveTypeId == (int)ReserveTypeIdEnum.IdaVuelta
-                ? "Ida y vuelta"
-                : "Ida";
+            var type = reserveType == ReserveTypeIdEnum.IdaVuelta ? "Ida y vuelta" : "Ida";
             return $"Reserva: {type} #{rid} - {originName} - {destName} {reserve.ReserveDate:HH:mm}";
         }
 
@@ -710,56 +832,6 @@ public class ReserveBusiness : IReserveBusiness
         var desc2 = $"Vuelta #{rid2} - {dest2} - {origin2} {reserve2.ReserveDate:HH:mm}";
 
         return $"Reserva(s): {desc1}; {desc2}";
-    }
-
-    private Result ValidateUserReserveCombination(List<PassengerReserveExternalCreateRequestDto> items)
-    {
-        if (items == null || items.Count == 0)
-            return Result.Failure(ReserveError.InvalidReserveCombination("No hay ítems para validar."));
-
-        // 1) Agrupar por reserva y obtener los tipos distintos por cada reserva
-        var byReserve = items
-            .GroupBy(i => i.ReserveId)
-            .ToDictionary(
-                g => g.Key,
-                g => g.Select(i => (ReserveTypeIdEnum)i.ReserveTypeId).Distinct().ToList()
-            );
-
-        // 2) Dentro de una misma reserva no puede haber más de un tipo
-        var mixedTypeReserveIds = byReserve
-            .Where(kv => kv.Value.Count > 1)
-            .Select(kv => kv.Key)
-            .ToList();
-
-        if (mixedTypeReserveIds.Any())
-            return Result.Failure(ReserveError.InvalidReserveCombination(
-                $"La(s) reserva(s) {string.Join(", ", mixedTypeReserveIds)} tiene(n) más de un tipo asignado."));
-
-        // 3) Máximo 2 reservas
-        var distinctReserveIds = byReserve.Keys.ToList();
-        if (distinctReserveIds.Count > 2)
-            return Result.Failure(ReserveError.InvalidReserveCombination(
-                "Solo se permite reservar hasta 2 reservas: ida y vuelta."));
-
-        // 4) Tomar el tipo (único) de cada reserva
-        var typesPerReserve = byReserve.ToDictionary(kv => kv.Key, kv => kv.Value.Single());
-
-        if (distinctReserveIds.Count == 1)
-        {
-            var singleType = typesPerReserve.Values.Single();
-            if (singleType == ReserveTypeIdEnum.IdaVuelta)
-                return Result.Failure(ReserveError.InvalidReserveCombination(
-                    "No se puede reservar únicamente la vuelta sin haber reservado ida."));
-            return Result.Success();
-        }
-
-        // 5) Si hay 2 reservas, la combinación válida es exactamente Ida + IdaVuelta
-        var typeSet = new HashSet<ReserveTypeIdEnum>(typesPerReserve.Values);
-        if (typeSet.SetEquals(new[] { ReserveTypeIdEnum.Ida, ReserveTypeIdEnum.IdaVuelta }))
-            return Result.Success();
-
-        return Result.Failure(ReserveError.InvalidReserveCombination(
-            "La combinación válida es exactamente Ida + IdaVuelta."));
     }
 
     private async Task<Result<Direction?>> GetDirectionAsync(int? locationId, string type)
@@ -799,576 +871,6 @@ public class ReserveBusiness : IReserveBusiness
         };
     }
 
-    public async Task<Result<bool>> UpdateReservePaymentsByExternalId(string externalPaymentId)
-    {
-        // Si ya se actualizó, salir rápido
-        if (_context.ReservePayments.Any(p => p.PaymentExternalId == long.Parse(externalPaymentId)
-            && p.Status != StatusPaymentEnum.Pending))
-        {
-            return Result.Success(true);
-        }
-
-        Payment mpPayment = await _paymentGateway.GetPaymentAsync(externalPaymentId);
-
-        if (mpPayment.Status.Equals("in_process") || mpPayment.Status.Equals("pending"))
-        {
-            return true;
-        }
-
-        return await _unitOfWork.ExecuteInTransactionAsync(async () =>
-        {
-            // ExternalReference = ReservePaymentId (del padre)
-            var parentPayment = await _context.ReservePayments
-                .FirstOrDefaultAsync(rp => rp.ReservePaymentId == int.Parse(mpPayment.ExternalReference));
-
-            if (parentPayment == null)
-                return Result.Failure<bool>(Error.NotFound("Payment.NotFound",
-                    "No se encontró el pago con el ID externo proporcionado"));
-
-            var internalStatus = GetPaymentStatusFromExternal(mpPayment.Status);
-            if (internalStatus == null)
-                return Result.Failure<bool>(Error.Validation("Payment.InvalidStatus",
-                    "Estado de pago no reconocido"));
-
-            // Actualizar padre
-            parentPayment.Status = internalStatus.Value;
-            parentPayment.StatusDetail = mpPayment.StatusDetail;
-            parentPayment.PaymentExternalId = mpPayment.Id;
-            parentPayment.ResultApiExternalRawJson = JsonConvert.SerializeObject(mpPayment);
-            parentPayment.UpdatedBy = "System";
-            parentPayment.UpdatedDate = DateTime.UtcNow;
-            _context.ReservePayments.Update(parentPayment);
-
-            // Actualizar hijos (mismo estado que el padre)
-            var children = await _context.ReservePayments
-                .Where(c => c.ParentReservePaymentId == parentPayment.ReservePaymentId)
-                .ToListAsync();
-
-            foreach (var child in children)
-            {
-                child.Status = parentPayment.Status;
-                child.StatusDetail = parentPayment.StatusDetail;
-                _context.ReservePayments.Update(child);
-            }
-
-            // Actualizar pasajeros de la(s) reserva(s) del padre y de cada hijo
-            var reserveIdsToTouch = new List<int> { parentPayment.ReserveId };
-            reserveIdsToTouch.AddRange(children.Select(ch => ch.ReserveId));
-
-            var reservesToUpdate = await _context.Reserves
-                .Include(r => r.Passengers)
-                .Where(r => reserveIdsToTouch.Contains(r.ReserveId))
-                .ToListAsync();
-
-            var newPassengerStatus = internalStatus.Value == StatusPaymentEnum.Paid
-                ? PassengerStatusEnum.Confirmed
-                : PassengerStatusEnum.Cancelled;
-
-            foreach (var reserve in reservesToUpdate)
-            {
-                foreach (var passenger in reserve.Passengers)
-                {
-                    passenger.Status = newPassengerStatus;
-                    _context.Passengers.Update(passenger);
-                }
-            }
-
-            await _context.SaveChangesWithOutboxAsync();
-            return Result.Success(true);
-        });
-    }
-
-    public async Task<Result<bool>> ProcessPaymentFromWebhook(ExternalPaymentResultDto externalPayment)
-    {
-        // Si ya se actualizó, salir rápido
-        if (_context.ReservePayments.Any(p => p.PaymentExternalId == externalPayment.PaymentExternalId
-            && p.Status != StatusPaymentEnum.Pending))
-        {
-            return Result.Success(true);
-        }
-
-        return await _unitOfWork.ExecuteInTransactionAsync(async () =>
-        {
-            // ExternalReference = ReservePaymentId (del padre)
-            var parentPayment = await _context.ReservePayments
-                .FirstOrDefaultAsync(rp => rp.ReservePaymentId == int.Parse(externalPayment.ExternalReference));
-
-            if (parentPayment == null)
-                return Result.Failure<bool>(Error.NotFound("Payment.NotFound",
-                    "No se encontró el pago con el ID externo proporcionado"));
-
-            var internalStatus = GetPaymentStatusFromExternal(externalPayment.Status);
-            if (internalStatus == null)
-                return Result.Failure<bool>(Error.Validation("Payment.InvalidStatus",
-                    "Estado de pago no reconocido"));
-
-            // Actualizar padre
-            parentPayment.Status = internalStatus.Value;
-            parentPayment.StatusDetail = externalPayment.StatusDetail;
-            parentPayment.PaymentExternalId = externalPayment.PaymentExternalId;
-            parentPayment.ResultApiExternalRawJson = externalPayment.RawJson;
-            parentPayment.UpdatedBy = "System";
-            parentPayment.UpdatedDate = DateTime.UtcNow;
-            _context.ReservePayments.Update(parentPayment);
-
-            // Actualizar hijos (mismo estado que el padre)
-            var children = await _context.ReservePayments
-                .Where(c => c.ParentReservePaymentId == parentPayment.ReservePaymentId)
-                .ToListAsync();
-
-            foreach (var child in children)
-            {
-                child.Status = parentPayment.Status;
-                child.StatusDetail = parentPayment.StatusDetail;
-                _context.ReservePayments.Update(child);
-            }
-
-            // Actualizar pasajeros de la(s) reserva(s) del padre y de cada hijo
-            var reserveIdsToTouch = new List<int> { parentPayment.ReserveId };
-            reserveIdsToTouch.AddRange(children.Select(ch => ch.ReserveId));
-
-            var reservesToUpdate = await _context.Reserves
-                .Include(r => r.Passengers)
-                .Where(r => reserveIdsToTouch.Contains(r.ReserveId))
-                .ToListAsync();
-
-            var newPassengerStatus = internalStatus.Value == StatusPaymentEnum.Paid
-                ? PassengerStatusEnum.Confirmed
-                : PassengerStatusEnum.Cancelled;
-
-            foreach (var reserve in reservesToUpdate)
-            {
-                foreach (var passenger in reserve.Passengers)
-                {
-                    passenger.Status = newPassengerStatus;
-                    _context.Passengers.Update(passenger);
-                }
-            }
-
-            await _context.SaveChangesWithOutboxAsync();
-            return Result.Success(true);
-        });
-    }
-
-    // Métodos de reportes actualizados
-    public async Task<Result<PagedReportResponseDto<ReserveReportResponseDto>>> GetReserveReport(
-        DateTime reserveDate, PagedReportRequestDto<ReserveReportFilterRequestDto> requestDto)
-    {
-        var date = reserveDate.Date;
-
-        // 1. Query base para contar y paginar
-        var baseQuery = _context.Reserves
-            .Include(r => r.Passengers)
-            .Include(r => r.Vehicle)
-            .Where(r => r.Status == ReserveStatusEnum.Confirmed)
-            .Where(r => r.ReserveDate.Date == date);
-
-        // 2. Contar total
-        var totalCount = await baseQuery.CountAsync();
-
-        // 3. Aplicar ordenamiento
-        var sortBy = requestDto.SortBy?.ToLower() ?? "reservedate";
-        var sortDesc = requestDto.SortDescending;
-
-        IOrderedQueryable<Reserve> orderedQuery = sortBy switch
-        {
-            "serviceorigin" => sortDesc ? baseQuery.OrderByDescending(r => r.OriginName) : baseQuery.OrderBy(r => r.OriginName),
-            "servicedest" => sortDesc ? baseQuery.OrderByDescending(r => r.DestinationName) : baseQuery.OrderBy(r => r.DestinationName),
-            _ => sortDesc ? baseQuery.OrderByDescending(r => r.ReserveDate) : baseQuery.OrderBy(r => r.ReserveDate)
-        };
-
-        // 4. Aplicar paginación y obtener reservas
-        var pageNumber = requestDto.PageNumber > 0 ? requestDto.PageNumber : 1;
-        var pageSize = requestDto.PageSize > 0 ? requestDto.PageSize : 10;
-
-        var reserves = await orderedQuery
-            .Skip((pageNumber - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync();
-
-        // 5. Precios eliminados para optimización (se deben pedir por GetTripById bajo demanda)
-        var tripIds = reserves.Select(r => r.TripId).Distinct().ToList();
-
-        var tripDescriptions = await _context.Trips
-            .Where(t => tripIds.Contains(t.TripId))
-            .ToDictionaryAsync(t => t.TripId, t => t.Description);
-
-        // 7. Proyectar a DTOs
-        var items = reserves.Select(r =>
-        {
-            var tripName = tripDescriptions.GetValueOrDefault(r.TripId) ?? "Unknown Trip";
-
-            return new ReserveReportResponseDto(
-                r.ReserveId,
-                r.TripId,
-                tripName,
-                r.OriginName,
-                r.DestinationName,
-                r.Vehicle.AvailableQuantity,
-                r.Passengers.Count,
-                r.DepartureHour.ToString(@"hh\:mm"),
-                r.VehicleId,
-                r.DriverId.GetValueOrDefault(),
-                r.ReserveDate
-            );
-        }).ToList();
-
-        var pagedResult = new PagedReportResponseDto<ReserveReportResponseDto>
-        {
-            Items = items,
-            TotalRecords = totalCount,
-            PageNumber = pageNumber,
-            PageSize = pageSize
-        };
-
-        return Result.Success(pagedResult);
-    }
-
-
-    public async Task<Result<ReserveGroupedPagedReportResponseDto>> GetReserveReport(
-        PagedReportRequestDto<ReserveReportFilterRequestDto> requestDto)
-    {
-        var idaDate = requestDto.Filters.DepartureDate.Date;
-        var vueltaDate = requestDto.Filters.ReturnDate?.Date;
-        var passengersRequested = requestDto.Filters.Passengers;
-        var tripId = requestDto.Filters.TripId;
-
-        // Fetch the ida trip with prices
-        var idaTrip = await _context.Trips
-            .Where(t => t.TripId == tripId && t.Status == EntityStatusEnum.Active)
-            .Include(t => t.Prices.Where(p => p.Status == EntityStatusEnum.Active))
-            .FirstOrDefaultAsync();
-
-        if (idaTrip == null)
-            return Result.Failure<ReserveGroupedPagedReportResponseDto>(TripError.TripNotFound);
-
-        var originId = idaTrip.OriginCityId;
-        var destinationId = idaTrip.DestinationCityId;
-
-        // Load TripPickupStops for pickup time calculation
-        var pickupDirectionId = requestDto.Filters.PickupDirectionId;
-        List<TripPickupStop>? idaTripPickupStops = null;
-        if (pickupDirectionId.HasValue)
-        {
-            idaTripPickupStops = await _context.TripPickupStops
-                .Where(td => td.TripId == tripId && td.Status == EntityStatusEnum.Active)
-                .Include(td => td.Direction)
-                .OrderBy(td => td.Order)
-                .ToListAsync();
-
-            if (!idaTripPickupStops.Any(td => td.DirectionId == pickupDirectionId.Value))
-                return Result.Failure<ReserveGroupedPagedReportResponseDto>(TripError.TripPickupStopNotFound);
-        }
-
-        // Fetch the return trip (inverse route) if needed
-        Trip? vueltaTrip = null;
-        List<TripPickupStop>? vueltaTripPickupStops = null;
-        if (vueltaDate.HasValue)
-        {
-            vueltaTrip = await _context.Trips
-                .Where(t => t.OriginCityId == destinationId && t.DestinationCityId == originId
-                         && t.Status == EntityStatusEnum.Active)
-                .Include(t => t.Prices.Where(p => p.Status == EntityStatusEnum.Active))
-                .FirstOrDefaultAsync();
-
-            if (vueltaTrip != null && pickupDirectionId.HasValue)
-            {
-                vueltaTripPickupStops = await _context.TripPickupStops
-                    .Where(td => td.TripId == vueltaTrip.TripId && td.Status == EntityStatusEnum.Active)
-                    .Include(td => td.Direction)
-                    .OrderBy(td => td.Order)
-                    .ToListAsync();
-            }
-        }
-
-        var idaPrice = idaTrip.Prices
-            .Where(p => p.ReserveTypeId == ReserveTypeIdEnum.Ida && p.CityId == destinationId && p.DirectionId == null)
-            .Select(p => p.Price)
-            .FirstOrDefault();
-
-        var vueltaPrice = vueltaTrip?.Prices
-            .Where(p => p.ReserveTypeId == ReserveTypeIdEnum.Ida && p.CityId == originId && p.DirectionId == null)
-            .Select(p => p.Price)
-            .FirstOrDefault() ?? 0;
-
-        var query = _context.Reserves
-            .Include(r => r.Vehicle)
-            .Include(r => r.Passengers)
-            .Include(r => r.Trip)
-            .Where(rp => rp.Status == ReserveStatusEnum.Confirmed &&
-                        (rp.ReserveDate.Date == idaDate ||
-                         (vueltaDate.HasValue && rp.ReserveDate.Date == vueltaDate.Value)));
-
-        var items = await query.ToListAsync();
-
-        var idaItems = items
-            .Where(rp => rp.ReserveDate.Date == idaDate)
-            .Where(rp => rp.TripId == tripId)
-            .Where(rp =>
-            {
-                int totalReserved = rp.Passengers
-                    .Count(p => p.Status == PassengerStatusEnum.Confirmed
-                             || p.Status == PassengerStatusEnum.PendingPayment);
-                var available = rp.Vehicle.AvailableQuantity - totalReserved;
-                return available >= passengersRequested;
-            })
-            .Select(rp =>
-            {
-                int totalReserved = rp.Passengers
-                    .Count(p => p.Status == PassengerStatusEnum.Confirmed
-                             || p.Status == PassengerStatusEnum.PendingPayment);
-                var arrivalTime = rp.DepartureHour.Add(rp.EstimatedDuration);
-                var stopSchedules = idaTripPickupStops?.Select(td => new ReserveStopScheduleDto(
-                    td.DirectionId,
-                    td.Direction.Name,
-                    td.Order,
-                    rp.DepartureHour.Add(td.PickupTimeOffset).ToString(@"hh\:mm")
-                )).ToList();
-                return new ReserveExternalReportResponseDto(
-                    rp.ReserveId,
-                    rp.OriginName,
-                    rp.DestinationName,
-                    rp.DepartureHour.ToString(@"hh\:mm"),
-                    rp.ReserveDate,
-                    rp.EstimatedDuration.ToString(@"hh\:mm"),
-                    arrivalTime.ToString(@"hh\:mm"),
-                    idaPrice,
-                    rp.Vehicle.AvailableQuantity - totalReserved,
-                    rp.Vehicle.InternalNumber,
-                    rp.TripId,
-                    stopSchedules
-                );
-            })
-            .ToList();
-
-        var vueltaItems = vueltaDate.HasValue && vueltaTrip != null
-            ? items
-                .Where(rp => rp.ReserveDate.Date == vueltaDate.Value)
-                .Where(rp => rp.TripId == vueltaTrip.TripId)
-                .Where(rp =>
-                {
-                    int totalReserved = rp.Passengers
-                        .Count(p => p.Status == PassengerStatusEnum.Confirmed
-                                 || p.Status == PassengerStatusEnum.PendingPayment);
-                    var available = rp.Vehicle.AvailableQuantity - totalReserved;
-                    return available >= passengersRequested;
-                })
-                .Select(rp =>
-                {
-                    int totalReserved = rp.Passengers
-                        .Count(p => p.Status == PassengerStatusEnum.Confirmed
-                                 || p.Status == PassengerStatusEnum.PendingPayment);
-                    var arrivalTime = rp.DepartureHour.Add(rp.EstimatedDuration);
-                    var vueltaStopSchedules = vueltaTripPickupStops?.Select(td => new ReserveStopScheduleDto(
-                        td.DirectionId,
-                        td.Direction.Name,
-                        td.Order,
-                        rp.DepartureHour.Add(td.PickupTimeOffset).ToString(@"hh\:mm")
-                    )).ToList();
-                    return new ReserveExternalReportResponseDto(
-                        rp.ReserveId,
-                        rp.OriginName,
-                        rp.DestinationName,
-                        rp.DepartureHour.ToString(@"hh\:mm"),
-                        rp.ReserveDate,
-                        rp.EstimatedDuration.ToString(@"hh\:mm"),
-                        arrivalTime.ToString(@"hh\:mm"),
-                        vueltaPrice,
-                        rp.Vehicle.AvailableQuantity - totalReserved,
-                        rp.Vehicle.InternalNumber,
-                        rp.TripId,
-                        vueltaStopSchedules
-                    );
-                })
-                .ToList()
-            : new List<ReserveExternalReportResponseDto>();
-
-        var pagedOutbound = PagedReportResponseDto<ReserveExternalReportResponseDto>.Create(
-            idaItems,
-            requestDto.PageNumber,
-            requestDto.PageSize
-        );
-
-        var pagedReturn = PagedReportResponseDto<ReserveExternalReportResponseDto>.Create(
-            vueltaItems,
-            requestDto.PageNumber,
-            requestDto.PageSize
-        );
-
-        var result = new ReserveGroupedPagedReportResponseDto
-        {
-            Outbound = pagedOutbound,
-            Return = pagedReturn
-        };
-
-        return Result.Success(result);
-    }
-
-    public async Task<Result<PagedReportResponseDto<PassengerReserveReportResponseDto>>> GetReservePassengerReport(
-        int reserveId,
-        PagedReportRequestDto<PassengerReserveReportFilterRequestDto> requestDto)
-    {
-        var query = _context.Passengers
-            .Include(p => p.Customer)
-            .Include(p => p.Reserve)
-                .ThenInclude(r => r.Vehicle)
-            .Where(p => p.ReserveId == reserveId);
-
-        if (!string.IsNullOrWhiteSpace(requestDto.Filters.PassengerFullName))
-        {
-            var nameFilter = requestDto.Filters.PassengerFullName.ToLower();
-            query = query.Where(p =>
-                (p.FirstName + " " + p.LastName).ToLower().Contains(nameFilter));
-        }
-
-        if (!string.IsNullOrWhiteSpace(requestDto.Filters.DocumentNumber))
-        {
-            var docFilter = requestDto.Filters.DocumentNumber.Trim();
-            query = query.Where(p => p.DocumentNumber.Contains(docFilter));
-        }
-
-        if (!string.IsNullOrWhiteSpace(requestDto.Filters.Email))
-        {
-            var emailFilter = requestDto.Filters.Email.ToLower().Trim();
-            query = query.Where(p => p.Email != null && p.Email.ToLower().Contains(emailFilter));
-        }
-
-        // Obtener pasajeros
-        var passengers = await query.ToListAsync();
-
-        // Obtener el count total de pasajeros de la reserva (sin filtros aplicados)
-        var totalPassengersInReserve = await _context.Passengers
-            .CountAsync(p => p.ReserveId == reserveId);
-
-        // Obtener IDs de reservas relacionadas de estos pasajeros (ida/vuelta)
-        var relatedReserveIds = passengers
-            .Where(p => p.ReserveRelatedId.HasValue)
-            .Select(p => p.ReserveRelatedId!.Value)
-            .Distinct()
-            .ToList();
-
-        // Lista de todas las reservas de interés (la actual y sus relacionadas)
-        var allRelevantReserveIds = new List<int> { reserveId };
-        allRelevantReserveIds.AddRange(relatedReserveIds);
-
-        // Obtener pagos de todas las reservas relevantes para enriquecer la respuesta
-        var reservePayments = await _context.ReservePayments
-            .AsNoTracking()
-            .Where(rp => allRelevantReserveIds.Contains(rp.ReserveId))
-            .ToListAsync();
-
-        // Agrupar pagos por CustomerId
-        var paymentsByCustomer = new Dictionary<int, (string Methods, decimal Amount)>();
-
-        // Procesar pagos (padres) de todas las reservas involucradas
-        var localParentPayments = reservePayments
-            .Where(p => p.ParentReservePaymentId == null && p.CustomerId.HasValue)
-            .GroupBy(p => p.CustomerId!.Value);
-
-        foreach (var group in localParentPayments)
-        {
-            var parentPayments = group.ToList();
-            // Breakdown children: ParentId != null && Amount > 0
-            var breakdownChildren = reservePayments
-                .Where(p => p.ParentReservePaymentId != null
-                    && p.Amount > 0
-                    && parentPayments.Any(pp => pp.ReservePaymentId == p.ParentReservePaymentId))
-                .ToList();
-
-            var paymentsForMethods = breakdownChildren.Any() ? breakdownChildren : parentPayments;
-            var methods = paymentsForMethods
-                .Select(p => GetPaymentMethodName(p.Method))
-                .Distinct()
-                .OrderBy(m => m)
-                .ToList();
-
-            var totalAmount = parentPayments.Sum(p => p.Amount);
-
-            paymentsByCustomer[group.Key] = (string.Join(", ", methods), totalAmount);
-        }
-
-        var sortMappings = new Dictionary<string, Expression<Func<Passenger, object>>>
-        {
-            ["passengerfullname"] = p => p.FirstName + " " + p.LastName,
-            ["documentnumber"] = p => p.DocumentNumber,
-            ["email"] = p => p.Email
-        };
-
-        // Aplicar ordenamiento en memoria (ya que ya traemos la lista)
-
-        // Aplicar ordenamiento
-        if (!string.IsNullOrWhiteSpace(requestDto.SortBy) && sortMappings.ContainsKey(requestDto.SortBy.ToLower()))
-        {
-            var sortKey = sortMappings[requestDto.SortBy.ToLower()].Compile();
-            passengers = requestDto.SortDescending
-                ? passengers.OrderByDescending(sortKey).ToList()
-                : passengers.OrderBy(sortKey).ToList();
-        }
-
-        // Pre-fetch prices for this reserve's route via Trip
-        var firstPassenger = passengers.FirstOrDefault();
-        var routePrices = new Dictionary<ReserveTypeIdEnum, decimal>();
-        if (firstPassenger != null)
-        {
-            var trip = await _context.Trips
-                .Where(t => t.TripId == firstPassenger.Reserve.TripId)
-                .Include(t => t.Prices.Where(p => p.Status == EntityStatusEnum.Active))
-                .FirstOrDefaultAsync();
-
-            if (trip != null)
-            {
-                foreach (var price in trip.Prices.Where(p => p.DirectionId == null))
-                {
-                    routePrices[price.ReserveTypeId] = price.Price;
-                }
-            }
-        }
-
-        // Mapear a DTOs con información de pagos
-        var allItems = passengers.Select(p =>
-        {
-            var paymentInfo = p.CustomerId.HasValue && paymentsByCustomer.ContainsKey(p.CustomerId.Value)
-                ? paymentsByCustomer[p.CustomerId.Value]
-                : (Methods: (string?)null, Amount: 0m);
-
-            var paidAmount = paymentInfo.Amount;
-            var isPayment = paymentInfo.Amount > 0;
-
-            // Si no tiene pago, obtenemos el precio de la ruta
-            if (!isPayment)
-            {
-                var typeId = p.ReserveRelatedId.HasValue ? ReserveTypeIdEnum.IdaVuelta : ReserveTypeIdEnum.Ida;
-                paidAmount = routePrices.TryGetValue(typeId, out var price) ? price : 0;
-            }
-
-            return new PassengerReserveReportResponseDto(
-                p.PassengerId,
-                p.CustomerId,
-                $"{p.FirstName} {p.LastName}",
-                p.DocumentNumber,
-                p.Email,
-                p.Phone,
-                p.ReserveId,
-                p.DropoffLocationId ?? 0,
-                p.DropoffAddress,
-                p.PickupLocationId ?? 0,
-                p.PickupAddress,
-                p.Customer?.CurrentBalance ?? 0,
-                p.Reserve.Vehicle.AvailableQuantity - totalPassengersInReserve,
-                paymentInfo.Methods,
-                paidAmount,
-                isPayment,
-                p.HasTraveled,
-                (int)p.Status);
-        }).ToList();
-
-        var pagedResult = PagedReportResponseDto<PassengerReserveReportResponseDto>.Create(
-            allItems,
-            requestDto.PageNumber,
-            requestDto.PageSize);
-
-        return Result.Success(pagedResult);
-    }
 
     public async Task<Result<bool>> UpdateReserveAsync(int reserveId, ReserveUpdateRequestDto request)
     {
@@ -1447,324 +949,6 @@ public class ReserveBusiness : IReserveBusiness
         return Result.Success(true);
     }
 
-    public async Task<Result<bool>> CreatePaymentsAsync(
-      int customerId,
-      int reserveId,
-      List<CreatePaymentRequestDto> payments)
-    {
-        return await _unitOfWork.ExecuteInTransactionAsync(async () =>
-        {
-            var reserve = await _context.Reserves
-                .Include(r => r.Passengers)
-                .Include(r => r.Service)
-                .FirstOrDefaultAsync(r => r.ReserveId == reserveId);
-
-            if (reserve is null)
-                return Result.Failure<bool>(ReserveError.NotFound);
-
-            if (payments == null || !payments.Any())
-                return Result.Failure<bool>(Error.Validation("Payments.Empty",
-                    "Debe proporcionar al menos un pago."));
-
-            // Validar montos
-            var invalidAmounts = payments
-                .Select((p, i) => new { Index = i + 1, Amount = p.TransactionAmount })
-                .Where(p => p.Amount <= 0)
-                .ToList();
-
-            if (invalidAmounts.Any())
-            {
-                var errorMsg = string.Join(", ",
-                    invalidAmounts.Select(p => $"Pago #{p.Index} tiene monto inválido: {p.Amount}"));
-                return Result.Failure<bool>(Error.Validation("Payments.InvalidAmount", errorMsg));
-            }
-
-            // Validar métodos duplicados
-            var duplicatedMethods = payments
-                .GroupBy(p => p.PaymentMethod)
-                .Where(g => g.Count() > 1)
-                .Select(g => g.Key)
-                .ToList();
-
-            if (duplicatedMethods.Any())
-            {
-                var duplicatedList = string.Join(", ", duplicatedMethods);
-                return Result.Failure<bool>(Error.Validation("Payments.DuplicatedMethod",
-                    $"Los métodos de pago no deben repetirse. Duplicados: {duplicatedList}"));
-            }
-
-            // Calcular el monto esperado basado en los pasajeros
-            var totalPassengerPrice = reserve.Passengers.Sum(p => p.Price);
-            var providedAmount = payments.Sum(p => p.TransactionAmount);
-
-            // Calcular pagos ya realizados (padres con status Paid)
-            var totalAlreadyPaid = await _context.ReservePayments
-                .Where(rp => rp.ReserveId == reserveId
-                    && rp.ParentReservePaymentId == null
-                    && rp.Status == StatusPaymentEnum.Paid)
-                .SumAsync(rp => rp.Amount);
-
-            var remainingAmount = totalPassengerPrice - totalAlreadyPaid;
-
-            if (remainingAmount <= 0)
-                return Result.Failure<bool>(ReserveError.AlreadyFullyPaid(reserveId));
-
-            if (providedAmount > remainingAmount)
-                return Result.Failure<bool>(
-                    ReserveError.OverPaymentNotAllowed(remainingAmount, providedAmount));
-
-            Customer payer = await _context.Customers.Where(x => x.CustomerId == customerId).FirstOrDefaultAsync();
-            if (payer == null)
-                return Result.Failure<bool>(CustomerError.NotFound);
-
-            // Obtener la caja abierta
-            var cashBoxResult = await _cashBoxBusiness.GetOpenCashBoxEntity();
-            if (cashBoxResult.IsFailure)
-                return Result.Failure<bool>(cashBoxResult.Error);
-
-            var cashBox = cashBoxResult.Value;
-            var primaryMethod = (PaymentMethodEnum)payments.First().PaymentMethod;
-
-            // Crear pago PADRE en la reserva indicada
-            var parentPayment = new ReservePayment
-            {
-                ReserveId = reserveId,
-                CustomerId = payer.CustomerId,
-                PayerDocumentNumber = payer.DocumentNumber,
-                PayerName = $"{payer.FirstName} {payer.LastName}",
-                PayerEmail = payer.Email,
-                Amount = providedAmount,
-                Method = primaryMethod,
-                Status = StatusPaymentEnum.Paid,
-                StatusDetail = "paid_on_departure",
-                CashBoxId = cashBox.CashBoxId
-            };
-            _context.ReservePayments.Add(parentPayment);
-            await _context.SaveChangesWithOutboxAsync(); // necesitamos el Id del padre
-
-            // Si hay split de medios (>=2), crear hijos de desglose (Breakdown)
-            if (payments.Count > 1)
-            {
-                foreach (var payment in payments)
-                {
-                    var breakdownChild = new ReservePayment
-                    {
-                        ReserveId = reserveId,
-                        CustomerId = payer.CustomerId,
-                        PayerDocumentNumber = payer.DocumentNumber,
-                        PayerName = $"{payer.FirstName} {payer.LastName}",
-                        PayerEmail = payer.Email,
-                        Amount = payment.TransactionAmount,
-                        Method = (PaymentMethodEnum)payment.PaymentMethod,
-                        Status = StatusPaymentEnum.Paid,
-                        ParentReservePaymentId = parentPayment.ReservePaymentId,
-                        CashBoxId = cashBox.CashBoxId
-                    };
-                    _context.ReservePayments.Add(breakdownChild);
-                }
-            }
-
-            // Solo confirmar pasajeros si la deuda queda completamente saldada
-            if (totalAlreadyPaid + providedAmount >= totalPassengerPrice)
-            {
-                foreach (var passenger in reserve.Passengers)
-                {
-                    if (passenger.Status == PassengerStatusEnum.PendingPayment)
-                    {
-                        passenger.Status = PassengerStatusEnum.Confirmed;
-                        _context.Passengers.Update(passenger);
-                    }
-                }
-            }
-
-            // Asiento de Payment (negativo) e impacto en saldo
-            var transaction = new CustomerAccountTransaction
-            {
-                CustomerId = payer.CustomerId,
-                Date = DateTime.UtcNow,
-                Type = TransactionType.Payment,
-                Amount = -providedAmount,
-                Description = $"Pago aplicado a reserva #{reserveId}",
-                RelatedReserveId = reserveId,
-                ReservePaymentId = parentPayment.ReservePaymentId
-            };
-            _context.CustomerAccountTransactions.Add(transaction);
-
-            payer.CurrentBalance -= providedAmount;
-            _context.Customers.Update(payer);
-
-            await _context.SaveChangesWithOutboxAsync();
-            return Result.Success(true);
-        });
-    }
-
-    public async Task<Result<bool>> SettleCustomerDebtAsync(SettleCustomerDebtRequestDto request)
-    {
-        return await _unitOfWork.ExecuteInTransactionAsync(async () =>
-        {
-            // 1. Validar customer existe
-            var customer = await _context.Customers.Where(x => x.CustomerId == request.CustomerId).FirstOrDefaultAsync();
-            if (customer is null)
-                return Result.Failure<bool>(CustomerError.NotFound);
-
-            // 2. Validar pagos (montos > 0, sin metodos duplicados)
-            var invalidAmounts = request.Payments
-                .Select((p, i) => new { Index = i + 1, Amount = p.TransactionAmount })
-                .Where(p => p.Amount <= 0)
-                .ToList();
-
-            if (invalidAmounts.Any())
-            {
-                var errorMsg = string.Join(", ",
-                    invalidAmounts.Select(p => $"Pago #{p.Index} tiene monto inválido: {p.Amount}"));
-                return Result.Failure<bool>(Error.Validation("Payments.InvalidAmount", errorMsg));
-            }
-
-            var duplicatedMethods = request.Payments
-                .GroupBy(p => p.PaymentMethod)
-                .Where(g => g.Count() > 1)
-                .Select(g => g.Key)
-                .ToList();
-
-            if (duplicatedMethods.Any())
-            {
-                var duplicatedList = string.Join(", ", duplicatedMethods);
-                return Result.Failure<bool>(Error.Validation("Payments.DuplicatedMethod",
-                    $"Los métodos de pago no deben repetirse. Duplicados: {duplicatedList}"));
-            }
-
-            // 3. Cargar reservas con pasajeros del customer
-            var reserves = await _context.Reserves
-                .Include(r => r.Passengers)
-                .Where(r => request.ReserveIds.Contains(r.ReserveId))
-                .ToListAsync();
-
-            if (!reserves.Any())
-                return Result.Failure<bool>(ReserveError.NotFound);
-
-            // 4. Para cada reserva: calcular deuda pendiente
-            var reserveDebts = new List<(Reserve Reserve, decimal Debt)>();
-            foreach (var reserve in reserves)
-            {
-                var customerPassengerPrice = reserve.Passengers
-                    .Where(p => p.CustomerId == request.CustomerId)
-                    .Sum(p => p.Price);
-
-                var paidAmount = await _context.ReservePayments
-                    .Where(rp => rp.ReserveId == reserve.ReserveId
-                        && rp.CustomerId == request.CustomerId
-                        && rp.ParentReservePaymentId == null
-                        && rp.Status == StatusPaymentEnum.Paid)
-                    .SumAsync(rp => rp.Amount);
-
-                var debt = customerPassengerPrice - paidAmount;
-                if (debt > 0)
-                    reserveDebts.Add((reserve, debt));
-            }
-
-            // 5. Si todas estan pagadas -> error
-            if (!reserveDebts.Any())
-                return Result.Failure<bool>(ReserveError.NoDebtToSettle);
-
-            // 6. Validar totalPayment <= totalDebtAcrossReserves
-            var totalPayment = request.Payments.Sum(p => p.TransactionAmount);
-            var totalDebt = reserveDebts.Sum(rd => rd.Debt);
-
-            if (totalPayment > totalDebt)
-                return Result.Failure<bool>(ReserveError.OverPaymentNotAllowed(totalDebt, totalPayment));
-
-            // 7. Obtener CashBox abierta
-            var cashBoxResult = await _cashBoxBusiness.GetOpenCashBoxEntity();
-            if (cashBoxResult.IsFailure)
-                return Result.Failure<bool>(cashBoxResult.Error);
-
-            var cashBox = cashBoxResult.Value;
-            var mainReserveId = reserveDebts.First().Reserve.ReserveId;
-            var primaryMethod = (PaymentMethodEnum)request.Payments.First().PaymentMethod;
-
-            // 8. Crear ReservePayment padre
-            var parentPayment = new ReservePayment
-            {
-                ReserveId = mainReserveId,
-                CustomerId = customer.CustomerId,
-                PayerDocumentNumber = customer.DocumentNumber,
-                PayerName = $"{customer.FirstName} {customer.LastName}",
-                PayerEmail = customer.Email,
-                Amount = totalPayment,
-                Method = primaryMethod,
-                Status = StatusPaymentEnum.Paid,
-                StatusDetail = "debt_settlement",
-                CashBoxId = cashBox.CashBoxId
-            };
-            _context.ReservePayments.Add(parentPayment);
-            await _context.SaveChangesWithOutboxAsync();
-
-            // 9. Si multi-metodo, crear hijos de desglose
-            if (request.Payments.Count > 1)
-            {
-                foreach (var p in request.Payments)
-                {
-                    var breakdownChild = new ReservePayment
-                    {
-                        ReserveId = mainReserveId,
-                        CustomerId = customer.CustomerId,
-                        PayerDocumentNumber = customer.DocumentNumber,
-                        PayerName = $"{customer.FirstName} {customer.LastName}",
-                        PayerEmail = customer.Email,
-                        Amount = p.TransactionAmount,
-                        Method = (PaymentMethodEnum)p.PaymentMethod,
-                        Status = StatusPaymentEnum.Paid,
-                        ParentReservePaymentId = parentPayment.ReservePaymentId,
-                        CashBoxId = cashBox.CashBoxId
-                    };
-                    _context.ReservePayments.Add(breakdownChild);
-                }
-            }
-
-            // 10. Crear transaccion Payment
-            _context.CustomerAccountTransactions.Add(new CustomerAccountTransaction
-            {
-                CustomerId = customer.CustomerId,
-                Date = DateTime.UtcNow,
-                Type = TransactionType.Payment,
-                Amount = -totalPayment,
-                Description = $"Saldo de deuda aplicado a reserva(s) #{string.Join(", #", reserveDebts.Select(rd => rd.Reserve.ReserveId))}",
-                RelatedReserveId = mainReserveId,
-                ReservePaymentId = parentPayment.ReservePaymentId
-            });
-
-            // 11. Actualizar Customer.CurrentBalance
-            customer.CurrentBalance -= totalPayment;
-            _context.Customers.Update(customer);
-
-            // 12. Distribuir pago secuencialmente por reservas
-            var remainingPayment = totalPayment;
-            foreach (var (reserve, debt) in reserveDebts)
-            {
-                if (remainingPayment <= 0) break;
-
-                var appliedToReserve = Math.Min(remainingPayment, debt);
-                remainingPayment -= appliedToReserve;
-
-                // Si esta reserva queda saldada, confirmar pasajeros
-                if (appliedToReserve >= debt)
-                {
-                    foreach (var passenger in reserve.Passengers.Where(p => p.CustomerId == request.CustomerId))
-                    {
-                        if (passenger.Status == PassengerStatusEnum.PendingPayment)
-                        {
-                            passenger.Status = PassengerStatusEnum.Confirmed;
-                            _context.Passengers.Update(passenger);
-                        }
-                    }
-                }
-            }
-
-            await _context.SaveChangesWithOutboxAsync();
-            return Result.Success(true);
-        });
-    }
-
     public async Task<Result<List<CustomerPendingReserveDto>>> GetCustomerPendingReservesAsync(int customerId)
     {
         var customer = await _context.Customers.Where(x => x.CustomerId == customerId).FirstOrDefaultAsync();
@@ -1824,269 +1008,36 @@ public class ReserveBusiness : IReserveBusiness
         return Result.Success(result);
     }
 
-    public async Task<Result<LockReserveSlotsResponseDto>> LockReserveSlots(LockReserveSlotsRequestDto request)
-    {
-        const int maxRetries = 3;
-
-        for (int attempt = 0; attempt < maxRetries; attempt++)
-        {
-            try
-            {
-                return await _unitOfWork.ExecuteInTransactionAsync(async () =>
-                {
-                    var userEmail = _userContext.Email;
-                    var userId = _userContext.UserId;
-
-                    Customer? associatedCustomer = null;
-                    if (userId != null && userId > 0)
-                    {
-                        var user = await _context.Users
-                            .Include(u => u.Customer)
-                            .FirstOrDefaultAsync(u => u.UserId == userId);
-                        associatedCustomer = user?.Customer;
-                    }
-
-                    var activeLocksCount = await _context.ReserveSlotLocks
-                        .CountAsync(l => l.UserEmail == userEmail &&
-                                       l.Status == ReserveSlotLockStatus.Active &&
-                                       l.ExpiresAt > DateTime.UtcNow);
-
-                    if (activeLocksCount >= _reserveOptions.MaxSimultaneousLocksPerUser)
-                        return Result.Failure<LockReserveSlotsResponseDto>(ReserveSlotLockError.MaxSimultaneousLocksExceeded);
-
-                    var availableSlots = await GetAvailableSlotsWithOptimisticLocking(request.OutboundReserveId, request.ReturnReserveId);
-
-                    if (availableSlots < request.PassengerCount)
-                        return Result.Failure<LockReserveSlotsResponseDto>(ReserveSlotLockError.InsufficientSlots);
-
-                    var lockToken = Guid.NewGuid().ToString();
-                    var expiresAt = DateTime.UtcNow.AddMinutes(_reserveOptions.SlotLockTimeoutMinutes);
-
-                    var slotLock = new ReserveSlotLock
-                    {
-                        LockToken = lockToken,
-                        OutboundReserveId = request.OutboundReserveId,
-                        ReturnReserveId = request.ReturnReserveId,
-                        SlotsLocked = request.PassengerCount,
-                        ExpiresAt = expiresAt,
-                        Status = ReserveSlotLockStatus.Active,
-                        UserEmail = userEmail,
-                        UserDocumentNumber = associatedCustomer?.DocumentNumber,
-                        CustomerId = associatedCustomer?.CustomerId,
-                        RowVersion = new byte[8]
-                    };
-
-                    _context.ReserveSlotLocks.Add(slotLock);
-                    await _context.SaveChangesWithOutboxAsync();
-
-                    return Result.Success(new LockReserveSlotsResponseDto(
-                        lockToken,
-                        expiresAt,
-                        _reserveOptions.SlotLockTimeoutMinutes
-                    ));
-                });
-            }
-            catch (DbUpdateConcurrencyException) when (attempt < maxRetries - 1)
-            {
-                await Task.Delay(Random.Shared.Next(10, 100)); // Jitter to avoid thundering herd
-                continue;
-            }
-            catch (DbUpdateException ex) when (ex.InnerException?.Message.Contains("deadlock") == true && attempt < maxRetries - 1)
-            {
-                await Task.Delay(Random.Shared.Next(50, 200));
-                continue;
-            }
-        }
-
-        return Result.Failure<LockReserveSlotsResponseDto>(
-            Error.Failure("ConcurrencyConflict", "Unable to acquire slot lock due to high concurrency. Please try again."));
-    }
-
-    private async Task<int> GetAvailableSlotsWithOptimisticLocking(int outboundReserveId, int? returnReserveId = null)
-    {
-        var reserveIds = new List<int> { outboundReserveId };
-        if (returnReserveId.HasValue) reserveIds.Add(returnReserveId.Value);
-
-        var reserves = await _context.Reserves
-            .Include(r => r.Passengers)
-            .Include(r => r.Vehicle)
-            .Where(r => reserveIds.Contains(r.ReserveId))
-            .ToListAsync();
-
-        var minAvailable = int.MaxValue;
-
-        foreach (var reserve in reserves)
-        {
-            var confirmedPassengers = reserve.Passengers
-                .Count(p => p.Status == PassengerStatusEnum.Confirmed ||
-                           p.Status == PassengerStatusEnum.PendingPayment);
-
-            var activeLocks = await _context.ReserveSlotLocks
-                .Where(l => (l.OutboundReserveId == reserve.ReserveId || l.ReturnReserveId == reserve.ReserveId) &&
-                           l.Status == ReserveSlotLockStatus.Active &&
-                           l.ExpiresAt > DateTime.UtcNow)
-                .ToListAsync();
-
-            var totalActiveLocks = activeLocks.Sum(l => l.SlotsLocked);
-
-            var available = reserve.Vehicle.AvailableQuantity - confirmedPassengers - totalActiveLocks;
-            minAvailable = Math.Min(minAvailable, available);
-
-            reserve.UpdatedDate = DateTime.UtcNow;
-            reserve.UpdatedBy = "SlotLockSystem";
-        }
-
-        return Math.Max(0, minAvailable);
-    }
-
     public async Task<Result<CreateReserveExternalResult>> CreatePassengerReservesWithLock(CreateReserveWithLockRequestDto request)
     {
         return await _unitOfWork.ExecuteInTransactionAsync(async () =>
         {
-            var slotLock = await _context.ReserveSlotLocks
-                .FirstOrDefaultAsync(l => l.LockToken == request.LockToken &&
-                                         l.Status == ReserveSlotLockStatus.Active &&
-                                         l.ExpiresAt > DateTime.UtcNow);
+            var validation = await _slotLockBusiness.ValidateAsync(
+                request.LockToken,
+                request.OutboundReserveId,
+                request.ReturnReserveId,
+                request.Passengers.Count);
 
-            if (slotLock == null)
-                return Result.Failure<CreateReserveExternalResult>(ReserveSlotLockError.InvalidOrExpiredLock);
-
-            var requestReserveIds = request.Items.Select(i => i.ReserveId).Distinct().OrderBy(x => x).ToList();
-            var lockReserveIds = new List<int> { slotLock.OutboundReserveId };
-            if (slotLock.ReturnReserveId.HasValue)
-                lockReserveIds.Add(slotLock.ReturnReserveId.Value);
-            lockReserveIds = lockReserveIds.OrderBy(x => x).ToList();
-
-            if (!requestReserveIds.SequenceEqual(lockReserveIds))
-                return Result.Failure<CreateReserveExternalResult>(ReserveSlotLockError.LockReserveMismatch);
-
-            if (request.Items.Count != slotLock.SlotsLocked)
-                return Result.Failure<CreateReserveExternalResult>(ReserveSlotLockError.LockReserveMismatch);
+            if (validation.IsFailure)
+                return Result.Failure<CreateReserveExternalResult>(validation.Error);
 
             var externalDto = new PassengerReserveCreateRequestWrapperExternalDto(
+                request.ReserveTypeId,
+                request.OutboundReserveId,
+                request.ReturnReserveId,
                 request.Payment,
-                request.Items
+                request.Passengers
             );
 
             var result = await CreatePassengerReservesExternalCore(externalDto);
 
             if (result.IsSuccess)
             {
-                slotLock.Status = ReserveSlotLockStatus.Used;
-                slotLock.UpdatedDate = DateTime.UtcNow;
-                _context.ReserveSlotLocks.Update(slotLock);
-                await _context.SaveChangesWithOutboxAsync();
+                await _slotLockBusiness.MarkAsUsedAsync(validation.Value);
             }
 
             return result;
         });
-    }
-
-    public async Task<Result<bool>> CancelReserveSlotLock(string lockToken)
-    {
-        return await _unitOfWork.ExecuteInTransactionAsync(async () =>
-        {
-            var slotLock = await _context.ReserveSlotLocks
-                .FirstOrDefaultAsync(l => l.LockToken == lockToken &&
-                                         l.Status == ReserveSlotLockStatus.Active);
-
-            if (slotLock == null)
-                return Result.Failure<bool>(ReserveSlotLockError.LockNotFound);
-
-            slotLock.Status = ReserveSlotLockStatus.Cancelled;
-            slotLock.UpdatedDate = DateTime.UtcNow;
-
-            _context.ReserveSlotLocks.Update(slotLock);
-            await _context.SaveChangesWithOutboxAsync();
-
-            return Result.Success(true);
-        });
-    }
-
-    public async Task<Result<bool>> CleanupExpiredReserveSlotLocks()
-    {
-        var expiredLocks = await _context.ReserveSlotLocks
-            .Where(l => l.Status == ReserveSlotLockStatus.Active &&
-                       l.ExpiresAt < DateTime.UtcNow)
-            .ToListAsync();
-
-        if (expiredLocks.Any())
-        {
-            foreach (var expiredLock in expiredLocks)
-            {
-                expiredLock.Status = ReserveSlotLockStatus.Expired;
-                expiredLock.UpdatedDate = DateTime.UtcNow;
-            }
-
-            _context.ReserveSlotLocks.UpdateRange(expiredLocks);
-            await _context.SaveChangesWithOutboxAsync();
-        }
-
-        return Result.Success(true);
-    }
-
-    public async Task<Result<PagedReportResponseDto<ReservePaymentSummaryResponseDto>>> GetReservePaymentSummary(
-        int reserveId,
-        PagedReportRequestDto<ReservePaymentSummaryFilterRequestDto> requestDto)
-    {
-        var reserve = await _context.Reserves
-            .AsNoTracking()
-            .FirstOrDefaultAsync(r => r.ReserveId == reserveId);
-
-        if (reserve is null)
-            return Result.Failure<PagedReportResponseDto<ReservePaymentSummaryResponseDto>>(ReserveError.NotFound);
-
-        // Obtener pagos de la reserva
-        var payments = await _context.ReservePayments
-            .AsNoTracking()
-            .Where(p => p.ReserveId == reserveId)
-            .ToListAsync();
-
-        // Separar pagos padres de hijos (Breakdown: ParentId != null && Amount > 0)
-        var parentPayments = payments.Where(p => p.ParentReservePaymentId == null).ToList();
-        var childBreakdownPayments = payments
-            .Where(p => p.ParentReservePaymentId != null && p.Amount > 0)
-            .ToList();
-
-        // Si hay hijos de desglose (Breakdown), usamos esos para el detalle por método
-        // Si no hay, usamos los padres
-        var paymentsForSummary = childBreakdownPayments.Any() ? childBreakdownPayments : parentPayments;
-
-        var paymentsByMethod = paymentsForSummary
-            .GroupBy(p => p.Method)
-            .Select(g => new PaymentMethodSummaryDto(
-                (int)g.Key,
-                GetPaymentMethodName(g.Key),
-                g.Sum(p => p.Amount)))
-            .OrderBy(p => p.PaymentMethodId)
-            .ToList();
-
-        // Total es la suma de los pagos padres (no los hijos para evitar duplicar)
-        var totalAmount = parentPayments.Sum(p => p.Amount);
-
-        var summaryItem = new ReservePaymentSummaryResponseDto(
-            reserveId,
-            paymentsByMethod,
-            totalAmount);
-
-        var result = PagedReportResponseDto<ReservePaymentSummaryResponseDto>.Create(
-            new List<ReservePaymentSummaryResponseDto> { summaryItem },
-            requestDto.PageNumber,
-            requestDto.PageSize);
-
-        return Result.Success(result);
-    }
-
-    private static string GetPaymentMethodName(PaymentMethodEnum method)
-    {
-        return method switch
-        {
-            PaymentMethodEnum.Cash => "Efectivo",
-            PaymentMethodEnum.Online => "Online",
-            PaymentMethodEnum.CreditCard => "Tarjeta de Crédito",
-            PaymentMethodEnum.Transfer => "Transferencia",
-            _ => method.ToString()
-        };
     }
 
     private async Task<decimal?> GetPassengerPriceAsync(

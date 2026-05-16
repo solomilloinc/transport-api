@@ -24,11 +24,22 @@ namespace transport_api.Functions;
 public class ReservesFunction : FunctionBase
 {
     private readonly IReserveBusiness _reserveBusiness;
+    private readonly IReserveSlotLockBusiness _slotLockBusiness;
+    private readonly IReserveReportBusiness _reportBusiness;
+    private readonly IReservePaymentBusiness _paymentBusiness;
 
-    public ReservesFunction(IReserveBusiness reserveBusiness, IServiceProvider serviceProvider)
+    public ReservesFunction(
+        IReserveBusiness reserveBusiness,
+        IReserveSlotLockBusiness slotLockBusiness,
+        IReserveReportBusiness reportBusiness,
+        IReservePaymentBusiness paymentBusiness,
+        IServiceProvider serviceProvider)
        : base(serviceProvider)
     {
         _reserveBusiness = reserveBusiness;
+        _slotLockBusiness = slotLockBusiness;
+        _reportBusiness = reportBusiness;
+        _paymentBusiness = paymentBusiness;
     }
 
     [Function("CreateReserve")]
@@ -85,7 +96,7 @@ public class ReservesFunction : FunctionBase
             return req.CreateResponse(HttpStatusCode.BadRequest);
 
         var filter = await req.ReadFromJsonAsync<PagedReportRequestDto<ReserveReportFilterRequestDto>>();
-        var result = await _reserveBusiness.GetReserveReport(parsedDate, filter);
+        var result = await _reportBusiness.GetReserveReport(parsedDate, filter);
         return await MatchResultAsync(req, result);
     }
 
@@ -104,7 +115,7 @@ public class ReservesFunction : FunctionBase
     string reserveDate)
     {
         var filter = await req.ReadFromJsonAsync<PagedReportRequestDto<ReserveReportFilterRequestDto>>();
-        var result = await _reserveBusiness.GetReserveReport(filter);
+        var result = await _reportBusiness.GetReserveReport(filter);
         return await MatchResultAsync(req, result);
     }
 
@@ -119,7 +130,7 @@ public class ReservesFunction : FunctionBase
     int reserveId)
     {
         var filter = await req.ReadFromJsonAsync<PagedReportRequestDto<PassengerReserveReportFilterRequestDto>>();
-        var result = await _reserveBusiness.GetReservePassengerReport(reserveId, filter);
+        var result = await _reportBusiness.GetReservePassengerReport(reserveId, filter);
         return await MatchResultAsync(req, result);
     }
 
@@ -170,7 +181,7 @@ public class ReservesFunction : FunctionBase
         if (payments == null || !payments.Any())
             return req.CreateResponse(HttpStatusCode.BadRequest);
 
-        var result = await _reserveBusiness.CreatePaymentsAsync(customerId, reserveId, payments);
+        var result = await _paymentBusiness.CreatePaymentsAsync(customerId, reserveId, payments);
         return await MatchResultAsync(req, result);
     }
 
@@ -214,7 +225,7 @@ public class ReservesFunction : FunctionBase
         var dto = await req.ReadFromJsonAsync<LockReserveSlotsRequestDto>();
 
         var result = await ValidateAndMatchAsync(req, dto, GetValidator<LockReserveSlotsRequestDto>())
-                        .BindAsync(_reserveBusiness.LockReserveSlots);
+                        .BindAsync(_slotLockBusiness.AcquireAsync);
 
         return await MatchResultAsync(req, result);
     }
@@ -254,7 +265,7 @@ public class ReservesFunction : FunctionBase
         [HttpTrigger(AuthorizationLevel.Anonymous, "delete", Route = "reserve-slots-lock/{lockToken}")] HttpRequestData req,
         string lockToken)
     {
-        var result = await _reserveBusiness.CancelReserveSlotLock(lockToken);
+        var result = await _slotLockBusiness.CancelAsync(lockToken);
 
         return await MatchResultAsync(req, result);
     }
@@ -294,7 +305,7 @@ public class ReservesFunction : FunctionBase
         var dto = await req.ReadFromJsonAsync<SettleCustomerDebtRequestDto>();
 
         var result = await ValidateAndMatchAsync(req, dto, GetValidator<SettleCustomerDebtRequestDto>())
-                        .BindAsync(_reserveBusiness.SettleCustomerDebtAsync);
+                        .BindAsync(_paymentBusiness.SettleCustomerDebtAsync);
 
         return await MatchResultAsync(req, result);
     }
@@ -315,7 +326,7 @@ public class ReservesFunction : FunctionBase
         int reserveId)
     {
         var filter = await req.ReadFromJsonAsync<PagedReportRequestDto<ReservePaymentSummaryFilterRequestDto>>();
-        var result = await _reserveBusiness.GetReservePaymentSummary(reserveId, filter);
+        var result = await _reportBusiness.GetReservePaymentSummary(reserveId, filter);
         return await MatchResultAsync(req, result);
     }
 

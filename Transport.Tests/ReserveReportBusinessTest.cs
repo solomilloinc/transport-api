@@ -1,19 +1,16 @@
-﻿using Moq;
+﻿using FluentAssertions;
+using Moq;
 using Transport.Business.Data;
-using Transport.Business.ReserveBusiness;
-using Transport.Domain.CashBoxes;
-using Transport.Domain.CashBoxes.Abstraction;
+using Transport.Business.ReserveReportBusiness;
 using Transport.Domain.Customers;
 using Transport.Domain.Reserves;
 using Transport.Domain.Services;
 using Transport.SharedKernel;
+using Transport.SharedKernel.Contracts.Passenger;
 using Transport.SharedKernel.Contracts.Reserve;
 using Xunit;
 using Transport.Domain.Vehicles;
 using Transport.Domain.Cities;
-using Transport.Business.Authentication;
-using Transport.Business.Services.Payment;
-using Transport.Domain.Customers.Abstraction;
 using Transport.Domain.Passengers;
 using Transport.Domain.Trips;
 
@@ -22,27 +19,12 @@ namespace Transport.Tests;
 public class ReserveReportBusinessTest : TestBase
 {
     private readonly Mock<IApplicationDbContext> _contextMock;
-    private readonly Mock<IUnitOfWork> _unitOfWorkMock;
-    private readonly Mock<IUserContext> _userContextMock;
-    private readonly Mock<IMercadoPagoPaymentGateway> _mercadoPagoPaymentGatewayMock;
-    private readonly Mock<ICustomerBusiness> _customerBusinessMock;
-    private readonly Mock<ICashBoxBusiness> _cashBoxBusinessMock;
-    private readonly ReserveBusiness _reserveBusiness;
+    private readonly ReserveReportBusiness _reserveBusiness;
 
     public ReserveReportBusinessTest()
     {
         _contextMock = new Mock<IApplicationDbContext>();
-        _unitOfWorkMock = new Mock<IUnitOfWork>();
-        _userContextMock = new Mock<IUserContext>();
-        _mercadoPagoPaymentGatewayMock = new Mock<IMercadoPagoPaymentGateway>();
-        _customerBusinessMock = new Mock<ICustomerBusiness>();
-        _cashBoxBusinessMock = new Mock<ICashBoxBusiness>();
-
-        var openCashBox = new CashBox { CashBoxId = 1, Status = CashBoxStatusEnum.Open };
-        _cashBoxBusinessMock.Setup(x => x.GetOpenCashBoxEntity())
-            .ReturnsAsync(Result.Success(openCashBox));
-
-        _reserveBusiness = new ReserveBusiness(_contextMock.Object, _unitOfWorkMock.Object, _userContextMock.Object, _mercadoPagoPaymentGatewayMock.Object, _customerBusinessMock.Object, new FakeReserveOption(), _cashBoxBusinessMock.Object);
+        _reserveBusiness = new ReserveReportBusiness(_contextMock.Object);
     }
 
     [Fact]
@@ -675,5 +657,373 @@ public class ReserveReportBusinessTest : TestBase
         // Return has NOT enough capacity so returns empty list
         Assert.Empty(result.Value.Return.Items);
     }
+    #region GetReservePaymentSummary Tests
+
+    [Fact]
+    public async Task GetReservePaymentSummary_ShouldFail_WhenReserveNotFound()
+    {
+        // Arrange
+        _contextMock.Setup(c => c.Reserves)
+            .Returns(GetQueryableMockDbSet(new List<Reserve>()));
+
+        var request = new PagedReportRequestDto<ReservePaymentSummaryFilterRequestDto>();
+
+        // Act
+        var result = await _reserveBusiness.GetReservePaymentSummary(999, request);
+
+        // Assert
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Be(ReserveError.NotFound);
+    }
+
+    [Fact]
+    public async Task GetReservePaymentSummary_ShouldReturnEmptySummary_WhenNoPayments()
+    {
+        // Arrange
+        var reserve = new Reserve { ReserveId = 1 };
+        var reserves = new List<Reserve> { reserve };
+        var payments = new List<ReservePayment>();
+
+        _contextMock.Setup(c => c.Reserves)
+            .Returns(GetQueryableMockDbSet(reserves));
+        _contextMock.Setup(c => c.ReservePayments)
+            .Returns(GetQueryableMockDbSet(payments));
+
+        var request = new PagedReportRequestDto<ReservePaymentSummaryFilterRequestDto>();
+
+        // Act
+        var result = await _reserveBusiness.GetReservePaymentSummary(1, request);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Items.Should().HaveCount(1);
+        result.Value.Items[0].ReserveId.Should().Be(1);
+        result.Value.Items[0].PaymentsByMethod.Should().BeEmpty();
+        result.Value.Items[0].TotalAmount.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task GetReservePaymentSummary_ShouldReturnCorrectSummary_WithSinglePaymentMethod()
+    {
+        // Arrange
+        var reserve = new Reserve { ReserveId = 1 };
+        var reserves = new List<Reserve> { reserve };
+        var payments = new List<ReservePayment>
+        {
+            new ReservePayment
+            {
+                ReservePaymentId = 1,
+                ReserveId = 1,
+                Amount = 5000,
+                Method = PaymentMethodEnum.Cash,
+                ParentReservePaymentId = null
+            }
+        };
+
+        _contextMock.Setup(c => c.Reserves)
+            .Returns(GetQueryableMockDbSet(reserves));
+        _contextMock.Setup(c => c.ReservePayments)
+            .Returns(GetQueryableMockDbSet(payments));
+
+        var request = new PagedReportRequestDto<ReservePaymentSummaryFilterRequestDto>();
+
+        // Act
+        var result = await _reserveBusiness.GetReservePaymentSummary(1, request);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Items.Should().HaveCount(1);
+
+        var summary = result.Value.Items[0];
+        summary.ReserveId.Should().Be(1);
+        summary.TotalAmount.Should().Be(5000);
+        summary.PaymentsByMethod.Should().HaveCount(1);
+        summary.PaymentsByMethod[0].PaymentMethodId.Should().Be((int)PaymentMethodEnum.Cash);
+        summary.PaymentsByMethod[0].PaymentMethodName.Should().Be("Efectivo");
+        summary.PaymentsByMethod[0].Amount.Should().Be(5000);
+    }
+
+    [Fact]
+    public async Task GetReservePaymentSummary_ShouldReturnCorrectSummary_WithMultiplePaymentMethods()
+    {
+        // Arrange
+        var reserve = new Reserve { ReserveId = 1 };
+        var reserves = new List<Reserve> { reserve };
+
+        // Simular pago padre con monto total y hijos de desglose por método
+        var payments = new List<ReservePayment>
+        {
+            // Pago padre (monto total consolidado)
+            new ReservePayment
+            {
+                ReservePaymentId = 1,
+                ReserveId = 1,
+                Amount = 8000,
+                Method = PaymentMethodEnum.Cash,
+                ParentReservePaymentId = null
+            },
+            // Hijo desglose - Efectivo (Breakdown: Amount > 0)
+            new ReservePayment
+            {
+                ReservePaymentId = 2,
+                ReserveId = 1,
+                Amount = 5000,
+                Method = PaymentMethodEnum.Cash,
+                ParentReservePaymentId = 1
+            },
+            // Hijo desglose - Tarjeta (Breakdown: Amount > 0)
+            new ReservePayment
+            {
+                ReservePaymentId = 3,
+                ReserveId = 1,
+                Amount = 3000,
+                Method = PaymentMethodEnum.CreditCard,
+                ParentReservePaymentId = 1
+            }
+        };
+
+        _contextMock.Setup(c => c.Reserves)
+            .Returns(GetQueryableMockDbSet(reserves));
+        _contextMock.Setup(c => c.ReservePayments)
+            .Returns(GetQueryableMockDbSet(payments));
+
+        var request = new PagedReportRequestDto<ReservePaymentSummaryFilterRequestDto>();
+
+        // Act
+        var result = await _reserveBusiness.GetReservePaymentSummary(1, request);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Items.Should().HaveCount(1);
+
+        var summary = result.Value.Items[0];
+        summary.ReserveId.Should().Be(1);
+        summary.TotalAmount.Should().Be(8000, "Total debe ser la suma de pagos padres");
+        summary.PaymentsByMethod.Should().HaveCount(2, "Debe haber 2 métodos de pago diferentes");
+
+        var cashPayment = summary.PaymentsByMethod.First(p => p.PaymentMethodId == (int)PaymentMethodEnum.Cash);
+        cashPayment.Amount.Should().Be(5000);
+        cashPayment.PaymentMethodName.Should().Be("Efectivo");
+
+        var cardPayment = summary.PaymentsByMethod.First(p => p.PaymentMethodId == (int)PaymentMethodEnum.CreditCard);
+        cardPayment.Amount.Should().Be(3000);
+        cardPayment.PaymentMethodName.Should().Be("Tarjeta de Crédito");
+    }
+
+    [Fact]
+    public async Task GetReservePaymentSummary_ShouldAggregateMultiplePayments_SameMethod()
+    {
+        // Arrange - Múltiples pagos del mismo método
+        var reserve = new Reserve { ReserveId = 1 };
+        var reserves = new List<Reserve> { reserve };
+
+        var payments = new List<ReservePayment>
+        {
+            new ReservePayment
+            {
+                ReservePaymentId = 1,
+                ReserveId = 1,
+                Amount = 2000,
+                Method = PaymentMethodEnum.Cash,
+                ParentReservePaymentId = null
+            },
+            new ReservePayment
+            {
+                ReservePaymentId = 2,
+                ReserveId = 1,
+                Amount = 3000,
+                Method = PaymentMethodEnum.Cash,
+                ParentReservePaymentId = null
+            }
+        };
+
+        _contextMock.Setup(c => c.Reserves)
+            .Returns(GetQueryableMockDbSet(reserves));
+        _contextMock.Setup(c => c.ReservePayments)
+            .Returns(GetQueryableMockDbSet(payments));
+
+        var request = new PagedReportRequestDto<ReservePaymentSummaryFilterRequestDto>();
+
+        // Act
+        var result = await _reserveBusiness.GetReservePaymentSummary(1, request);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        var summary = result.Value.Items[0];
+
+        summary.TotalAmount.Should().Be(5000);
+        summary.PaymentsByMethod.Should().HaveCount(1);
+        summary.PaymentsByMethod[0].Amount.Should().Be(5000, "Debe sumar todos los pagos en efectivo");
+    }
+
+    [Fact]
+    public async Task GetReservePassengerReport_ShouldIncludeRelatedReservePayments()
+    {
+        // Arrange
+        var reserveId = 1;
+        var relatedReserveId = 2;
+        var customerId = 10;
+
+        var vehicle = new Vehicle { AvailableQuantity = 10 };
+        var service = new Service { Vehicle = vehicle };
+        var reserve1 = new Reserve
+        {
+            ReserveId = reserveId,
+            Service = service,
+            Vehicle = vehicle,
+            Passengers = new List<Passenger>(),
+
+            TripId = 1
+        };
+
+        var passengers = new List<Passenger>
+        {
+            new Passenger
+            {
+                PassengerId = 1,
+                ReserveId = reserveId,
+                ReserveRelatedId = relatedReserveId,
+                CustomerId = customerId,
+                FirstName = "Juan",
+                LastName = "Perez",
+                DocumentNumber = "123",
+                Reserve = reserve1
+            }
+        };
+        reserve1.Passengers = passengers;
+
+        var payments = new List<ReservePayment>
+        {
+            // Pago en la reserva actual (Ida) - Efectivo 1000
+            new ReservePayment
+            {
+                ReservePaymentId = 1,
+                ReserveId = reserveId,
+                CustomerId = customerId,
+                Amount = 1000,
+                Method = PaymentMethodEnum.Cash
+            },
+            // Pago en la reserva relacionada (Vuelta) - Online 2000
+            new ReservePayment
+            {
+                ReservePaymentId = 2,
+                ReserveId = relatedReserveId,
+                CustomerId = customerId,
+                Amount = 2000,
+                Method = PaymentMethodEnum.Online
+            }
+        };
+
+        var trips = new List<Trip>
+        {
+            new Trip { TripId = 1, OriginCityId = 1, DestinationCityId = 2, Status = EntityStatusEnum.Active, Prices = new List<TripPrice> {
+                new TripPrice { ReserveTypeId = ReserveTypeIdEnum.Ida, CityId = 2, Price = 100, Status = EntityStatusEnum.Active },
+                new TripPrice { ReserveTypeId = ReserveTypeIdEnum.IdaVuelta, CityId = 2, Price = 200, Status = EntityStatusEnum.Active }
+            }}
+        };
+
+        _contextMock.Setup(c => c.Passengers).Returns(GetQueryableMockDbSet(passengers));
+        _contextMock.Setup(c => c.ReservePayments).Returns(GetQueryableMockDbSet(payments));
+        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(new List<Reserve> { reserve1 }));
+        _contextMock.Setup(c => c.Trips).Returns(GetQueryableMockDbSet(trips));
+
+        var request = new PagedReportRequestDto<PassengerReserveReportFilterRequestDto>
+        {
+            Filters = new PassengerReserveReportFilterRequestDto(null, null, null)
+        };
+
+        // Act
+        var result = await _reserveBusiness.GetReservePassengerReport(reserveId, request);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Items.Should().HaveCount(1);
+        
+        var passengerReport = result.Value.Items[0];
+        passengerReport.PaidAmount.Should().Be(3000, "Debe sumar pagos de ambas reservas (1000 + 2000)");
+        passengerReport.PaymentMethods.Should().Contain("Efectivo");
+        passengerReport.PaymentMethods.Should().Contain("Online");
+    }
+
+    [Fact]
+    public async Task GetReservePassengerReport_ShouldIncludeServicePrice_WhenNoPaymentsExist()
+    {
+        // Arrange
+        var reserveId = 1;
+        var passengerIdUnpaidIda = 1;
+        var passengerIdUnpaidIdaVuelta = 2;
+
+        var trips = new List<Trip>
+        {
+            new Trip { TripId = 1, OriginCityId = 1, DestinationCityId = 2, Status = EntityStatusEnum.Active, Prices = new List<TripPrice> {
+                new TripPrice { ReserveTypeId = ReserveTypeIdEnum.Ida, CityId = 2, Price = 1500, Status = EntityStatusEnum.Active },
+                new TripPrice { ReserveTypeId = ReserveTypeIdEnum.IdaVuelta, CityId = 2, Price = 2500, Status = EntityStatusEnum.Active }
+            }}
+        };
+        var vehicle = new Vehicle { AvailableQuantity = 10 };
+        var service = new Service { Vehicle = vehicle };
+        var reserve1 = new Reserve
+        {
+            ReserveId = reserveId,
+            Service = service,
+            Vehicle = vehicle,
+            Passengers = new List<Passenger>(),
+
+            TripId = 1
+        };
+
+        var passengers = new List<Passenger>
+        {
+            // Pasajero 1: Solo Ida, sin pago
+            new Passenger
+            {
+                PassengerId = passengerIdUnpaidIda,
+                ReserveId = reserveId,
+                FirstName = "Unpaid",
+                LastName = "Ida",
+                DocumentNumber = "001",
+                Reserve = reserve1
+            },
+            // Pasajero 2: Ida y Vuelta, sin pago
+            new Passenger
+            {
+                PassengerId = passengerIdUnpaidIdaVuelta,
+                ReserveId = reserveId,
+                ReserveRelatedId = 3, // Indica que es Ida y Vuelta
+                FirstName = "Unpaid",
+                LastName = "IdaVuelta",
+                DocumentNumber = "002",
+                Reserve = reserve1
+            }
+        };
+        reserve1.Passengers = passengers;
+
+        _contextMock.Setup(c => c.Passengers).Returns(GetQueryableMockDbSet(passengers));
+        _contextMock.Setup(c => c.Trips).Returns(GetQueryableMockDbSet(trips));
+        _contextMock.Setup(c => c.ReservePayments).Returns(GetQueryableMockDbSet(new List<ReservePayment>()));
+        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(new List<Reserve> { reserve1 }));
+
+        var request = new PagedReportRequestDto<PassengerReserveReportFilterRequestDto>
+        {
+            Filters = new PassengerReserveReportFilterRequestDto(null, null, null)
+        };
+
+        // Act
+        var result = await _reserveBusiness.GetReservePassengerReport(reserveId, request);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Items.Should().HaveCount(2);
+        
+        var reportIda = result.Value.Items.First(i => i.PassengerId == passengerIdUnpaidIda);
+        reportIda.PaidAmount.Should().Be(1500, "Debe mostrar el precio de Ida del servicio");
+        reportIda.IsPayment.Should().BeFalse();
+
+        var reportIdaVuelta = result.Value.Items.First(i => i.PassengerId == passengerIdUnpaidIdaVuelta);
+        reportIdaVuelta.PaidAmount.Should().Be(2500, "Debe mostrar el precio de IdaVuelta del servicio");
+        reportIdaVuelta.IsPayment.Should().BeFalse();
+    }
+
+    #endregion
 
 }

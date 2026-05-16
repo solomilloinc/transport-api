@@ -32,11 +32,10 @@ public class CashBoxBusiness : ICashBoxBusiness
         if (cashBox is null)
             return Result.Failure<CashBoxResponseDto>(CashBoxError.NoOpenCashBox);
 
-        // TODO: Validar pagos pendientes cuando se confirme la funcionalidad
-        // var hasPendingPayments = await _context.ReservePayments
-        //     .AnyAsync(p => p.CashBoxId == cashBox.CashBoxId && p.Status == StatusPaymentEnum.Pending);
-        // if (hasPendingPayments)
-        //     return Result.Failure<CashBoxResponseDto>(CashBoxError.CannotCloseWithPendingPayments);
+        var hasPendingPayments = await _context.ReservePayments
+            .AnyAsync(p => p.CashBoxId == cashBox.CashBoxId && p.Status == StatusPaymentEnum.Pending);
+        if (hasPendingPayments)
+            return Result.Failure<CashBoxResponseDto>(CashBoxError.CannotCloseWithPendingPayments);
 
         // Cerrar la caja actual
         cashBox.Description = request.Description;

@@ -243,6 +243,11 @@ public class TenantBusiness : ITenantBusiness
         SetIfNotNull(legal, "cancellationPolicy", config.CancellationPolicy);
         styleJson["legal"] = legal;
 
+        // Business rules — flags that affect frontend behavior
+        var businessRules = styleJson["businessRules"] as JObject ?? new JObject();
+        businessRules["roundTripRequiresSameDay"] = config.RoundTripRequiresSameDay;
+        styleJson["businessRules"] = businessRules;
+
         return styleJson.ToString(Newtonsoft.Json.Formatting.None);
     }
 

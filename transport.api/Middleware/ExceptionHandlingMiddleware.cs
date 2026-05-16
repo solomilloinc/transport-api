@@ -8,6 +8,7 @@ using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.IdentityModel.Tokens;
 using Transport.SharedKernel;
 using Microsoft.AspNetCore.Http;
+using Transport_Api.Infrastructure;
 
 namespace Transport_Api.Middleware;
 
@@ -79,7 +80,7 @@ public class ExceptionHandlingMiddleware : IFunctionsWorkerMiddleware
         var httpRequest = await context.GetHttpRequestDataAsync();
         var response = httpRequest.CreateResponse((HttpStatusCode)details.Status!);
         response.Headers.Add("Content-Type", "application/json");
-        await response.WriteStringAsync(JsonSerializer.Serialize(details));
+        await response.WriteStringAsync(JsonSerializer.Serialize(details, JsonDefaults.Web));
         context.GetInvocationResult().Value = response;
     }
 
@@ -90,7 +91,7 @@ public class ExceptionHandlingMiddleware : IFunctionsWorkerMiddleware
         var problem = Infrastructure.CustomResults.ToProblemDetails(result);
         response.StatusCode = (HttpStatusCode)problem.Status!;
         response.Headers.Add("Content-Type", "application/json");
-        await response.WriteStringAsync(JsonSerializer.Serialize(problem));
+        await response.WriteStringAsync(JsonSerializer.Serialize(problem, JsonDefaults.Web));
         context.GetInvocationResult().Value = response;
     }
 }

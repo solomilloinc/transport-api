@@ -1,9 +1,11 @@
+using Azure.Core.Serialization;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Transport.Infraestructure;
 using Transport.Business;
 using Microsoft.Extensions.Configuration;
+using Transport_Api.Infrastructure;
 using Transport_Api.Middleware;
 using Microsoft.Azure.Functions.Worker.Extensions.OpenApi.Extensions;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Abstractions;
@@ -25,6 +27,9 @@ var host = new HostBuilder()
          x.UseMiddleware<ExceptionHandlingMiddleware>();
          x.UseMiddleware<TenantResolutionMiddleware>();
          x.UseMiddleware<AuthorizationMiddleware>();
+     }, workerOptions =>
+     {
+         workerOptions.Serializer = new JsonObjectSerializer(JsonDefaults.Web);
      })
     .ConfigureOpenApi()
     .ConfigureAppConfiguration(c =>

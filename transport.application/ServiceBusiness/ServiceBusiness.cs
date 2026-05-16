@@ -259,6 +259,7 @@ public class ServiceBusiness : IServiceBusiness
         return Result.Success(true);
     }
 
+    //TODO: Contemplar ServiceDirections en ReserveDirections.
     public async Task<Result<bool>> GenerateFutureReservesAsync()
     {
         await MarkOldReservesAsExpiredAsync();

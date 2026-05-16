@@ -16,6 +16,14 @@ public record TripReportResponseDto(
     // Frontend-ready options
     List<PickupOptionDto> PickupOptions,
     List<DropoffOptionDto> DropoffOptionsIda,
+    /// <summary>
+    /// Precios IdaVuelta (descuento round-trip). Sólo aplican cuando el tenant tiene
+    /// <see cref="Transport.Domain.Tenants.TenantConfig.RoundTripRequiresSameDay"/> en true
+    /// Y las dos reservas seleccionadas (outbound y return) son del MISMO día calendario.
+    /// Si las fechas difieren, el frontend debe sumar precios de <see cref="DropoffOptionsIda"/>
+    /// para cada pierna y mandar precio Ida en el wrapper. Si no, el server validará
+    /// y rechazará con PriceNotAvailable.
+    /// </summary>
     List<DropoffOptionDto> DropoffOptionsIdaVuelta,
     List<TripPickupStopReportDto>? StopSchedules = null);
 
