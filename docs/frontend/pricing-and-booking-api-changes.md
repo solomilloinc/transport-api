@@ -30,6 +30,14 @@ El descuento IdaVuelta solo se aplica si las dos reservas (outbound + return) so
 
 La regla es **configurable por tenant** via `TenantConfig.RoundTripRequiresSameDay` (default `true`). Si un tenant la desactiva, el comportamiento legacy vuelve (siempre IdaVuelta sin importar fechas).
 
+### Semántica del precio IdaVuelta (importante)
+
+`dropoffOptionsIdaVuelta[].price` (lo que cargó el admin) representa el **precio TOTAL del paquete round-trip**, no por pierna. Si la UI muestra "Capital Federal - $12.000" como IdaVuelta, esos son los $12.000 que paga el cliente por ida + vuelta juntos (con su descuento ya aplicado), NO $12.000 × 2.
+
+El backend valida la **suma** de las dos piernas contra ese precio total: `outbound.price + return.price === idaVueltaPackagePrice`. El frontend puede mandar cualquier split (50/50 es lo recomendado).
+
+`dropoffOptionsIda[].price` sigue siendo precio **por pierna**. Para una booking de fechas distintas (downgrade a Ida), cada pierna se valida independientemente contra esa tarifa.
+
 ### Cómo el frontend conoce el flag del tenant
 
 El config que ya devuelve `GET /tenant/resolve?host=...` (primera llamada del frontend al cargar) y `GET /tenant/config` ahora incluye una sección `businessRules`:
@@ -56,30 +64,53 @@ El frontend lee `config.businessRules.roundTripRequiresSameDay` una sola vez al 
 ### Implicación para el pricing en el frontend
 
 `GET /trip/{id}` → `TripReportResponseDto` devuelve ambas tablas de precios:
-- `DropoffOptionsIda` — precio Ida por dropoff
-- `DropoffOptionsIdaVuelta` — precio IdaVuelta por dropoff
+- `dropoffOptionsIda[].price` — precio Ida **por pierna**
+- `dropoffOptionsIdaVuelta[].price` — precio TOTAL del paquete round-trip
 
-Cuando el usuario seleccionó outbound + return, el frontend decide qué tabla usar combinando el flag del tenant con las fechas:
+Cuando el usuario seleccionó outbound + return, el frontend decide qué tarifa aplicar combinando el flag del tenant con las fechas:
 
 ```ts
 const sameDay = outboundReserve.reserveDate.slice(0, 10) === returnReserve.reserveDate.slice(0, 10);
 
 // Si el tenant exige same-day y las fechas difieren, el descuento NO aplica
-const useIdaVueltaTariff = !tenant.businessRules.roundTripRequiresSameDay || sameDay;
+const useIdaVueltaPackage = !tenant.businessRules.roundTripRequiresSameDay || sameDay;
 
-const dropoffOptions = useIdaVueltaTariff
-  ? trip.dropoffOptionsIdaVuelta
-  : trip.dropoffOptionsIda;
+if (useIdaVueltaPackage) {
+  // Mostrar y mandar el precio del paquete (UNA vez, no doble)
+  const packagePrice = trip.dropoffOptionsIdaVuelta
+    .find(o => o.cityId === selectedDropoffCityId)?.price; // p.ej. $12.000
 
-const pricePerLeg = dropoffOptions.find(o => o.cityId === selectedDropoffCityId)?.price;
+  const totalForUser = packagePrice;                      // mostrar "$12.000"
+  // Split 50/50 al mandar:
+  const halfPrice = packagePrice / 2;
+  const outboundLeg = { ..., price: halfPrice };
+  const returnLeg   = { ..., price: halfPrice };
+} else {
+  // Cada pierna se cobra a precio Ida completo (de SU trip)
+  const outboundIdaPrice = outboundTrip.dropoffOptionsIda
+    .find(o => o.cityId === outboundDropoffCityId)?.price; // p.ej. $10.000
+  const returnIdaPrice   = returnTrip.dropoffOptionsIda
+    .find(o => o.cityId === returnDropoffCityId)?.price;   // p.ej. $10.000
+
+  const totalForUser = outboundIdaPrice + returnIdaPrice;  // mostrar "$20.000"
+  const outboundLeg = { ..., price: outboundIdaPrice };
+  const returnLeg   = { ..., price: returnIdaPrice };
+}
 ```
 
 Reglas concretas:
-- Tenant con `roundTripRequiresSameDay = false` → siempre usa precios `DropoffOptionsIdaVuelta` (independiente de fechas)
-- Tenant con `roundTripRequiresSameDay = true` Y mismo día → `DropoffOptionsIdaVuelta`
-- Tenant con `roundTripRequiresSameDay = true` Y días distintos → `DropoffOptionsIda` × 2 piernas
 
-**El server valida**. Si mandás IdaVuelta-tariff con fechas distintas y el tenant tiene la regla activa, te rechaza con `Reserve.PriceNotAvailable`.
+| Escenario | `outbound.price` | `return.price` | Total mostrado al usuario |
+|-----------|-----------------|----------------|---------------------------|
+| Tenant `roundTripRequiresSameDay = false` o mismo día | `idaVueltaPrice / 2` | `idaVueltaPrice / 2` | `idaVueltaPrice` (paquete) |
+| Tenant `roundTripRequiresSameDay = true` y días distintos | `outboundTrip.idaPrice` | `returnTrip.idaPrice` | `outboundIda + returnIda` |
+
+**Para la rama "días distintos":** el frontend necesita los precios Ida de los **dos** trips (outbound y return). Si tu flujo actual sólo tiene cargado el trip outbound, vas a necesitar fetchear `GET /trip/{returnTripId}` para conocer su `dropoffOptionsIda`.
+
+**El server valida la suma**:
+- Para IdaVuelta efectivo: `outbound.price + return.price === idaVueltaPackagePrice` (un lookup en el trip outbound)
+- Para Ida efectivo (incluye downgrade): cada pierna se valida contra la tarifa Ida de SU trip
+- Si no coincide → `Reserve.PriceNotAvailable`
 
 ---
 
@@ -103,12 +134,14 @@ Reglas concretas:
 ```
 
 #### Ahora (camelCase, nuevo shape)
+
+Ejemplo IdaVuelta — paquete cargado en el admin = $12.000, mismo día → frontend manda split 50/50:
 ```json
 {
   "reserveTypeId": 2,
   "outboundReserveId": 1,
   "returnReserveId": 2,
-  "payments": [{ "transactionAmount": 160, "paymentMethod": 1 }],
+  "payments": [{ "transactionAmount": 12000, "paymentMethod": 1 }],
   "passengers": [
     {
       "customerId": 1,
@@ -117,17 +150,20 @@ Reglas concretas:
       "outbound": {
         "pickupLocationId": 1,
         "dropoffLocationId": 2,
-        "price": 80
+        "price": 6000
       },
       "return": {
         "pickupLocationId": 2,
         "dropoffLocationId": 1,
-        "price": 80
+        "price": 6000
       }
     }
   ]
 }
 ```
+**Reglas que aplica el server**:
+- `outbound.price + return.price === dropoffOptionsIdaVuelta.price` (paquete)
+- `payments.transactionAmount === outbound.price + return.price`
 
 Para una reserva **Ida** (sin vuelta):
 ```json
@@ -199,14 +235,16 @@ La regla 7-8 es donde se aplica el toggle del tenant + check de fechas: si el se
 
 ## 4. Total esperado en `payments`
 
-El backend calcula `totalExpectedAmount = Sum(outbound.price + return?.price ?? 0)` sobre todos los pasajeros.
+El backend calcula `totalExpectedAmount` distinto según el tipo efectivo:
+- **IdaVuelta efectivo**: `totalExpectedAmount = idaVueltaPackagePrice` (lookup único en el trip outbound)
+- **Ida efectivo (incluye downgrade)**: `totalExpectedAmount = outbound.price + return?.price ?? 0` (suma de piernas, cada una validada contra su tarifa Ida)
 
-| Escenario | Cálculo |
-|-----------|---------|
+| Escenario | Cálculo del total |
+|-----------|-------------------|
 | Ida, 1 pax, $100 | `100` |
 | Ida, 3 pax, $100 c/u | `300` |
-| IdaVuelta mismo día, 1 pax, $80 c/pierna | `160` |
-| IdaVuelta días distintos, 1 pax, $100 c/pierna (Ida) | `200` |
+| IdaVuelta mismo día, 1 pax, paquete $12.000 | `12000` |
+| IdaVuelta días distintos (downgrade), 1 pax, Ida $10.000 c/pierna | `20000` |
 
 El frontend debe mandar `payments[].transactionAmount` (o `payment.transactionAmount` en el endpoint público) sumando exactamente lo que el server espera; sobrepagos se rechazan con `Reserve.OverPaymentNotAllowed`.
 
@@ -230,17 +268,22 @@ El frontend debe mandar `payments[].transactionAmount` (o `payment.transactionAm
 1. Al cargar la app: leer `config.businessRules.roundTripRequiresSameDay` del response de `/tenant/resolve` y guardarlo en el store (default `true` si no viene).
 
 2. Después de que el usuario seleccione outbound + return (si aplica IdaVuelta):
-   - Si `roundTripRequiresSameDay === false` → tomar precios de `dropoffOptionsIdaVuelta` directamente
-   - Si `roundTripRequiresSameDay === true`:
-     - Comparar `outboundReserve.reserveDate.toDate()` vs `returnReserve.reserveDate.toDate()` por **fecha calendario** (zona horaria Argentina; ignorar hora)
-     - Si igual → `dropoffOptionsIdaVuelta`
-     - Si distinto → `dropoffOptionsIda` para ambas piernas
+   - Si `roundTripRequiresSameDay === false` o las fechas son iguales:
+     - Usar `packagePrice = trip.dropoffOptionsIdaVuelta[].price` (precio TOTAL del paquete)
+     - Total a mostrar al usuario: `packagePrice`
+     - Split sugerido (50/50): `outbound.price = packagePrice / 2`, `return.price = packagePrice / 2`
+   - Si `roundTripRequiresSameDay === true` Y las fechas difieren (downgrade a Ida):
+     - Tener los `dropoffOptionsIda` de los **dos** trips (puede requerir fetch extra de `GET /trip/{returnTripId}`)
+     - Total a mostrar al usuario: `outboundIdaPrice + returnIdaPrice`
+     - Mandar: `outbound.price = outboundIdaPrice`, `return.price = returnIdaPrice`
+
+   Comparación de fechas: `outboundReserve.reserveDate.slice(0, 10) === returnReserve.reserveDate.slice(0, 10)` (zona horaria Argentina; ignorar hora).
 
 3. Armar `passengers[]` con un objeto por pasajero, cada uno con `outbound` y `return` (este último solo cuando IdaVuelta).
 
 4. Mandar `reserveTypeId = 2` (IdaVuelta) **siempre que sea round-trip**, incluso si por fechas el server va a cobrar Ida. El `reserveTypeId` es la **intención de compra**, no el precio efectivo. Esto preserva el dato "esta venta era round-trip" en reportes.
 
-5. Calcular `payments[].transactionAmount` (o `payment.transactionAmount` en el público) como suma de todos los precios mandados.
+5. Calcular `payments[].transactionAmount` (o `payment.transactionAmount` en el público) como **suma de todos los precios mandados** — que va a equivaler al paquete IdaVuelta cuando aplica, o a la suma de las Ida por pierna cuando hay downgrade.
 
 ---
 

@@ -2495,3 +2495,61 @@ GO
 COMMIT;
 GO
 
+BEGIN TRANSACTION;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260514005051_AddRoundTripRequiresSameDayConfig'
+)
+BEGIN
+    ALTER TABLE [TenantConfig] ADD [RoundTripRequiresSameDay] bit NOT NULL DEFAULT CAST(1 AS bit);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260514005051_AddRoundTripRequiresSameDayConfig'
+)
+BEGIN
+    EXEC(N'UPDATE [Role] SET [CreatedDate] = ''2026-05-14T00:50:51.2476865Z''
+    WHERE [RoleId] = 1;
+    SELECT @@ROWCOUNT');
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260514005051_AddRoundTripRequiresSameDayConfig'
+)
+BEGIN
+    EXEC(N'UPDATE [Role] SET [CreatedDate] = ''2026-05-14T00:50:51.2476867Z''
+    WHERE [RoleId] = 2;
+    SELECT @@ROWCOUNT');
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260514005051_AddRoundTripRequiresSameDayConfig'
+)
+BEGIN
+    EXEC(N'UPDATE [Role] SET [CreatedDate] = ''2026-05-14T00:50:51.2476868Z''
+    WHERE [RoleId] = 3;
+    SELECT @@ROWCOUNT');
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260514005051_AddRoundTripRequiresSameDayConfig'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20260514005051_AddRoundTripRequiresSameDayConfig', N'8.0.14');
+END;
+GO
+
+COMMIT;
+GO
+

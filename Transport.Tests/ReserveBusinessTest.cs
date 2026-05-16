@@ -237,8 +237,9 @@ public class ReserveBusinessTests : TestBase
                 It.IsAny<IsolationLevel>()))
             .Returns<Func<Task<Result<bool>>>, IsolationLevel>((func, _) => func());
 
-        // New shape: a single passenger booking per "passenger". For 2 reserves => IdaVuelta with Outbound+Return legs.
-        // For 1 reserve => Ida only with Outbound leg.
+        // New shape (C-back semantics): TripPrice IdaVuelta = $100 es el TOTAL del paquete.
+        // - Ida (reserveCount=1): un solo leg, precio Ida = $100.
+        // - IdaVuelta (reserveCount=2): split 50/50 ($50 + $50 = $100 paquete).
         var isRoundTrip = reserveCount == 2;
         var passengersList = new List<PassengerBookingDto>
         {
@@ -246,13 +247,12 @@ public class ReserveBusinessTests : TestBase
                 CustomerId: 1,
                 IsPayment: true,
                 HasTraveled: false,
-                Outbound: new LegInfoDto(PickupLocationId: 1, DropoffLocationId: 2, Price: 100),
-                Return: isRoundTrip ? new LegInfoDto(PickupLocationId: 2, DropoffLocationId: 1, Price: 100) : null)
+                Outbound: new LegInfoDto(PickupLocationId: 1, DropoffLocationId: 2, Price: isRoundTrip ? 50 : 100),
+                Return: isRoundTrip ? new LegInfoDto(PickupLocationId: 2, DropoffLocationId: 1, Price: 50) : null)
         };
 
-        // Total = sum(outbound + return?) per passenger. With 1 passenger:
-        // Ida (reserveCount=1) => 100; IdaVuelta (reserveCount=2) => 200.
-        var totalAmount = 100m * reserveCount;
+        // Ida: $100. IdaVuelta: $100 paquete.
+        var totalAmount = 100m;
         var payments = new List<CreatePaymentRequestDto>();
 
         if (paymentCount == 1)
@@ -449,7 +449,7 @@ public class ReserveBusinessTests : TestBase
             paymentGatewayMock.Object,
             _cashBoxBusinessMock.Object);
 
-        // 1 pasajero IdaVuelta: un PassengerBookingExternalDto con Outbound + Return.
+        // 1 pasajero IdaVuelta: TripPrice IdaVuelta = $100 (paquete). Split 50/50.
         var passengerList = new List<PassengerBookingExternalDto>
         {
             new(
@@ -461,14 +461,14 @@ public class ReserveBusinessTests : TestBase
                 Email: "pepe@example.com",
                 Phone1: "32145678",
                 DocumentNumber: "32145678",
-                Outbound: new LegInfoDto(PickupLocationId: 1, DropoffLocationId: 2, Price: 100m),
-                Return:   new LegInfoDto(PickupLocationId: 1, DropoffLocationId: 2, Price: 100m)
+                Outbound: new LegInfoDto(PickupLocationId: 1, DropoffLocationId: 2, Price: 50m),
+                Return:   new LegInfoDto(PickupLocationId: 1, DropoffLocationId: 2, Price: 50m)
             )
         };
 
-        // 1 pasajero IdaVuelta: ahora el total es la suma de Outbound + Return = 200
+        // Total del paquete IdaVuelta = $100.
         var paymentDto = new CreatePaymentExternalRequestDto(
-            TransactionAmount: 200m,
+            TransactionAmount: 100m,
             Token: "token",
             Description: "Reserva de ida y vuelta",
             Installments: 1,
@@ -507,8 +507,8 @@ public class ReserveBusinessTests : TestBase
 
         var parentPayment = reservePaymentsList[0];
 
-        // Verificar pago padre (1 pasajero IdaVuelta = suma de Outbound + Return = 200)
-        Assert.Equal(200m, parentPayment.Amount);
+        // Verificar pago padre (1 pasajero IdaVuelta = paquete = $100)
+        Assert.Equal(100m, parentPayment.Amount);
         Assert.Null(parentPayment.ParentReservePaymentId);
         Assert.Equal(987654321, parentPayment.PaymentExternalId);
         Assert.Equal(StatusPaymentEnum.Paid, parentPayment.Status);
@@ -553,8 +553,8 @@ public class ReserveBusinessTests : TestBase
 
         var walletParentPayment = reservePaymentsList[0];
 
-        // Verificar pago padre (1 pasajero IdaVuelta = suma de Outbound + Return = 200)
-        Assert.Equal(200m, walletParentPayment.Amount);
+        // Verificar pago padre (1 pasajero IdaVuelta = paquete = $100)
+        Assert.Equal(100m, walletParentPayment.Amount);
         Assert.Null(walletParentPayment.ParentReservePaymentId);
         Assert.Null(walletParentPayment.PaymentExternalId); // Aun no tiene ID externo
         Assert.Equal(StatusPaymentEnum.Pending, walletParentPayment.Status);
@@ -1270,22 +1270,21 @@ public class ReserveBusinessTests : TestBase
                 It.IsAny<IsolationLevel>()))
             .Returns<Func<Task<Result<bool>>>, IsolationLevel>((func, _) => func());
 
-        // IdaVuelta: 1 PassengerBookingDto con Outbound + Return.
-        // Total esperado = Outbound.Price + Return.Price = 200.
+        // IdaVuelta: TripPrice IdaVuelta = $100 (paquete). Frontend manda split 50/50.
         var passengerItems = new List<PassengerBookingDto>
         {
             new PassengerBookingDto(
                 CustomerId: 1,
                 IsPayment: true,
                 HasTraveled: false,
-                Outbound: new LegInfoDto(PickupLocationId: 1, DropoffLocationId: 1, Price: 100),
-                Return:   new LegInfoDto(PickupLocationId: 1, DropoffLocationId: 1, Price: 100)
+                Outbound: new LegInfoDto(PickupLocationId: 1, DropoffLocationId: 1, Price: 50),
+                Return:   new LegInfoDto(PickupLocationId: 1, DropoffLocationId: 1, Price: 50)
             )
         };
 
         var paymentItems = new List<CreatePaymentRequestDto>
         {
-            new CreatePaymentRequestDto(200, (int)PaymentMethodEnum.Cash) // IdaVuelta: suma de ambas piernas
+            new CreatePaymentRequestDto(100, (int)PaymentMethodEnum.Cash) // IdaVuelta: paquete = $100
         };
 
         var request = new PassengerReserveCreateRequestWrapperDto(
@@ -1308,7 +1307,7 @@ public class ReserveBusinessTests : TestBase
 
         // El pago va a la reserva principal seleccionada (no a "la mas proxima")
         parentPayment.ReserveId.Should().Be(1, "El pago va a la reserva de ida");
-        parentPayment.Amount.Should().Be(200, "IdaVuelta: total = Outbound.Price + Return.Price");
+        parentPayment.Amount.Should().Be(100, "IdaVuelta: paquete total");
         parentPayment.Status.Should().Be(StatusPaymentEnum.Paid);
         parentPayment.CashBoxId.Should().Be(1, "El pago debe estar en la caja abierta");
 
@@ -1943,10 +1942,11 @@ public class ReserveBusinessTests : TestBase
     }
 
     [Fact]
-    public async Task CreatePassengerReserves_IdaVueltaSameDate_UsesIdaVueltaTariff()
+    public async Task CreatePassengerReserves_IdaVueltaSameDate_UsesIdaVueltaPackagePrice()
     {
         // Arrange — outbound y vuelta el MISMO día, tenant exige same-day.
-        // Frontend manda precio IdaVuelta ($80). Debe pasar y guardar Price=80 en cada Passenger.
+        // TripPrice IdaVuelta = $80 (precio TOTAL del paquete).
+        // Frontend manda split 50/50 ($40 + $40) que suma $80. Server valida la suma.
         var (trip, vehicle, service, customer, dropoff, pickup) = BuildIdaVueltaFixture();
         var sameDay = new DateTime(2026, 5, 13);
         var outbound = BuildReserve(1, sameDay, trip);
@@ -1977,15 +1977,15 @@ public class ReserveBusinessTests : TestBase
         var passengers = new List<PassengerBookingDto>
         {
             new(CustomerId: 1, IsPayment: true, HasTraveled: false,
-                Outbound: new LegInfoDto(PickupLocationId: 1, DropoffLocationId: 2, Price: 80),
-                Return:   new LegInfoDto(PickupLocationId: 1, DropoffLocationId: 2, Price: 80))
+                Outbound: new LegInfoDto(PickupLocationId: 1, DropoffLocationId: 2, Price: 40),
+                Return:   new LegInfoDto(PickupLocationId: 1, DropoffLocationId: 2, Price: 40))
         };
 
         var request = new PassengerReserveCreateRequestWrapperDto(
             ReserveTypeId: (int)ReserveTypeIdEnum.IdaVuelta,
             OutboundReserveId: 1,
             ReturnReserveId: 2,
-            Payments: new List<CreatePaymentRequestDto> { new(160, (int)PaymentMethodEnum.Cash) },
+            Payments: new List<CreatePaymentRequestDto> { new(80, (int)PaymentMethodEnum.Cash) },
             Passengers: passengers);
 
         // Act
@@ -1994,15 +1994,15 @@ public class ReserveBusinessTests : TestBase
         // Assert
         result.IsSuccess.Should().BeTrue();
         passengersList.Should().HaveCount(2);
-        passengersList.Should().AllSatisfy(p => p.Price.Should().Be(80m));
+        passengersList.Should().AllSatisfy(p => p.Price.Should().Be(40m));
     }
 
     [Fact]
-    public async Task CreatePassengerReserves_IdaVueltaDifferentDates_TenantRequiresSameDay_FailsWhenFrontendSendsIdaVueltaPrices()
+    public async Task CreatePassengerReserves_IdaVueltaDifferentDates_TenantRequiresSameDay_FailsWhenFrontendSendsIdaVueltaPackage()
     {
         // Arrange — outbound y vuelta en DÍAS distintos, tenant exige same-day.
-        // El frontend manda precio IdaVuelta ($80). El server debe degradar a Ida ($100)
-        // y rechazar con PriceNotAvailable.
+        // Frontend manda split del paquete IdaVuelta ($40 + $40 = $80). El server degrada a Ida,
+        // valida cada pierna contra tarifa Ida ($100). $40 != $100 → PriceNotAvailable.
         var (trip, vehicle, service, customer, dropoff, pickup) = BuildIdaVueltaFixture();
         var outbound = BuildReserve(1, new DateTime(2026, 5, 13), trip);
         var ret = BuildReserve(2, new DateTime(2026, 5, 14), trip);
@@ -2018,15 +2018,15 @@ public class ReserveBusinessTests : TestBase
         var passengers = new List<PassengerBookingDto>
         {
             new(CustomerId: 1, IsPayment: true, HasTraveled: false,
-                Outbound: new LegInfoDto(PickupLocationId: 1, DropoffLocationId: 2, Price: 80),
-                Return:   new LegInfoDto(PickupLocationId: 1, DropoffLocationId: 2, Price: 80))
+                Outbound: new LegInfoDto(PickupLocationId: 1, DropoffLocationId: 2, Price: 40),
+                Return:   new LegInfoDto(PickupLocationId: 1, DropoffLocationId: 2, Price: 40))
         };
 
         var request = new PassengerReserveCreateRequestWrapperDto(
             ReserveTypeId: (int)ReserveTypeIdEnum.IdaVuelta,
             OutboundReserveId: 1,
             ReturnReserveId: 2,
-            Payments: new List<CreatePaymentRequestDto> { new(160, (int)PaymentMethodEnum.Cash) },
+            Payments: new List<CreatePaymentRequestDto> { new(80, (int)PaymentMethodEnum.Cash) },
             Passengers: passengers);
 
         // Act
@@ -2038,10 +2038,10 @@ public class ReserveBusinessTests : TestBase
     }
 
     [Fact]
-    public async Task CreatePassengerReserves_IdaVueltaDifferentDates_TenantDoesNotRequireSameDay_UsesIdaVueltaTariff()
+    public async Task CreatePassengerReserves_IdaVueltaDifferentDates_TenantDoesNotRequireSameDay_UsesIdaVueltaPackagePrice()
     {
         // Arrange — fechas distintas pero tenant tiene la regla DESACTIVADA.
-        // El descuento IdaVuelta sigue aplicando.
+        // El paquete IdaVuelta sigue aplicando. Split 50/50 ($40 + $40 = $80 paquete).
         var (trip, vehicle, service, customer, dropoff, pickup) = BuildIdaVueltaFixture();
         var outbound = BuildReserve(1, new DateTime(2026, 5, 13), trip);
         var ret = BuildReserve(2, new DateTime(2026, 5, 14), trip);
@@ -2071,15 +2071,15 @@ public class ReserveBusinessTests : TestBase
         var passengers = new List<PassengerBookingDto>
         {
             new(CustomerId: 1, IsPayment: true, HasTraveled: false,
-                Outbound: new LegInfoDto(PickupLocationId: 1, DropoffLocationId: 2, Price: 80),
-                Return:   new LegInfoDto(PickupLocationId: 1, DropoffLocationId: 2, Price: 80))
+                Outbound: new LegInfoDto(PickupLocationId: 1, DropoffLocationId: 2, Price: 40),
+                Return:   new LegInfoDto(PickupLocationId: 1, DropoffLocationId: 2, Price: 40))
         };
 
         var request = new PassengerReserveCreateRequestWrapperDto(
             ReserveTypeId: (int)ReserveTypeIdEnum.IdaVuelta,
             OutboundReserveId: 1,
             ReturnReserveId: 2,
-            Payments: new List<CreatePaymentRequestDto> { new(160, (int)PaymentMethodEnum.Cash) },
+            Payments: new List<CreatePaymentRequestDto> { new(80, (int)PaymentMethodEnum.Cash) },
             Passengers: passengers);
 
         // Act
@@ -2088,7 +2088,7 @@ public class ReserveBusinessTests : TestBase
         // Assert
         result.IsSuccess.Should().BeTrue();
         passengersList.Should().HaveCount(2);
-        passengersList.Should().AllSatisfy(p => p.Price.Should().Be(80m));
+        passengersList.Should().AllSatisfy(p => p.Price.Should().Be(40m));
     }
 
     [Fact]

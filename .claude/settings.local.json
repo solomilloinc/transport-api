@@ -2,6 +2,26 @@
   "permissions": {
     "allow": [
       "Bash(dotnet test:*)",
+      "Bash(dotnet build:*)",
+      "Bash(dotnet ef:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git commit -m ' *)",
+      "Bash(powershell -Command \"\\(Get-Content 'C:\\\\Users\\\\x\\\\Documents\\\\GitHub\\\\transport-api\\\\transport.application\\\\ReserveBusiness\\\\ReserveBusiness.cs' | Measure-Object -Line\\).Lines\")",
+      "PowerShell(dotnet test C:\\\\Users\\\\x\\\\Documents\\\\GitHub\\\\transport-api\\\\Transport.Tests\\\\Transport.Tests.csproj --nologo --no-build --filter \"FullyQualifiedName!~Integration\" 2>&1)",
+      "Bash(git add *)",
+      "Bash(awk 'NR>=956 && NR<=1374' \"C:\\\\Users\\\\x\\\\Documents\\\\GitHub\\\\transport-api\\\\transport.application\\\\ReserveBusiness\\\\ReserveBusiness.cs\")",
+      "Bash(awk 'NR>=1477 && NR<=1844' \"C:\\\\Users\\\\x\\\\Documents\\\\GitHub\\\\transport-api\\\\Transport.Tests\\\\ReserveBusinessTest.cs\")",
+      "Read(//tmp/**)",
+      "Bash(awk 'NR<=657' \"C:\\\\Users\\\\x\\\\Documents\\\\GitHub\\\\transport-api\\\\Transport.Tests\\\\ReserveReportBusinessTest.cs\")",
+      "Bash(cat /tmp/tail_keep.txt /tmp/tests_to_migrate.txt)",
+      "Bash(echo \"\")",
+      "Bash(echo \"}\")",
+      "Bash(cp /tmp/new_file.txt \"C:\\\\Users\\\\x\\\\Documents\\\\GitHub\\\\transport-api\\\\Transport.Tests\\\\ReserveReportBusinessTest.cs\" && wc -l \"C:\\\\Users\\\\x\\\\Documents\\\\GitHub\\\\transport-api\\\\Transport.Tests\\\\ReserveReportBusinessTest.cs\")",
+      "Bash(awk 'NR<=1476 || NR>=1846' \"C:\\\\Users\\\\x\\\\Documents\\\\GitHub\\\\transport-api\\\\Transport.Tests\\\\ReserveBusinessTest.cs\")",
+      "Bash(awk 'NR<=803 || NR>=954' \"C:\\\\Users\\\\x\\\\Documents\\\\GitHub\\\\transport-api\\\\transport.application\\\\ReserveBusiness\\\\ReserveBusiness.cs\")",
+      "Bash(awk 'NR<=880 || NR>=1199' \"C:\\\\Users\\\\x\\\\Documents\\\\GitHub\\\\transport-api\\\\transport.application\\\\ReserveBusiness\\\\ReserveBusiness.cs\")"
     ],
     "deny": [],
     "ask": []

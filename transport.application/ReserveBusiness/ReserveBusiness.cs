@@ -209,17 +209,56 @@ public class ReserveBusiness : IReserveBusiness
 
             foreach (var pax in request.Passengers)
             {
-                var outboundResult = await CreatePassengerAdmin(
-                    outboundReserve, returnReserve?.ReserveId, pax, pax.Outbound, effectiveType, payer);
+                // Price validation depends on the EFFECTIVE reserve type:
+                // - IdaVuelta (same-day round-trip with discount): the TripPrice IdaVuelta is the
+                //   TOTAL package price; lookup ONCE on the outbound trip and validate that the sum
+                //   Outbound.Price + Return.Price matches. Frontend can split arbitrarily (50/50, etc.).
+                // - Ida (single leg or downgraded round-trip): each leg validates independently
+                //   against the Ida tariff of its own Trip.
+                if (effectiveType == ReserveTypeIdEnum.IdaVuelta && returnReserve is not null && pax.Return is not null)
+                {
+                    var packagePrice = await GetPassengerPriceAsync(
+                        outboundReserve.Trip.OriginCityId, outboundReserve.Trip.DestinationCityId,
+                        ReserveTypeIdEnum.IdaVuelta, pax.Outbound.DropoffLocationId);
+
+                    if (packagePrice is null || pax.Outbound.Price + pax.Return.Price != packagePrice.Value)
+                        return Result.Failure<bool>(ReserveError.PriceNotAvailable);
+
+                    totalExpectedAmount += packagePrice.Value;
+                }
+                else
+                {
+                    var outboundExpected = await GetPassengerPriceAsync(
+                        outboundReserve.Trip.OriginCityId, outboundReserve.Trip.DestinationCityId,
+                        effectiveType, pax.Outbound.DropoffLocationId);
+
+                    if (outboundExpected is null || pax.Outbound.Price != outboundExpected.Value)
+                        return Result.Failure<bool>(ReserveError.PriceNotAvailable);
+
+                    totalExpectedAmount += pax.Outbound.Price;
+
+                    if (returnReserve is not null && pax.Return is not null)
+                    {
+                        var returnExpected = await GetPassengerPriceAsync(
+                            returnReserve.Trip.OriginCityId, returnReserve.Trip.DestinationCityId,
+                            effectiveType, pax.Return.DropoffLocationId);
+
+                        if (returnExpected is null || pax.Return.Price != returnExpected.Value)
+                            return Result.Failure<bool>(ReserveError.PriceNotAvailable);
+
+                        totalExpectedAmount += pax.Return.Price;
+                    }
+                }
+
+                var outboundResult = await CreatePassengerAdminEntity(
+                    outboundReserve, returnReserve?.ReserveId, pax, pax.Outbound, payer);
                 if (outboundResult.IsFailure) return Result.Failure<bool>(outboundResult.Error);
-                totalExpectedAmount += pax.Outbound.Price;
 
                 if (returnReserve is not null && pax.Return is not null)
                 {
-                    var returnResult = await CreatePassengerAdmin(
-                        returnReserve, outboundReserve.ReserveId, pax, pax.Return, effectiveType, payer);
+                    var returnResult = await CreatePassengerAdminEntity(
+                        returnReserve, outboundReserve.ReserveId, pax, pax.Return, payer);
                     if (returnResult.IsFailure) return Result.Failure<bool>(returnResult.Error);
-                    totalExpectedAmount += pax.Return.Price;
                 }
             }
 
@@ -328,16 +367,14 @@ public class ReserveBusiness : IReserveBusiness
         });
     }
 
-    private async Task<Result<Passenger>> CreatePassengerAdmin(
-        Reserve reserve, int? relatedReserveId, PassengerBookingDto pax, LegInfoDto leg,
-        ReserveTypeIdEnum effectiveType, Customer payer)
+    /// <summary>
+    /// Creates a Passenger entity for a leg. Price validation is performed by the caller
+    /// (CreatePassengerReserves) because the validation strategy differs between Ida (per leg)
+    /// and IdaVuelta (sum of legs against package price).
+    /// </summary>
+    private async Task<Result<Passenger>> CreatePassengerAdminEntity(
+        Reserve reserve, int? relatedReserveId, PassengerBookingDto pax, LegInfoDto leg, Customer payer)
     {
-        var reservePrice = await GetPassengerPriceAsync(
-            reserve.Trip.OriginCityId, reserve.Trip.DestinationCityId, effectiveType, leg.DropoffLocationId);
-
-        if (reservePrice is null || leg.Price != reservePrice.Value)
-            return Result.Failure<Passenger>(ReserveError.PriceNotAvailable);
-
         var pickupResult = await GetDirectionAsync(leg.PickupLocationId, "Pickup");
         if (pickupResult.IsFailure) return Result.Failure<Passenger>(pickupResult.Error);
 
@@ -353,7 +390,7 @@ public class ReserveBusiness : IReserveBusiness
             PickupAddress = pickupResult.Value?.Name,
             DropoffAddress = dropoffResult.Value?.Name,
             HasTraveled = pax.HasTraveled,
-            Price = reservePrice.Value,
+            Price = leg.Price,
             Status = PassengerStatusEnum.PendingPayment,
             CustomerId = payer.CustomerId,
             DocumentNumber = payer.DocumentNumber,
@@ -465,11 +502,48 @@ public class ReserveBusiness : IReserveBusiness
 
         foreach (var pax in request.Passengers)
         {
-            var outboundResult = await CreatePassengerExternal(
-                outboundReserve, returnReserve?.ReserveId, pax, pax.Outbound, effectiveType,
+            // Same pricing model as the admin flow:
+            // - IdaVuelta (effective): TripPrice is the package total. Validate sum of legs.
+            // - Ida (effective or downgraded): validate each leg against its own Trip's Ida tariff.
+            if (effectiveType == ReserveTypeIdEnum.IdaVuelta && returnReserve is not null && pax.Return is not null)
+            {
+                var packagePrice = await GetPassengerPriceAsync(
+                    outboundReserve.Trip.OriginCityId, outboundReserve.Trip.DestinationCityId,
+                    ReserveTypeIdEnum.IdaVuelta, pax.Outbound.DropoffLocationId);
+
+                if (packagePrice is null || pax.Outbound.Price + pax.Return.Price != packagePrice.Value)
+                    return Result.Failure<CreateReserveExternalResult>(ReserveError.PriceNotAvailable);
+
+                totalExpectedAmount += packagePrice.Value;
+            }
+            else
+            {
+                var outboundExpected = await GetPassengerPriceAsync(
+                    outboundReserve.Trip.OriginCityId, outboundReserve.Trip.DestinationCityId,
+                    effectiveType, pax.Outbound.DropoffLocationId);
+
+                if (outboundExpected is null || pax.Outbound.Price != outboundExpected.Value)
+                    return Result.Failure<CreateReserveExternalResult>(ReserveError.PriceNotAvailable);
+
+                totalExpectedAmount += pax.Outbound.Price;
+
+                if (returnReserve is not null && pax.Return is not null)
+                {
+                    var returnExpected = await GetPassengerPriceAsync(
+                        returnReserve.Trip.OriginCityId, returnReserve.Trip.DestinationCityId,
+                        effectiveType, pax.Return.DropoffLocationId);
+
+                    if (returnExpected is null || pax.Return.Price != returnExpected.Value)
+                        return Result.Failure<CreateReserveExternalResult>(ReserveError.PriceNotAvailable);
+
+                    totalExpectedAmount += pax.Return.Price;
+                }
+            }
+
+            var outboundResult = await CreatePassengerExternalEntity(
+                outboundReserve, returnReserve?.ReserveId, pax, pax.Outbound,
                 isPaid: request.Payment is not null);
             if (outboundResult.IsFailure) return Result.Failure<CreateReserveExternalResult>(outboundResult.Error);
-            totalExpectedAmount += pax.Outbound.Price;
             preferenceItems.Add(new PaymentPreferenceItemDto(
                 $"Pasaje de {pax.FirstName} {pax.LastName}",
                 pax.Outbound.Price,
@@ -477,11 +551,10 @@ public class ReserveBusiness : IReserveBusiness
 
             if (returnReserve is not null && pax.Return is not null)
             {
-                var returnResult = await CreatePassengerExternal(
-                    returnReserve, outboundReserve.ReserveId, pax, pax.Return, effectiveType,
+                var returnResult = await CreatePassengerExternalEntity(
+                    returnReserve, outboundReserve.ReserveId, pax, pax.Return,
                     isPaid: request.Payment is not null);
                 if (returnResult.IsFailure) return Result.Failure<CreateReserveExternalResult>(returnResult.Error);
-                totalExpectedAmount += pax.Return.Price;
                 preferenceItems.Add(new PaymentPreferenceItemDto(
                     $"Pasaje de {pax.FirstName} {pax.LastName}",
                     pax.Return.Price,
@@ -541,16 +614,13 @@ public class ReserveBusiness : IReserveBusiness
         }
     }
 
-    private async Task<Result<Passenger>> CreatePassengerExternal(
-        Reserve reserve, int? relatedReserveId, PassengerBookingExternalDto pax, LegInfoDto leg,
-        ReserveTypeIdEnum effectiveType, bool isPaid)
+    /// <summary>
+    /// Creates a Passenger entity for the external (public) flow. Price validation is performed
+    /// by CreatePassengerReservesExternalCore.
+    /// </summary>
+    private async Task<Result<Passenger>> CreatePassengerExternalEntity(
+        Reserve reserve, int? relatedReserveId, PassengerBookingExternalDto pax, LegInfoDto leg, bool isPaid)
     {
-        var reservePrice = await GetPassengerPriceAsync(
-            reserve.Trip.OriginCityId, reserve.Trip.DestinationCityId, effectiveType, leg.DropoffLocationId);
-
-        if (reservePrice is null || leg.Price != reservePrice.Value)
-            return Result.Failure<Passenger>(ReserveError.PriceNotAvailable);
-
         if (reserve.Passengers.Any(p => p.DocumentNumber == pax.DocumentNumber))
             return Result.Failure<Passenger>(ReserveError.PassengerAlreadyExists(pax.DocumentNumber));
 
@@ -577,7 +647,7 @@ public class ReserveBusiness : IReserveBusiness
             PickupAddress = pickupResult.Value?.Name,
             DropoffAddress = dropoffResult.Value?.Name,
             HasTraveled = false,
-            Price = reservePrice.Value,
+            Price = leg.Price,
             Status = isPaid ? PassengerStatusEnum.Confirmed : PassengerStatusEnum.PendingPayment,
             CustomerId = existingCustomer?.CustomerId,
         };
