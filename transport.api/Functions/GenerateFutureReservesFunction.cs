@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Transport.Business.Authentication;
 using Transport.Business.Data;
+using Transport.Domain.FrequentSubscriptions.Abstraction;
 using Transport.Domain.Services.Abstraction;
 using Transport.Infraestructure.Authentication;
 using Transport.Infraestructure.Authorization;
@@ -17,17 +18,20 @@ public class GenerateFutureReservesFunction
 {
     private readonly ILogger<GenerateFutureReservesFunction> _logger;
     private readonly IServiceBusiness _serviceBusiness;
+    private readonly IFrequentPassengerBusiness _frequentPassengerBusiness;
     private readonly IApplicationDbContext _dbContext;
     private readonly ITenantContext _tenantContext;
 
     public GenerateFutureReservesFunction(
         ILogger<GenerateFutureReservesFunction> logger,
         IServiceBusiness serviceBusiness,
+        IFrequentPassengerBusiness frequentPassengerBusiness,
         IApplicationDbContext dbContext,
         ITenantContext tenantContext)
     {
         _logger = logger;
         _serviceBusiness = serviceBusiness;
+        _frequentPassengerBusiness = frequentPassengerBusiness;
         _dbContext = dbContext;
         _tenantContext = tenantContext;
     }
@@ -62,6 +66,18 @@ public class GenerateFutureReservesFunction
             else
             {
                 _logger.LogError("Failed to generate reserves for tenant {TenantCode}: {Error}", tenant.Code, result.Error);
+                continue;
+            }
+
+            var passengerResult = await _frequentPassengerBusiness.GenerateFrequentPassengersAsync();
+            if (passengerResult.IsSuccess)
+            {
+                _logger.LogInformation("Frequent passengers generated for tenant {TenantCode}", tenant.Code);
+            }
+            else
+            {
+                _logger.LogError("Failed to generate frequent passengers for tenant {TenantCode}: {Error}",
+                    tenant.Code, passengerResult.Error);
             }
         }
 

@@ -30,6 +30,11 @@ public static class CustomResults
             }
         }
 
+        if (result.Error.Details is not null)
+        {
+            problemDetails.Extensions["details"] = result.Error.Details;
+        }
+
         return problemDetails;
     }
 

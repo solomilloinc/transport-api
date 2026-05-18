@@ -1,0 +1,27 @@
+namespace Transport.SharedKernel.Contracts.FrequentSubscription;
+
+public record FrequentSubscriptionResponseDto(
+    int FrequentSubscriptionId,
+    int CustomerId,
+    string CustomerFullName,
+    string CustomerDocumentNumber,
+    int ReserveTypeId,
+    int OutboundServiceId,
+    string OutboundServiceName,
+    DayOfWeek OutboundDayOfWeek,
+    TimeSpan OutboundDepartureHour,
+    int? InboundServiceId,
+    string? InboundServiceName,
+    DayOfWeek? InboundDayOfWeek,
+    TimeSpan? InboundDepartureHour,
+    int OutboundPickupLocationId,
+    string OutboundPickupLocationName,
+    int OutboundDropoffLocationId,
+    string OutboundDropoffLocationName,
+    int? InboundPickupLocationId,
+    string? InboundPickupLocationName,
+    int? InboundDropoffLocationId,
+    string? InboundDropoffLocationName,
+    DateTime StartDate,
+    DateTime? EndDate,
+    string Status);

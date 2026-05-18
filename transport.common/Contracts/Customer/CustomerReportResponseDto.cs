@@ -1,6 +1,4 @@
-﻿namespace Transport.SharedKernel.Contracts.Customer;
-
-public record CustomerServiceDto(int ServiceId, string ServiceName);
+namespace Transport.SharedKernel.Contracts.Customer;
 
 public record CustomerReportResponseDto(
     int CustomerId,
@@ -11,5 +9,4 @@ public record CustomerReportResponseDto(
     string Phone1,
     string? Phone2,
     DateTime CreatedDate,
-    decimal CurrentBalance,
-    List<CustomerServiceDto> Services);
+    decimal CurrentBalance);

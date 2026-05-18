@@ -7,7 +7,6 @@ using Transport.SharedKernel.Contracts.Customer;
 using System.Linq.Expressions;
 using Transport.Domain.Reserves;
 using Transport.SharedKernel.Contracts.Reserve;
-using Transport.Domain.Services;
 
 namespace Transport.Business.CustomerBusiness;
 
@@ -22,22 +21,15 @@ public class CustomerBusiness : ICustomerBusiness
 
     public async Task<Result<int>> Create(CustomerCreateRequestDto dto)
     {
-        var customer = await _context.Customers
+        var existing = await _context.Customers
             .SingleOrDefaultAsync(x => x.DocumentNumber == dto.DocumentNumber);
 
-        if (customer != null)
+        if (existing != null)
         {
             return Result.Failure<int>(CustomerError.AlreadyExists);
         }
 
-        if (dto.ServiceIds?.Any() == true)
-        {
-            var validationResult = await ValidateServiceIdsAsync(dto.ServiceIds);
-            if (validationResult.IsFailure)
-                return Result.Failure<int>(validationResult.Error);
-        }
-
-        customer = new Customer
+        var customer = new Customer
         {
             FirstName = dto.FirstName,
             LastName = dto.LastName,
@@ -49,19 +41,6 @@ public class CustomerBusiness : ICustomerBusiness
 
         _context.Customers.Add(customer);
         await _context.SaveChangesWithOutboxAsync();
-
-        if (dto.ServiceIds?.Any() == true)
-        {
-            foreach (var serviceId in dto.ServiceIds.Distinct())
-            {
-                _context.ServiceCustomers.Add(new ServiceCustomer
-                {
-                    CustomerId = customer.CustomerId,
-                    ServiceId = serviceId
-                });
-            }
-            await _context.SaveChangesWithOutboxAsync();
-        }
 
         return customer.CustomerId;
     }
@@ -75,6 +54,11 @@ public class CustomerBusiness : ICustomerBusiness
             return Result.Failure<bool>(CustomerError.NotFound);
         }
 
+        var activeSubsCount = await _context.FrequentSubscriptions
+            .CountAsync(s => s.CustomerId == customerId && s.Status == EntityStatusEnum.Active);
+        if (activeSubsCount > 0)
+            return Result.Failure<bool>(CustomerError.HasActiveSubscriptions(customerId, activeSubsCount));
+
         customer.Status = EntityStatusEnum.Deleted;
         _context.Customers.Update(customer);
 
@@ -85,8 +69,6 @@ public class CustomerBusiness : ICustomerBusiness
     public async Task<Result<PagedReportResponseDto<CustomerReportResponseDto>>> GetCustomerReport(PagedReportRequestDto<CustomerReportFilterRequestDto> requestDto)
     {
         var query = _context.Customers
-            .Include(c => c.Services)
-                .ThenInclude(sc => sc.Service)
             .AsNoTracking()
             .AsQueryable();
 
@@ -114,7 +96,7 @@ public class CustomerBusiness : ICustomerBusiness
 
         var pagedResult = await query.ToPagedReportAsync<CustomerReportResponseDto, Customer, CustomerReportFilterRequestDto>(
             requestDto,
-            selector: c => new CustomerReportResponseDto(c.CustomerId, c.FirstName, c.LastName, c.Email, c.DocumentNumber, c.Phone1, c.Phone2, c.CreatedDate, c.CurrentBalance, c.Services.Select(s => new CustomerServiceDto(s.ServiceId, s.Service.Name)).ToList()),
+            selector: c => new CustomerReportResponseDto(c.CustomerId, c.FirstName, c.LastName, c.Email, c.DocumentNumber, c.Phone1, c.Phone2, c.CreatedDate, c.CurrentBalance),
             sortMappings: sortMappings
         );
 
@@ -128,30 +110,6 @@ public class CustomerBusiness : ICustomerBusiness
         if (customer is null)
         {
             return Result.Failure<bool>(CustomerError.NotFound);
-        }
-
-        if (dto.ServiceIds is not null)
-        {
-            if (dto.ServiceIds.Any())
-            {
-                var validationResult = await ValidateServiceIdsAsync(dto.ServiceIds);
-                if (validationResult.IsFailure)
-                    return Result.Failure<bool>(validationResult.Error);
-            }
-
-            var existingRelations = await _context.ServiceCustomers
-                .Where(sc => sc.CustomerId == customerId)
-                .ToListAsync();
-            _context.ServiceCustomers.RemoveRange(existingRelations);
-
-            foreach (var serviceId in dto.ServiceIds.Distinct())
-            {
-                _context.ServiceCustomers.Add(new ServiceCustomer
-                {
-                    CustomerId = customerId,
-                    ServiceId = serviceId
-                });
-            }
         }
 
         customer.FirstName = dto.FirstName;
@@ -179,7 +137,7 @@ public class CustomerBusiness : ICustomerBusiness
         await _context.SaveChangesWithOutboxAsync();
 
         return Result.Success(true);
-    }   
+    }
 
 
     public async Task<Result<CustomerAccountSummaryDto>> GetCustomerAccountSummaryAsync(int customerId, PagedReportRequestDto<CustomerTransactionReportFilterRequestDto> requestDto)
@@ -235,22 +193,5 @@ public class CustomerBusiness : ICustomerBusiness
         );
 
         return Result.Success(result);
-    }
-
-    private async Task<Result<bool>> ValidateServiceIdsAsync(List<int> serviceIds)
-    {
-        var distinctIds = serviceIds.Distinct().ToList();
-        var activeServiceIds = await _context.Services
-            .Where(s => distinctIds.Contains(s.ServiceId) && s.Status == EntityStatusEnum.Active)
-            .Select(s => s.ServiceId)
-            .ToListAsync();
-
-        var invalidServiceId = distinctIds.FirstOrDefault(id => !activeServiceIds.Contains(id));
-        if (invalidServiceId != 0)
-        {
-            return Result.Failure<bool>(ServiceError.ServiceNotActive(invalidServiceId));
-        }
-
-        return Result.Success(true);
     }
 }

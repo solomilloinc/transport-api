@@ -15,4 +15,10 @@ public static class CustomerError
     public static readonly Error Inactive = Error.Validation(
         "Customer.Inactive",
         "El cliente no se encuentra activo.");
+
+    public static Error HasActiveSubscriptions(int customerId, int count) =>
+        Error.Conflict(
+            "Customer.HasActiveSubscriptions",
+            $"No se puede eliminar el cliente {customerId}: tiene {count} suscripciones frecuentes activas. Cancelálas primero."
+        );
 }

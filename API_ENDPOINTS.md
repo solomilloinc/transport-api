@@ -164,22 +164,20 @@ Endpoints para integración con checkout externo (MercadoPago).
 **ServiceCreateDto:**
 ```json
 {
-  "name": "Córdoba-BsAs Mañana",
-  "originId": 1,
-  "destinationId": 2,
+  "name": "Córdoba-BsAs Lunes Mañana",
+  "tripId": 1,
   "vehicleId": 1,
-  "startDay": 1,            // DayOfWeek (0=Sunday)
-  "endDay": 5,
-  "estimatedDuration": "04:00:00"
+  "dayOfWeek": 1,           // DayOfWeek (0=Sunday)
+  "departureHour": "08:00:00",
+  "estimatedDuration": "04:00:00",
+  "isHoliday": false,
+  "allowedDirectionIds": [10, 11]
 }
 ```
 
-### Horarios de Servicio
-
-| Método | Ruta | Descripción | Auth |
-|--------|------|-------------|------|
-| POST | `/api/service-schedule-add/{serviceId}` | Agregar horario | Admin |
-| DELETE | `/api/service-schedule-delete/{scheduleId}` | Eliminar horario | Admin |
+Cada `Service` representa **un único slot semanal** (un tramo + un día + una hora). Para
+cubrir varios horarios del mismo tramo, crear un `Service` por cada combinación.
+La unicidad es estricta por `(TripId, DayOfWeek, DepartureHour)` (ver ADR 0003).
 
 ---
 
@@ -190,6 +188,26 @@ Endpoints para integración con checkout externo (MercadoPago).
 | POST | `/api/customer-create` | Crear cliente | Admin |
 | PUT | `/api/customer-update/{customerId}` | Actualizar cliente | Admin |
 | POST | `/api/customer-report` | Reporte de clientes | Admin |
+
+> Desde Mayo 2026: estos endpoints **ya no aceptan** el campo `serviceIds[]`. La asociación
+> Customer⇄Service vive en el CRUD de `FrequentSubscription` (ver abajo).
+
+---
+
+## FrequentSubscription (Pasajeros Frecuentes)
+
+| Método | Ruta | Descripción | Auth |
+|--------|------|-------------|------|
+| POST | `/api/frequent-subscription-create` | Crear suscripción frecuente (Ida o IdaVuelta) | Admin |
+| PUT | `/api/frequent-subscription-update/{id}` | Editar pickup/dropoff/vigencia | Admin |
+| DELETE | `/api/frequent-subscription-cancel/{id}` | Cancelar (cascade Passengers futuros + refunds) | Admin |
+| GET | `/api/frequent-subscription/{id}/cancel-preview` | Preview read-only del cancel (conteo + monto a reembolsar) | Admin |
+| GET | `/api/frequent-subscription/{id}` | Detalle | Admin |
+| POST | `/api/frequent-subscription-report` | Listado paginado con filtros | Admin |
+
+Detalle de payloads, semántica y manejo de errores en
+[docs/FRONTEND_SERVICIOS_CLIENTE.md](docs/FRONTEND_SERVICIOS_CLIENTE.md). Decisiones en
+[docs/adr/0004-frequent-passenger-subscription.md](docs/adr/0004-frequent-passenger-subscription.md).
 
 ---
 

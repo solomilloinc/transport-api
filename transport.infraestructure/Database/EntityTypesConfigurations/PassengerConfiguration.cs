@@ -79,6 +79,12 @@ public class PassengerConfiguration : IEntityTypeConfiguration<Passenger>
                .HasForeignKey(p => p.DropoffLocationId)
                .OnDelete(DeleteBehavior.NoAction);
 
+        builder.HasOne(p => p.FrequentSubscription)
+               .WithMany()
+               .HasForeignKey(p => p.FrequentSubscriptionId)
+               .IsRequired(false)
+               .OnDelete(DeleteBehavior.NoAction);
+
         // Auditoría
         builder.Property(p => p.CreatedBy)
                .HasColumnType("VARCHAR(100)")
@@ -93,6 +99,7 @@ public class PassengerConfiguration : IEntityTypeConfiguration<Passenger>
         builder.HasIndex(p => p.ReserveRelatedId);
         builder.HasIndex(p => p.CustomerId);
         builder.HasIndex(p => p.Status);
+        builder.HasIndex(p => p.FrequentSubscriptionId);
 
         // Evita duplicar el mismo documento en la misma reserva (regla de negocio)
         builder.HasIndex(p => new { p.ReserveId, p.DocumentNumber })

@@ -389,6 +389,7 @@ public class ReserveReportBusiness : IReserveReportBusiness
             return new PassengerReserveReportResponseDto(
                 p.PassengerId,
                 p.CustomerId,
+                p.FrequentSubscriptionId,
                 $"{p.FirstName} {p.LastName}",
                 p.DocumentNumber,
                 p.Email,

@@ -6,5 +6,4 @@ public record CustomerCreateRequestDto(
     string Email,
     string DocumentNumber,
     string Phone1,
-    string? Phone2,
-    List<int>? ServiceIds = null);
+    string? Phone2);

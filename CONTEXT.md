@@ -29,12 +29,8 @@ Espacio reservado para una fecha, horario y vehículo específicos. Es un **cont
 _Avoid_: Reservation, Booking, Slot.
 
 **Service**:
-Plantilla de horarios recurrentes que genera `Reserves` por batch para los próximos días. No tiene precio (los precios viven en `Trip`/`TripPrice`).
-_Avoid_: Schedule (eso es ServiceSchedule), Route, Línea.
-
-**ServiceSchedule**:
-Horario individual de salida dentro de un `Service` (ej. "08:00 los lunes").
-_Avoid_: Departure, Trip (ya tomado), Turn.
+Slot semanal recurrente (un `Trip`, un `DayOfWeek`, una `DepartureHour`) que genera una `Reserve` por semana para los próximos N días. No tiene precio (los precios viven en `Trip`/`TripPrice`).
+_Avoid_: Schedule, Route, Línea, Plantilla.
 
 **Vehicle**:
 Unidad física con capacidad fija (`AvailableQuantity`). Define el techo de pasajeros de cada `Reserve`.
@@ -49,6 +45,10 @@ _Avoid_: Ticket, Boleto, Pasaje, Seat.
 **Customer**:
 Cliente registrado en el sistema, opcionalmente referenciado por uno o más `Passenger` y con cuenta corriente (`CustomerAccountTransaction`).
 _Avoid_: User (eso es de auth), Client, Account.
+
+**FrequentSubscription**:
+Suscripción de un `Customer` a un slot recurrente (`Service` de Ida y, opcionalmente, `Service` de Vuelta como `IdaVuelta`). Captura pickup/dropoff `Direction` por leg y un rango de vigencia (`StartDate` requerido, `EndDate` opcional). Cada vez que el batch genera una `Reserve` para uno de sus Services en la ventana, crea un `Passenger` confirmado con el snapshot de precio + cargo automático a la cuenta corriente del cliente.
+_Avoid_: ServiceCustomer (concepto previo, eliminado), Membership, Recurring booking.
 
 **ReservePayment**:
 Registro de cobro asociado a una o más `Passenger` de una `Reserve`. Incluye estado (`Pending`/`Confirmed`/`Failed`) y referencia al gateway externo (MercadoPago).
@@ -65,8 +65,9 @@ _Avoid_: Hold, Reservation lock, Cart.
 - Una **Trip** tiene una o más **TripPrices** (una por ciudad-destino × `ReserveType` × `Direction` opcional).
 - Una **Reserve** referencia exactamente una **Trip** (para pricing) y exactamente un **Vehicle** (para capacidad).
 - Una **Reserve** contiene cero o más **Passengers**.
-- Un **Service** genera muchas **Reserves** (vía batch diario).
-- Un **Service** tiene uno o más **ServiceSchedules**.
+- Un **Service** genera una **Reserve** por semana (vía batch diario que mira hacia adelante N días) para el `DayOfWeek` + `DepartureHour` que define.
+- Un **Customer** tiene cero o más **FrequentSubscription**. Cada una referencia 1 `Service` (Outbound) y, opcionalmente, otro `Service` (Inbound) si el tipo es `IdaVuelta`.
+- Una **FrequentSubscription** activa fuerza, en cada corrida del batch, la creación de un `Passenger` confirmado por cada `Reserve` generada en sus `Service(s)` dentro de la vigencia.
 - Un **Passenger** referencia opcionalmente un **Customer**.
 - Un **Passenger** referencia opcionalmente otro **Passenger** (via `ReserveRelatedId`) cuando es `IdaVuelta`.
 - Una **ReservePayment** referencia exactamente una **Reserve**.
@@ -98,9 +99,9 @@ El sistema cobra y modela el precio por `Passenger`, pero no existe un concepto 
 
 **Resolución actual:** la unidad de cobro es `Passenger`. Documentado en `docs/adr/0002-no-explicit-booking-aggregate.md`.
 
-### 2. Fuente de capacidad: `Vehicle.AvailableQuantity` vs `ServiceSchedule`
+### 2. Fuente de capacidad: `Vehicle.AvailableQuantity` vs `Service`
 
-La capacidad efectiva de una `Reserve` surge del cruce entre el `Vehicle` asignado y, cuando viene de un `Service`, los `ServiceSchedule` correspondientes. Hoy esa lógica está distribuida en múltiples puntos del código (`ReserveBusiness.LockReserveSlots`, validaciones inline en `CreatePassengerReserves`) y no hay un único punto de verdad. Es uno de los motivos para extraer `IReserveCapacityValidator` durante el deepening.
+La capacidad efectiva de una `Reserve` surge del `Vehicle` asignado (el `Service` ya no aporta capacidad propia tras el refactor de Mayo 2026). Hoy esa lógica está distribuida en múltiples puntos del código (`ReserveBusiness.LockReserveSlots`, validaciones inline en `CreatePassengerReserves`) y no hay un único punto de verdad. Es uno de los motivos para extraer `IReserveCapacityValidator` durante el deepening.
 
 **Resolución actual:** sin resolver semánticamente; pendiente de consolidación técnica en el refactor de deep modules.
 

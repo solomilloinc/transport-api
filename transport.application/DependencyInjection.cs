@@ -2,6 +2,7 @@
 using FluentValidation;
 using Transport.Domain.CashBoxes.Abstraction;
 using Transport.Domain.Drivers.Abstraction;
+using Transport.Domain.FrequentSubscriptions.Abstraction;
 using Transport.Domain.Users.Abstraction;
 using Transport.Domain.Vehicles.Abstraction;
 using Transport.Domain.Cities.Abstraction;
@@ -36,6 +37,8 @@ public static class DependencyInjection
         services.AddScoped<ICashBoxBusiness, CashBoxBusiness.CashBoxBusiness>();
         services.AddScoped<ITripBusiness, TripBusiness.TripBusiness>();
         services.AddScoped<ITenantBusiness, TenantBusiness.TenantBusiness>();
+        services.AddScoped<IFrequentSubscriptionBusiness, FrequentSubscriptionBusiness.FrequentSubscriptionBusiness>();
+        services.AddScoped<IFrequentPassengerBusiness, FrequentSubscriptionBusiness.FrequentPassengerBusiness>();
         services.AddScoped<ISendReservationEmailTask, SendReservationEmailTask>();
 
         return services;

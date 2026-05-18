@@ -1,5 +1,5 @@
-﻿using Transport.Domain.Passengers;
-using Transport.Domain.Services;
+using Transport.Domain.FrequentSubscriptions;
+using Transport.Domain.Passengers;
 using Transport.Domain.Users;
 using Transport.SharedKernel;
 
@@ -24,7 +24,7 @@ public class Customer : Entity, IAuditable, ITenantScoped
     public DateTime CreatedDate { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedDate { get; set; }
 
-    public ICollection<ServiceCustomer> Services { get; set; } = new List<ServiceCustomer>();
+    public ICollection<FrequentSubscription> FrequentSubscriptions { get; set; } = new List<FrequentSubscription>();
     public ICollection<CustomerAccountTransaction> AccountTransactions { get; set; } = new List<CustomerAccountTransaction>();
     public ICollection<Passenger> Passengers { get; set; } = new List<Passenger>();
 }

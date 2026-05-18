@@ -21,6 +21,15 @@ public record Error
 
     public ErrorType Type { get; }
 
+    /// <summary>
+    /// Optional structured metadata for the error, exposed under <c>extensions.details</c> in the
+    /// ProblemDetails envelope. Used for field-level hints (ex: which form field caused a validation error).
+    /// </summary>
+    public IReadOnlyDictionary<string, object>? Details { get; init; }
+
+    public Error WithDetails(IReadOnlyDictionary<string, object> details) =>
+        this with { Details = details };
+
     public static Error Failure(string code, string description) =>
         new(code, description, ErrorType.Failure);
 

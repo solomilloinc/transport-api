@@ -12,6 +12,7 @@ using Transport.Domain.Users;
 using Transport.Domain.Vehicles;
 using Transport.Domain.Cities;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
+using Transport.Domain.FrequentSubscriptions;
 using Transport.Domain.Services;
 using Transport.Business.Authentication;
 using Transport.Domain.Directions;
@@ -42,13 +43,12 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<Trip> Trips { get; set; }
     public DbSet<TripPrice> TripPrices { get; set; }
     public DbSet<Passenger> Passengers { get; set; }
-    public DbSet<ServiceSchedule> ServiceSchedules { get; set; }
     public DbSet<ReservePayment> ReservePayments { get; set; }
     public DbSet<ReserveSlotLock> ReserveSlotLocks { get; set; }
     public DbSet<CustomerAccountTransaction> CustomerAccountTransactions { get; set; }
     public DbSet<CashBox> CashBoxes { get; set; }
     public DbSet<ServiceDirection> ServiceDirections { get; set; }
-    public DbSet<ServiceCustomer> ServiceCustomers { get; set; }
+    public DbSet<FrequentSubscription> FrequentSubscriptions { get; set; }
     public DbSet<ReserveDirection> ReserveDirections { get; set; }
     public DbSet<TripPickupStop> TripPickupStops { get; set; }
     public DbSet<Tenant> Tenants { get; set; }
