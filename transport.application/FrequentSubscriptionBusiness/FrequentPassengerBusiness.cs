@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Transport.Business.Data;
 using Transport.Domain.Customers;
 using Transport.Domain.FrequentSubscriptions;
@@ -17,15 +18,18 @@ public class FrequentPassengerBusiness : IFrequentPassengerBusiness
     private readonly IApplicationDbContext _context;
     private readonly IReserveOption _reserveOption;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly ILogger<FrequentPassengerBusiness>? _logger;
 
     public FrequentPassengerBusiness(
         IApplicationDbContext context,
         IReserveOption reserveOption,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        ILogger<FrequentPassengerBusiness>? logger = null)
     {
         _context = context;
         _reserveOption = reserveOption;
         _dateTimeProvider = dateTimeProvider;
+        _logger = logger;
     }
 
     public async Task<Result<bool>> GenerateFrequentPassengersAsync()
@@ -58,6 +62,10 @@ public class FrequentPassengerBusiness : IFrequentPassengerBusiness
         var today = _dateTimeProvider.UtcNow.Date;
         var windowEnd = today.AddDays(_reserveOption.ReserveGenerationDays);
 
+        _logger?.LogInformation(
+            "FrequentPassenger auto-apply START — subscriptionId={Id}, today={Today}, windowEnd={WindowEnd}",
+            frequentSubscriptionId, today, windowEnd);
+
         var subscription = await _context.FrequentSubscriptions
             .Where(s => s.FrequentSubscriptionId == frequentSubscriptionId
                      && s.Status == EntityStatusEnum.Active
@@ -68,12 +76,23 @@ public class FrequentPassengerBusiness : IFrequentPassengerBusiness
             .Include(s => s.InboundService!).ThenInclude(svc => svc.Trip)
             .FirstOrDefaultAsync();
 
-        // No-op si la sub no existe, está inactiva, o cae fuera de la ventana.
-        // No es error — el próximo batch run la pickea cuando entre en ventana.
-        if (subscription is null) return Result.Success(true);
+        if (subscription is null)
+        {
+            _logger?.LogWarning(
+                "FrequentPassenger auto-apply NO-OP — subscriptionId={Id} no encontrada o fuera de ventana " +
+                "[StartDate <= {WindowEnd} AND (EndDate IS NULL OR EndDate >= {Today}) AND Status = Active]. " +
+                "Si la sub existe en DB, revisar StartDate/EndDate/Status.",
+                frequentSubscriptionId, windowEnd, today);
+            return Result.Success(true);
+        }
 
         await ProcessSubscription(subscription, today, windowEnd);
         await _context.SaveChangesWithOutboxAsync();
+
+        _logger?.LogInformation(
+            "FrequentPassenger auto-apply END — subscriptionId={Id}",
+            frequentSubscriptionId);
+
         return Result.Success(true);
     }
 
@@ -84,7 +103,20 @@ public class FrequentPassengerBusiness : IFrequentPassengerBusiness
             ? subscription.EndDate.Value
             : windowEnd;
 
-        if (effectiveStart > effectiveEnd) return;
+        _logger?.LogInformation(
+            "ProcessSubscription subscriptionId={Id} type={Type} outboundServiceId={Out} inboundServiceId={In} " +
+            "effectiveRange=[{Start:yyyy-MM-dd}, {End:yyyy-MM-dd}]",
+            subscription.FrequentSubscriptionId, subscription.ReserveTypeId,
+            subscription.OutboundServiceId, subscription.InboundServiceId,
+            effectiveStart, effectiveEnd);
+
+        if (effectiveStart > effectiveEnd)
+        {
+            _logger?.LogWarning(
+                "ProcessSubscription subscriptionId={Id} SKIP: effectiveStart > effectiveEnd",
+                subscription.FrequentSubscriptionId);
+            return;
+        }
 
         var outboundReserves = await _context.Reserves
             .Where(r => r.ServiceId == subscription.OutboundServiceId
@@ -93,6 +125,10 @@ public class FrequentPassengerBusiness : IFrequentPassengerBusiness
                      && r.Status != ReserveStatusEnum.Cancelled
                      && r.Status != ReserveStatusEnum.Expired)
             .ToListAsync();
+
+        _logger?.LogInformation(
+            "ProcessSubscription subscriptionId={Id} outboundReserves encontradas={Count}",
+            subscription.FrequentSubscriptionId, outboundReserves.Count);
 
         var inboundReservesByDate = new Dictionary<DateTime, Reserve>();
         if (subscription.ReserveTypeId == ReserveTypeIdEnum.IdaVuelta && subscription.InboundServiceId.HasValue)
@@ -145,10 +181,28 @@ public class FrequentPassengerBusiness : IFrequentPassengerBusiness
         // Idempotente y atómico: si cualquier leg ya existe, no rellenamos el faltante.
         // El cargo a cuenta corriente es UNO solo por package, así que un estado parcial
         // implicaría cobrar dos veces o no cobrar al re-correr. Se skipea entero.
-        if (outboundExists || inboundExists) return;
+        if (outboundExists || inboundExists)
+        {
+            _logger?.LogDebug(
+                "CreatePairedPassengers SKIP (already exists) — subscriptionId={SubId} outboundReserveId={Out} inboundReserveId={In}",
+                subscription.FrequentSubscriptionId, outboundReserve.ReserveId, inboundReserve.ReserveId);
+            return;
+        }
 
-        if (!await HasCapacity(outboundReserve)) return;
-        if (!await HasCapacity(inboundReserve)) return;
+        if (!await HasCapacity(outboundReserve))
+        {
+            _logger?.LogWarning(
+                "CreatePairedPassengers SKIP (outbound capacity full) — subscriptionId={SubId} reserveId={ReserveId}",
+                subscription.FrequentSubscriptionId, outboundReserve.ReserveId);
+            return;
+        }
+        if (!await HasCapacity(inboundReserve))
+        {
+            _logger?.LogWarning(
+                "CreatePairedPassengers SKIP (inbound capacity full) — subscriptionId={SubId} reserveId={ReserveId}",
+                subscription.FrequentSubscriptionId, inboundReserve.ReserveId);
+            return;
+        }
 
         var packagePrice = await GetPriceAsync(
             subscription.OutboundService.Trip.OriginCityId,
@@ -158,7 +212,14 @@ public class FrequentPassengerBusiness : IFrequentPassengerBusiness
 
         if (packagePrice is null || packagePrice.Value <= 0)
         {
-            // No hay tarifa IdaVuelta configurada: degradamos a 2 Idas independientes.
+            _logger?.LogInformation(
+                "CreatePairedPassengers degrada a 2 Idas — subscriptionId={SubId}: no hay TripPrice IdaVuelta " +
+                "para tramo origin={Origin} dest={Dest} dropoff={Dropoff}",
+                subscription.FrequentSubscriptionId,
+                subscription.OutboundService.Trip.OriginCityId,
+                subscription.OutboundService.Trip.DestinationCityId,
+                subscription.OutboundDropoffLocationId);
+
             await CreateStandalonePassenger(subscription, outboundReserve, subscription.OutboundService, isOutbound: true);
             await CreateStandalonePassenger(subscription, inboundReserve, subscription.InboundService!, isOutbound: false);
             return;
@@ -190,8 +251,21 @@ public class FrequentPassengerBusiness : IFrequentPassengerBusiness
     private async Task CreateStandalonePassenger(
         FrequentSubscription subscription, Reserve reserve, Service service, bool isOutbound)
     {
-        if (await PassengerExists(reserve.ReserveId, subscription)) return;
-        if (!await HasCapacity(reserve)) return;
+        if (await PassengerExists(reserve.ReserveId, subscription))
+        {
+            _logger?.LogDebug(
+                "CreateStandalonePassenger SKIP (already exists) — subscriptionId={SubId} reserveId={ReserveId}",
+                subscription.FrequentSubscriptionId, reserve.ReserveId);
+            return;
+        }
+
+        if (!await HasCapacity(reserve))
+        {
+            _logger?.LogWarning(
+                "CreateStandalonePassenger SKIP (capacity full) — subscriptionId={SubId} reserveId={ReserveId} vehicleId={VehicleId}",
+                subscription.FrequentSubscriptionId, reserve.ReserveId, reserve.VehicleId);
+            return;
+        }
 
         var pickup = isOutbound ? subscription.OutboundPickupLocationId : subscription.InboundPickupLocationId!.Value;
         var dropoff = isOutbound ? subscription.OutboundDropoffLocationId : subscription.InboundDropoffLocationId!.Value;
@@ -202,7 +276,16 @@ public class FrequentPassengerBusiness : IFrequentPassengerBusiness
             ReserveTypeIdEnum.Ida,
             dropoff);
 
-        if (price is null || price.Value <= 0) return;
+        if (price is null || price.Value <= 0)
+        {
+            _logger?.LogWarning(
+                "CreateStandalonePassenger SKIP (price null/0) — subscriptionId={SubId} reserveId={ReserveId} " +
+                "tripId={TripId} originCityId={OriginCity} destCityId={DestCity} dropoffLocationId={Dropoff}. " +
+                "Verificar TripPrice configurado (Ida) para ese tramo + dropoff.",
+                subscription.FrequentSubscriptionId, reserve.ReserveId,
+                service.TripId, service.Trip.OriginCityId, service.Trip.DestinationCityId, dropoff);
+            return;
+        }
 
         var passenger = BuildPassenger(subscription, reserve, price.Value,
             pickupLocationId: pickup,
