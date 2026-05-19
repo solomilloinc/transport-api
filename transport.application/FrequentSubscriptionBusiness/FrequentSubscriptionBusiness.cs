@@ -183,6 +183,28 @@ public class FrequentSubscriptionBusiness : IFrequentSubscriptionBusiness
 
         _context.FrequentSubscriptions.Update(subscription);
         await _context.SaveChangesWithOutboxAsync();
+
+        // Auto-apply post-Update (mismo patrón que Create): si el update extendió el rango de
+        // fechas, se crean Passengers para las Reserves que ahora caen dentro. Es idempotente —
+        // los Passengers existentes mantienen su snapshot (ADR 0001) sin importar lo que se editó.
+        // Si la edición fue sólo pickup/dropoff sin cambio de fechas, es un no-op (correcto:
+        // los Passengers viejos no se tocan, los nuevos que se generen tomarán el pickup nuevo).
+        try
+        {
+            var applyResult = await _frequentPassengerBusiness
+                .GenerateForSubscriptionAsync(subscription.FrequentSubscriptionId);
+            if (applyResult.IsFailure)
+                _logger?.LogWarning(
+                    "Auto-apply post-Update de FrequentSubscription {Id} falló: {Error}. La próxima corrida del batch la pickea.",
+                    subscription.FrequentSubscriptionId, applyResult.Error.Code);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex,
+                "Auto-apply post-Update de FrequentSubscription {Id} lanzó excepción. La próxima corrida del batch la pickea.",
+                subscription.FrequentSubscriptionId);
+        }
+
         return Result.Success(true);
     }
 

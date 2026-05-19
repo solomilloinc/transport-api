@@ -245,6 +245,80 @@ public class FrequentSubscriptionBusinessTest : TestBase
     }
 
     [Fact]
+    public async Task Update_ShouldAutoApply_AfterPersistingChanges()
+    {
+        // Sub Ida activa que ya existe. El admin la edita (extiende EndDate). El Update
+        // tiene que disparar el mismo auto-apply que Create — idempotente, pickea Reserves
+        // que ahora caen en la nueva ventana sin tocar Passengers ya existentes.
+        var service = ActiveService(10);
+        var subscription = new FrequentSubscription
+        {
+            FrequentSubscriptionId = 42,
+            CustomerId = 1,
+            OutboundServiceId = 10,
+            OutboundService = service,
+            OutboundPickupLocationId = 100,
+            OutboundDropoffLocationId = 101,
+            ReserveTypeId = ReserveTypeIdEnum.Ida,
+            StartDate = new DateTime(2026, 05, 01),
+            EndDate = new DateTime(2026, 06, 01),
+            Status = EntityStatusEnum.Active
+        };
+        _ctx.Setup(c => c.FrequentSubscriptions).Returns(GetQueryableMockDbSet(new List<FrequentSubscription> { subscription }));
+        SetupSaveChangesWithOutboxAsync(_ctx);
+
+        var dto = new FrequentSubscriptionUpdateRequestDto(
+            OutboundPickupLocationId: 100,
+            OutboundDropoffLocationId: 101,
+            InboundPickupLocationId: null,
+            InboundDropoffLocationId: null,
+            StartDate: null,
+            EndDate: new DateTime(2026, 12, 31)); // extiende endDate
+
+        var result = await _business.Update(42, dto);
+
+        result.IsSuccess.Should().BeTrue();
+        subscription.EndDate.Should().Be(new DateTime(2026, 12, 31));
+        _passengers.Verify(p => p.GenerateForSubscriptionAsync(42), Times.Once);
+    }
+
+    [Fact]
+    public async Task Update_ShouldStillSucceed_WhenAutoApplyFails()
+    {
+        // Mismo principio que Create: si el auto-apply post-Update falla, la edición queda
+        // persistida igual. El próximo batch run pickea lo que faltó.
+        _passengers.Setup(p => p.GenerateForSubscriptionAsync(It.IsAny<int>()))
+                   .ReturnsAsync(Result.Failure<bool>(FrequentSubscriptionError.NotFound));
+
+        var service = ActiveService(10);
+        var subscription = new FrequentSubscription
+        {
+            FrequentSubscriptionId = 42,
+            CustomerId = 1,
+            OutboundServiceId = 10,
+            OutboundService = service,
+            OutboundPickupLocationId = 100,
+            OutboundDropoffLocationId = 101,
+            ReserveTypeId = ReserveTypeIdEnum.Ida,
+            StartDate = new DateTime(2026, 05, 01),
+            EndDate = new DateTime(2026, 06, 01),
+            Status = EntityStatusEnum.Active
+        };
+        _ctx.Setup(c => c.FrequentSubscriptions).Returns(GetQueryableMockDbSet(new List<FrequentSubscription> { subscription }));
+        SetupSaveChangesWithOutboxAsync(_ctx);
+
+        var dto = new FrequentSubscriptionUpdateRequestDto(
+            OutboundPickupLocationId: 200, OutboundDropoffLocationId: 201,
+            InboundPickupLocationId: null, InboundDropoffLocationId: null,
+            StartDate: null, EndDate: new DateTime(2026, 12, 31));
+
+        var result = await _business.Update(42, dto);
+
+        result.IsSuccess.Should().BeTrue();
+        subscription.OutboundPickupLocationId.Should().Be(200); // edición persistida igual
+    }
+
+    [Fact]
     public async Task Create_ShouldReturnDirectionErrorWithLegAndKindDetails()
     {
         var service = ActiveService(10, allowedDirection: 50); // pickup OK, dropoff NO
