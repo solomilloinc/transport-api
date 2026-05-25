@@ -1,4 +1,4 @@
-﻿using Transport.SharedKernel;
+using Transport.SharedKernel;
 using Transport.SharedKernel.Contracts.Service;
 
 namespace Transport.Domain.Services.Abstraction;
@@ -11,10 +11,5 @@ public interface IServiceBusiness
     Task<Result<bool>> Delete(int serviceId);
     Task<Result<bool>> Update(int serviceId, ServiceCreateRequestDto dto);
     Task<Result<bool>> GenerateFutureReservesAsync();
-    Task<Result<int>> CreateSchedule(int serviceId, ServiceScheduleCreateDto request);
-    Task<Result<bool>> UpdateScheduleStatus(int scheduleId, EntityStatusEnum status);
-    Task<Result<bool>> DeleteSchedule(int scheduleId);
-    Task<Result<bool>> UpdateSchedule(int scheduleId, ServiceScheduleUpdateDto request);
-    Task<Result<List<ServiceSchedule>>> GetSchedulesByServiceId(int serviceId);
-    Task<Result<List<ServiceIdNameDto>>> GetActiveServicesListAsync();
+    Task<Result<List<ServiceListItemDto>>> GetActiveServicesListAsync();
 }

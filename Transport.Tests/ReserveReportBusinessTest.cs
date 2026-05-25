@@ -33,14 +33,6 @@ public class ReserveReportBusinessTest : TestBase
         // Arrange
         var reserveDate = new DateTime(2024, 10, 5);
 
-        var schedule = new ServiceSchedule
-        {
-            ServiceScheduleId = 1,
-            DepartureHour = new TimeSpan(8, 0, 0),
-            IsHoliday = false,
-            Status = EntityStatusEnum.Active
-        };
-
         var vehicle = new Vehicle { AvailableQuantity = 3 };
         var service = new Service
         {
@@ -49,8 +41,7 @@ public class ReserveReportBusinessTest : TestBase
                 OriginCity = new City { Name = "Buenos Aires" },
                 DestinationCity = new City { Name = "Córdoba" }
             },
-            Vehicle = vehicle,
-            Schedules = new List<ServiceSchedule> { schedule }
+            Vehicle = vehicle
         };
 
         var reserves = new List<Reserve>
@@ -60,7 +51,6 @@ public class ReserveReportBusinessTest : TestBase
             ReserveId = 1,
             ReserveDate = reserveDate,
             Status = ReserveStatusEnum.Confirmed,
-            ServiceSchedule = schedule,
             Service = service,
             Vehicle = vehicle,
             OriginName = "Buenos Aires",
@@ -122,14 +112,6 @@ public class ReserveReportBusinessTest : TestBase
         // Arrange
         var reserveDate = new DateTime(2024, 11, 1);
 
-        var schedule = new ServiceSchedule
-        {
-            ServiceScheduleId = 1,
-            DepartureHour = new TimeSpan(8, 0, 0),
-            IsHoliday = false,
-            Status = EntityStatusEnum.Active
-        };
-
         var vehicle1 = new Vehicle { AvailableQuantity = 2 };
         var vehicle2 = new Vehicle { AvailableQuantity = 5 };
 
@@ -140,7 +122,6 @@ public class ReserveReportBusinessTest : TestBase
             ReserveId = 1,
             ReserveDate = reserveDate,
             Status = ReserveStatusEnum.Confirmed,
-            ServiceSchedule = schedule,
             Service = new Service
             {
                 Trip = new Trip
@@ -149,7 +130,6 @@ public class ReserveReportBusinessTest : TestBase
                     DestinationCity = new City { Name = "Santa Fe" }
                 },
                 Vehicle = vehicle1,
-                Schedules = new List<ServiceSchedule> { schedule }
             },
             Vehicle = vehicle1,
             OriginName = "Rosario",
@@ -162,7 +142,6 @@ public class ReserveReportBusinessTest : TestBase
             ReserveId = 2,
             ReserveDate = reserveDate,
             Status = ReserveStatusEnum.Confirmed,
-            ServiceSchedule = schedule,
             Service = new Service
             {
                 Trip = new Trip
@@ -171,7 +150,6 @@ public class ReserveReportBusinessTest : TestBase
                     DestinationCity = new City { Name = "San Juan" }
                 },
                 Vehicle = vehicle2,
-                Schedules = new List<ServiceSchedule> { schedule }
             },
             Vehicle = vehicle2,
             OriginName = "Mendoza",
@@ -462,14 +440,6 @@ public class ReserveReportBusinessTest : TestBase
         var departureDate = new DateTime(2024, 10, 10);
         var passengersRequested = 5;
 
-        var schedule = new ServiceSchedule
-        {
-            ServiceScheduleId = 1,
-            DepartureHour = new TimeSpan(9, 0, 0),
-            IsHoliday = false,
-            Status = EntityStatusEnum.Active
-        };
-
         var vehicle = new Vehicle { AvailableQuantity = 4 }; // less than passengersRequested
 
         var service = new Service
@@ -481,8 +451,7 @@ public class ReserveReportBusinessTest : TestBase
                 OriginCity = new City { Name = "Rosario" },
                 DestinationCity = new City { Name = "Santa Fe" }
             },
-            Vehicle = vehicle,
-            Schedules = new List<ServiceSchedule> { schedule }
+            Vehicle = vehicle
         };
 
         var trips = new List<Trip>
@@ -497,7 +466,6 @@ public class ReserveReportBusinessTest : TestBase
             ReserveId = 10,
             ReserveDate = departureDate,
             Status = ReserveStatusEnum.Confirmed,
-            ServiceSchedule = schedule,
             Service = service,
             Vehicle = vehicle,
             Trip = service.Trip,
@@ -546,14 +514,6 @@ public class ReserveReportBusinessTest : TestBase
         var returnDate = new DateTime(2024, 10, 12);
         var passengersRequested = 3;
 
-        var schedule = new ServiceSchedule
-        {
-            ServiceScheduleId = 1,
-            DepartureHour = new TimeSpan(9, 0, 0),
-            IsHoliday = false,
-            Status = EntityStatusEnum.Active
-        };
-
         var vehicleOutbound = new Vehicle { AvailableQuantity = 5, InternalNumber = "V001" };
         var vehicleReturn = new Vehicle { AvailableQuantity = 2, InternalNumber = "V002" }; // less capacity than requested passengers
 
@@ -567,7 +527,6 @@ public class ReserveReportBusinessTest : TestBase
                 DestinationCity = new City { CityId = 2, Name = "Santa Fe" }
             },
             Vehicle = vehicleOutbound,
-            Schedules = new List<ServiceSchedule> { schedule },
             EstimatedDuration = TimeSpan.FromHours(1)
         };
 
@@ -581,7 +540,6 @@ public class ReserveReportBusinessTest : TestBase
                 DestinationCity = new City { CityId = 1, Name = "Rosario" }
             },
             Vehicle = vehicleReturn,
-            Schedules = new List<ServiceSchedule> { schedule },
             EstimatedDuration = TimeSpan.FromHours(1)
         };
 
@@ -600,7 +558,6 @@ public class ReserveReportBusinessTest : TestBase
             ReserveId = 21,
             ReserveDate = departureDate,
             Status = ReserveStatusEnum.Confirmed,
-            ServiceSchedule = schedule,
             Service = serviceOutbound,
             Vehicle = vehicleOutbound,
             Trip = serviceOutbound.Trip,
@@ -616,7 +573,6 @@ public class ReserveReportBusinessTest : TestBase
             ReserveId = 22,
             ReserveDate = returnDate,
             Status = ReserveStatusEnum.Confirmed,
-            ServiceSchedule = schedule,
             Service = serviceReturn,
             Vehicle = vehicleReturn,
             Trip = serviceReturn.Trip,

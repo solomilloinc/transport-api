@@ -54,4 +54,10 @@ public static class ReserveError
     public static readonly Error NoDebtToSettle = Error.Validation(
         "Reserve.NoDebtToSettle",
         "No hay deuda pendiente en las reservas seleccionadas.");
+
+    public static Error SlotAlreadyTaken(int tripId, DateTime reserveDate, TimeSpan departureHour) =>
+        Error.Conflict(
+            "Reserve.SlotAlreadyTaken",
+            $"Ya existe una reserva para el tramo {tripId} el {reserveDate:yyyy-MM-dd} a las {departureHour:hh\\:mm}."
+        );
 }

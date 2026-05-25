@@ -95,6 +95,16 @@ public class ReserveBusiness : IReserveBusiness
                 return Result.Failure<int>(DriverError.DriverNotFound);
         }
 
+        var slotTaken = await _context.Reserves.AnyAsync(r =>
+            r.TripId == trip.TripId &&
+            r.ReserveDate.Date == dto.ReserveDate.Date &&
+            r.DepartureHour == dto.DepartureHour &&
+            r.Status != ReserveStatusEnum.Cancelled &&
+            r.Status != ReserveStatusEnum.Expired);
+
+        if (slotTaken)
+            return Result.Failure<int>(ReserveError.SlotAlreadyTaken(trip.TripId, dto.ReserveDate, dto.DepartureHour));
+
         var reserve = new Reserve
         {
             ReserveDate = dto.ReserveDate,
@@ -108,8 +118,7 @@ public class ReserveBusiness : IReserveBusiness
             EstimatedDuration = dto.EstimatedDuration,
             IsHoliday = dto.IsHoliday,
             Status = ReserveStatusEnum.Confirmed,
-            ServiceId = null,
-            ServiceScheduleId = null
+            ServiceId = null
         };
 
         // Add allowed directions whitelist for individual reserve

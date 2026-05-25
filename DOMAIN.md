@@ -89,7 +89,6 @@ Reserve
 ├── ReserveDate
 ├── TripId (FK → Trip)         // Para obtener precios
 ├── ServiceId (FK → Service)   // Opcional: si viene de batch
-├── ServiceScheduleId (FK)     // Opcional: horario del servicio
 ├── OriginId (FK → City)
 ├── DestinationId (FK → City)
 ├── VehicleId (FK → Vehicle)
@@ -107,6 +106,7 @@ Reserve
 - `ServiceId` es opcional (reservas manuales no tienen servicio)
 - `RowVersion` previene conflictos de concurrencia al actualizar
 - Capacidad máxima viene del `Vehicle` asociado
+- Unicidad estricta por `(TenantId, TripId, ReserveDate, DepartureHour)` excluyendo `Cancelled`/`Expired`
 
 **Estados de Reserve:**
 ```
@@ -140,40 +140,58 @@ Passenger
 - `Price` se calcula al crear desde TripPrice
 - `CustomerId` se asigna si el pasajero es cliente registrado
 
-### Service (Servicio Recurrente)
+### FrequentSubscription (Pasajero Frecuente)
 
-Define una ruta con horarios recurrentes para generación automática de reservas.
+Suscripción canónica de un `Customer` a un slot recurrente. Reemplaza al antiguo `ServiceCustomer`.
+
+```
+FrequentSubscription
+├── FrequentSubscriptionId (PK)
+├── CustomerId (FK → Customer)
+├── ReserveTypeId (Ida | IdaVuelta)
+├── OutboundServiceId (FK → Service)
+├── InboundServiceId (FK → Service, nullable, requerido si IdaVuelta)
+├── OutboundPickupLocationId / OutboundDropoffLocationId (FK → Direction)
+├── InboundPickupLocationId / InboundDropoffLocationId (FK → Direction, nullable, requerido si IdaVuelta)
+├── StartDate (date)            // default hoy si no se pasa
+├── EndDate (date, nullable)    // null = indefinida
+├── Status                       // Active | Deleted (cancel cascade)
+└── audit / tenant
+```
+
+**Reglas de Negocio:**
+- Unicidad: `(TenantId, CustomerId, OutboundServiceId)` filtrada por `Status = Active`.
+- Capacidad: al crear/editar, `count(subs activas en OutboundService) + 1 ≤ Vehicle.AvailableQuantity` (mismo check para Inbound si IdaVuelta).
+- Pickup/Dropoff deben estar en `Service.AllowedDirections` del Service respectivo (si la whitelist está poblada).
+- Cancelar la suscripción cancela todos los `Passenger` futuros no-viajados generados por ella y crea `CustomerAccountTransaction` Refund por cada uno.
+- Editar cambia sólo lo que se generará en adelante — los `Passenger` ya creados son snapshots (ADR 0001).
+- Decisiones documentadas en `docs/adr/0004-frequent-passenger-subscription.md`.
+
+### Service (Slot Semanal Recurrente)
+
+Define un slot semanal recurrente (un tramo + un día de la semana + una hora) que genera reservas automáticas para los próximos N días.
 
 ```
 Service
 ├── ServiceId (PK)
 ├── Name
-├── OriginId (FK → City)
-├── DestinationId (FK → City)
+├── TripId (FK → Trip)
 ├── VehicleId (FK → Vehicle)
-├── StartDay (DayOfWeek)      // Día inicio de semana
-├── EndDay (DayOfWeek)        // Día fin de semana
+├── DayOfWeek                 // Lunes..Domingo
+├── DepartureHour (TimeSpan)
 ├── EstimatedDuration
+├── IsHoliday                 // Si corre en feriado
 ├── Status
-├── Schedules[] → ServiceSchedule
+├── AllowedDirections[] → ServiceDirection
 ├── Customers[] → ServiceCustomer
 └── Reserves[] → Reserve
 ```
 
 **Reglas de Negocio:**
-- `StartDay/EndDay` definen qué días de la semana opera el servicio
-- El batch `GenerateFutureReserves` crea reserves automáticamente
-- Los precios NO están en Service, están en Trip/TripPrice
-
-### ServiceSchedule (Horario de Servicio)
-
-```
-ServiceSchedule
-├── ServiceScheduleId (PK)
-├── ServiceId (FK → Service)
-├── DepartureHour (TimeSpan)
-└── Status
-```
+- Cada Service representa **un único slot semanal**: un día + una hora.
+- Unicidad estricta por `(TenantId, TripId, DayOfWeek, DepartureHour)` filtrada por `Status = Active`. Ver ADR 0003.
+- El batch `GenerateFutureReserves` crea una Reserve por semana dentro de la ventana de N días.
+- Los precios NO están en Service, están en Trip/TripPrice.
 
 ---
 
@@ -185,9 +203,11 @@ ServiceSchedule
 1. Recibir ReserveCreateDto (TripId, OriginId, DestinationId, VehicleId, DepartureHour, ReserveDate)
 2. Validar datos con FluentValidation
 3. Buscar Trip para obtener nombres de ciudades
-4. Crear Reserve con datos desnormalizados
-5. SaveChangesAsync
-6. Retornar ReserveId
+4. Validar unicidad: no debe existir otra Reserve activa con (TripId, ReserveDate, DepartureHour);
+   si existe, retornar ReserveError.SlotAlreadyTaken
+5. Crear Reserve con datos desnormalizados
+6. SaveChangesAsync
+7. Retornar ReserveId
 ```
 
 ### 2. Agregar Pasajeros a Reserva (CreatePassengerReserves)
@@ -211,14 +231,15 @@ ServiceSchedule
 ### 3. Generación Batch de Reservas (GenerateFutureReserves)
 
 ```
-1. Timer trigger (diario)
-2. Para cada Service activo:
-   a. Verificar si el día actual está en rango (StartDay-EndDay)
-   b. Buscar Trip por OriginId/DestinationId del Service
-   c. Para cada Schedule:
-      - Crear Reserve para los próximos N días
-      - Asignar TripId, ServiceId, ServiceScheduleId
-3. SaveChangesAsync
+1. Trigger HTTP / scheduled (idempotente)
+2. Marcar como Expired las Reserves Available con ReserveDate < hoy
+3. Para cada Service activo:
+   a. Iterar fechas desde hoy hasta hoy + ReserveGenerationDays (default 15)
+   b. Saltear fechas cuyo DayOfWeek no coincida con service.DayOfWeek
+   c. Saltear feriados si service.IsHoliday == false
+   d. Skip-if-exists por (TenantId, TripId, ReserveDate, DepartureHour) — coherente con el índice único de Reserve
+   e. Crear Reserve con TripId, ServiceId y campos denormalizados
+4. SaveChangesWithOutboxAsync
 ```
 
 ### 4. Flujo de Pago Externo (Lock → Create)

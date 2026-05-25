@@ -17,7 +17,6 @@ public class Reserve: Entity, IAuditable, ITenantScoped
     public int VehicleId { get; set; }
     public int? DriverId { get; set; }
     public int? ServiceId { get; set;}
-    public int? ServiceScheduleId { get; set; }
     public int TripId { get; set; }
     public ReserveStatusEnum Status { get; set; }
     public string ServiceName { get; set; }
@@ -33,7 +32,6 @@ public class Reserve: Entity, IAuditable, ITenantScoped
     public Vehicle Vehicle { get; set; } = null!;
     public Driver? Driver { get; set; }
     public Service? Service { get; set; }
-    public ServiceSchedule? ServiceSchedule { get; set; }
     public Trip Trip { get; set; } = null!;
     public ICollection<Passenger> Passengers { get; set; } = new List<Passenger>();
     public ICollection<ReserveDirection> AllowedDirections { get; set; } = new List<ReserveDirection>();

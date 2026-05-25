@@ -8,6 +8,7 @@ using Transport.Domain.Users;
 using Transport.Domain.Vehicles;
 using Transport.Domain.Cities;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
+using Transport.Domain.FrequentSubscriptions;
 using Transport.Domain.Services;
 using Transport.Domain.Directions;
 using Transport.SharedKernel;
@@ -33,13 +34,12 @@ public interface IApplicationDbContext
     DbSet<Trip> Trips { get; }
     DbSet<TripPrice> TripPrices { get; }
     DbSet<Passenger> Passengers { get; }
-    DbSet<ServiceSchedule> ServiceSchedules { get; }
     DbSet<ReservePayment> ReservePayments { get; }
     DbSet<ReserveSlotLock> ReserveSlotLocks { get; }
     DbSet<CustomerAccountTransaction> CustomerAccountTransactions { get; }
     DbSet<CashBox> CashBoxes { get; }
     DbSet<ServiceDirection> ServiceDirections { get; }
-    DbSet<ServiceCustomer> ServiceCustomers { get; }
+    DbSet<FrequentSubscription> FrequentSubscriptions { get; }
     DbSet<ReserveDirection> ReserveDirections { get; }
     DbSet<TripPickupStop> TripPickupStops { get; }
     DbSet<Tenant> Tenants { get; }

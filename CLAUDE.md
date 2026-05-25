@@ -112,15 +112,10 @@ API (Azure Functions) → Business → Infrastructure → Domain
     │  Trip   │    │ Service  │    │ Reserve  │
     └────┬────┘    └────┬─────┘    └────┬─────┘
          │              │               │
-         ▼              │               ▼
-    ┌───────────┐       │         ┌───────────┐
-    │ TripPrice │       │         │ Passenger │
-    └───────────┘       │         └─────┬─────┘
-                        │               │
-                        ▼               ▼
-                ┌───────────────┐ ┌──────────┐
-                │ServiceSchedule│ │ Customer │
-                └───────────────┘ └──────────┘
+         ▼              ▼               ▼
+    ┌───────────┐  ┌──────────┐    ┌───────────┐
+    │ TripPrice │  │ Customer │    │ Passenger │
+    └───────────┘  └──────────┘    └───────────┘
 ```
 
 **Key Entities:**
@@ -145,10 +140,11 @@ API (Azure Functions) → Business → Infrastructure → Domain
 - `RowVersion`: Control de concurrencia optimista
 - Contiene múltiples `Passenger`
 
-**Service** (servicio recurrente):
-- Define rutas con horarios recurrentes (StartDay → EndDay)
-- Genera `Reserve` automáticamente vía batch
-- `Schedules`: Horarios de salida
+**Service** (slot semanal recurrente):
+- Define un único slot semanal: un `Trip` + un `DayOfWeek` + una `DepartureHour`
+- Genera una `Reserve` por semana vía batch dentro de la ventana de `ReserveGenerationDays`
+- `IsHoliday`: si corre en feriados
+- Unicidad: `(TenantId, TripId, DayOfWeek, DepartureHour)` filtrada por `Status = Active` (ver ADR 0003)
 
 **Passenger** (pasajero individual):
 - `ReserveId`: Pertenece a una reserva
@@ -211,7 +207,7 @@ var price = trip.Prices
 
 **Preventing Double Bookings:**
 1. Create `ReserveSlotLock` before attempting reservation.
-2. Lock checks available capacity on `Service` + `ServiceSchedule`.
+2. Lock checks available capacity on the `Vehicle` associated with the `Reserve`.
 3. Lock expires after `ReserveOption.SlotLockTimeoutMinutes`.
 4. Reservation commits within transaction, releasing lock.
 5. `Reserve.RowVersion` prevents race conditions during final commit.
@@ -343,7 +339,7 @@ public class YourBusinessTests : TestBase
 | Reserve | `transport.domain/Reserves/Reserve.cs` |
 | Passenger | `transport.domain/Passengers/Passenger.cs` |
 | Service | `transport.domain/Services/Service.cs` |
-| ServiceSchedule | `transport.domain/Services/ServiceSchedule.cs` |
+| FrequentSubscription | `transport.domain/FrequentSubscriptions/FrequentSubscription.cs` |
 | Customer | `transport.domain/Customers/Customer.cs` |
 | City | `transport.domain/Cities/City.cs` |
 | Direction | `transport.domain/Directions/Direction.cs` |
@@ -354,6 +350,8 @@ public class YourBusinessTests : TestBase
 | ReserveBusiness | `transport.application/ReserveBusiness/ReserveBusiness.cs` |
 | TripBusiness | `transport.application/TripBusiness/TripBusiness.cs` |
 | ServiceBusiness | `transport.application/ServiceBusiness/ServiceBusiness.cs` |
+| FrequentSubscriptionBusiness | `transport.application/FrequentSubscriptionBusiness/FrequentSubscriptionBusiness.cs` |
+| FrequentPassengerBusiness | `transport.application/FrequentSubscriptionBusiness/FrequentPassengerBusiness.cs` |
 | CustomerBusiness | `transport.application/CustomerBusiness/CustomerBusiness.cs` |
 | CityBusiness | `transport.application/CityBusiness/CityBusiness.cs` |
 
@@ -363,6 +361,7 @@ public class YourBusinessTests : TestBase
 | ReservesFunction | `transport.api/Functions/ReservesFunction.cs` |
 | TripsFunction | `transport.api/Functions/TripsFunction.cs` |
 | ServicesFunction | `transport.api/Functions/ServicesFunction.cs` |
+| FrequentSubscriptionsFunction | `transport.api/Functions/FrequentSubscriptionsFunction.cs` |
 | CustomersFunction | `transport.api/Functions/CustomersFunction.cs` |
 
 **EF Core Configurations:**

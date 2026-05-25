@@ -1,8 +1,11 @@
-﻿namespace Transport.SharedKernel.Contracts.Service;
+namespace Transport.SharedKernel.Contracts.Service;
 
 public record ServiceUpdateRequestDto(
     string Name,
-    TimeSpan EstimatedDuration,
+    int TripId,
     int VehicleId,
-    List<int>? AllowedDirectionIds = null
-);
+    DayOfWeek DayOfWeek,
+    TimeSpan DepartureHour,
+    TimeSpan EstimatedDuration,
+    bool IsHoliday = false,
+    List<int>? AllowedDirectionIds = null);

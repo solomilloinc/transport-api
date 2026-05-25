@@ -1,4 +1,4 @@
-﻿using Transport.Domain.Cities;
+using Transport.Domain.FrequentSubscriptions;
 using Transport.Domain.Reserves;
 using Transport.Domain.Trips;
 using Transport.Domain.Vehicles;
@@ -11,10 +11,11 @@ public class Service : Entity, IAuditable, ITenantScoped
     public int TenantId { get; set; }
     public string Name { get; set; } = null!;
     public int TripId { get; set; }
-    public TimeSpan EstimatedDuration { get; set; }
     public int VehicleId { get; set; }
-    public DayOfWeek StartDay { get; set; }
-    public DayOfWeek EndDay { get; set; }
+    public DayOfWeek DayOfWeek { get; set; }
+    public TimeSpan DepartureHour { get; set; }
+    public TimeSpan EstimatedDuration { get; set; }
+    public bool IsHoliday { get; set; }
     public EntityStatusEnum Status { get; set; } = EntityStatusEnum.Active;
 
     public string CreatedBy { get; set; } = null!;
@@ -25,20 +26,12 @@ public class Service : Entity, IAuditable, ITenantScoped
     public Trip Trip { get; set; } = null!;
     public Vehicle Vehicle { get; set; } = null!;
 
-    public ICollection<ServiceCustomer> Customers { get; set; } = new List<ServiceCustomer>();
     public ICollection<Reserve> Reserves { get; set; } = new List<Reserve>();
-    public ICollection<ServiceSchedule> Schedules { get; set; } = new List<ServiceSchedule>();
     public ICollection<ServiceDirection> AllowedDirections { get; set; } = new List<ServiceDirection>();
 
-    public bool IsDayWithinScheduleRange(DayOfWeek day)
-    {
-        if (StartDay == EndDay)
-            return day == StartDay;
+    // Suscripciones donde este Service es el outbound (la Ida del cliente).
+    public ICollection<FrequentSubscription> OutboundSubscriptions { get; set; } = new List<FrequentSubscription>();
 
-        if (StartDay < EndDay)
-            return day >= StartDay && day <= EndDay;
-
-        return day >= StartDay || day <= EndDay;
-    }
+    // Suscripciones donde este Service es el inbound (la Vuelta de un IdaVuelta).
+    public ICollection<FrequentSubscription> InboundSubscriptions { get; set; } = new List<FrequentSubscription>();
 }
-

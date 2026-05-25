@@ -31,6 +31,11 @@ public class TenantConfig : IAuditable
     // Business rules
     public bool RoundTripRequiresSameDay { get; set; } = true;
 
+    // Ventana del batch GenerateFutureReservesAsync: cuántos días hacia adelante genera
+    // Reserves a partir de hoy. Antes era global vía IReserveOption; ahora cada tenant
+    // puede configurar su ventana (ej. agencia A quiere 30 días, agencia B con 15).
+    public int ReserveGenerationDays { get; set; } = 15;
+
     public string CreatedBy { get; set; } = null!;
     public string? UpdatedBy { get; set; }
     public DateTime CreatedDate { get; set; } = DateTime.UtcNow;

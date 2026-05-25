@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Transport.Domain.Customers;
 using Transport.Domain.Directions;
+using Transport.Domain.FrequentSubscriptions;
 using Transport.Domain.Reserves;
 using Transport.SharedKernel;
 
@@ -39,12 +40,17 @@ public class Passenger : Entity, IAuditable, ITenantScoped
     // Relación opcional con Customer (si el pasajero es cliente)
     public int? CustomerId { get; set; }
 
+    // Sólo poblado en Passengers auto-creados por el batch de Pasajeros Frecuentes.
+    // Habilita el cascade del cancel de la suscripción.
+    public int? FrequentSubscriptionId { get; set; }
+
     // Navegación
     public Reserve Reserve { get; set; }
     public Reserve? ReserveRelated { get; set; }
     public Customer? Customer { get; set; }
     public Direction? PickupLocation { get; set; }
     public Direction? DropoffLocation { get; set; }
+    public FrequentSubscription? FrequentSubscription { get; set; }
 
     // Auditoría
     public string CreatedBy { get; set; }

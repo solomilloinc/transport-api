@@ -3,6 +3,8 @@ using Moq;
 using Transport.Business.CustomerBusiness;
 using Transport.Business.Data;
 using Transport.Domain.Customers;
+using Transport.Domain.FrequentSubscriptions;
+using Transport.Domain.Reserves;
 using Transport.SharedKernel.Contracts.Customer;
 using Transport.SharedKernel;
 using FluentAssertions;
@@ -103,6 +105,8 @@ public class CustomerBusinessTest : TestBase
 
         _mockContext.Setup(x => x.Customers)
             .Returns(GetQueryableMockDbSet(new List<Customer> { customer }));
+        _mockContext.Setup(x => x.FrequentSubscriptions)
+            .Returns(GetQueryableMockDbSet(new List<FrequentSubscription>()));
         _mockContext.Setup(x => x.SaveChangesWithOutboxAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
 
         // Act
@@ -112,6 +116,31 @@ public class CustomerBusinessTest : TestBase
         Assert.True(result.IsSuccess);
         Assert.True(result.Value);
         Assert.Equal(EntityStatusEnum.Deleted, customer.Status);
+    }
+
+    [Fact]
+    public async Task Delete_ShouldFail_WhenHasActiveSubscriptions()
+    {
+        var customer = new Customer { CustomerId = 1, Status = EntityStatusEnum.Active };
+        var sub = new FrequentSubscription
+        {
+            FrequentSubscriptionId = 9,
+            CustomerId = 1,
+            OutboundServiceId = 10,
+            ReserveTypeId = ReserveTypeIdEnum.Ida,
+            Status = EntityStatusEnum.Active
+        };
+
+        _mockContext.Setup(x => x.Customers)
+            .Returns(GetQueryableMockDbSet(new List<Customer> { customer }));
+        _mockContext.Setup(x => x.FrequentSubscriptions)
+            .Returns(GetQueryableMockDbSet(new List<FrequentSubscription> { sub }));
+
+        var result = await _customerBusiness.Delete(1);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Code.Should().Be("Customer.HasActiveSubscriptions");
+        customer.Status.Should().Be(EntityStatusEnum.Active);
     }
 
     [Fact]

@@ -154,23 +154,15 @@ public class RealConcurrencyTest : IDisposable
         {
             Name = $"Test Service {timestamp}",
             TripId = trip.TripId,
-
             VehicleId = vehicle.VehicleId,
-            Status = Transport.SharedKernel.EntityStatusEnum.Active,
-            CreatedBy = "Test"
-        };
-        _context.Services.Add(service);
-        _context.SaveChanges();
-
-        var serviceSchedule = new ServiceSchedule
-        {
-            ServiceId = service.ServiceId,
+            DayOfWeek = DateTime.Today.AddDays(1).DayOfWeek,
             DepartureHour = TimeSpan.FromHours(9),
+            EstimatedDuration = TimeSpan.FromHours(2),
             IsHoliday = false,
             Status = Transport.SharedKernel.EntityStatusEnum.Active,
             CreatedBy = "Test"
         };
-        _context.ServiceSchedules.Add(serviceSchedule);
+        _context.Services.Add(service);
         _context.SaveChanges();
 
         // Crear reserva con 8 pasajeros (quedando 2 cupos disponibles)
@@ -179,7 +171,6 @@ public class RealConcurrencyTest : IDisposable
             Status = ReserveStatusEnum.Confirmed,
             VehicleId = vehicle.VehicleId,
             ServiceId = service.ServiceId,
-            ServiceScheduleId = serviceSchedule.ServiceScheduleId,
             TripId = trip.TripId,
 
             ReserveDate = DateTime.Today.AddDays(1),

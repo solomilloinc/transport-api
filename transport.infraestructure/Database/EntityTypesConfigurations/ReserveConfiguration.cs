@@ -61,12 +61,6 @@ public class ReserveConfiguration : IEntityTypeConfiguration<Reserve>
                .HasForeignKey(r => r.DriverId)
                .OnDelete(DeleteBehavior.SetNull);
 
-        builder.HasOne(r => r.ServiceSchedule)
-               .WithMany()
-               .HasForeignKey(r => r.ServiceScheduleId)
-               .IsRequired(false)
-               .OnDelete(DeleteBehavior.Restrict);
-
         builder.HasOne(r => r.Trip)
                .WithMany()
                .HasForeignKey(r => r.TripId)
@@ -83,5 +77,10 @@ public class ReserveConfiguration : IEntityTypeConfiguration<Reserve>
         builder.HasIndex(r => new { r.ServiceId, r.ReserveDate });
         builder.HasIndex(r => new { r.Status, r.ReserveDate });
         builder.HasIndex(r => new { r.TripId, r.ReserveDate });
+
+        // SQL Server filtered indexes no soportan NOT IN — usamos AND de comparaciones simples.
+        builder.HasIndex(r => new { r.TenantId, r.TripId, r.ReserveDate, r.DepartureHour })
+            .HasFilter("[Status] <> 'Cancelled' AND [Status] <> 'Expired'")
+            .IsUnique();
     }
 }

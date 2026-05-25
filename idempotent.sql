@@ -2553,3 +2553,388 @@ GO
 COMMIT;
 GO
 
+BEGIN TRANSACTION;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260516201300_FlattenServiceDropServiceSchedule'
+)
+BEGIN
+    ALTER TABLE [Reserve] DROP CONSTRAINT [FK_Reserve_ServiceSchedule_ServiceScheduleId];
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260516201300_FlattenServiceDropServiceSchedule'
+)
+BEGIN
+    DROP TABLE [ServiceSchedule];
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260516201300_FlattenServiceDropServiceSchedule'
+)
+BEGIN
+    DROP INDEX [IX_Reserve_ServiceScheduleId] ON [Reserve];
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260516201300_FlattenServiceDropServiceSchedule'
+)
+BEGIN
+    DECLARE @var4 sysname;
+    SELECT @var4 = [d].[name]
+    FROM [sys].[default_constraints] [d]
+    INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
+    WHERE ([d].[parent_object_id] = OBJECT_ID(N'[Service]') AND [c].[name] = N'EndDay');
+    IF @var4 IS NOT NULL EXEC(N'ALTER TABLE [Service] DROP CONSTRAINT [' + @var4 + '];');
+    ALTER TABLE [Service] DROP COLUMN [EndDay];
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260516201300_FlattenServiceDropServiceSchedule'
+)
+BEGIN
+    DECLARE @var5 sysname;
+    SELECT @var5 = [d].[name]
+    FROM [sys].[default_constraints] [d]
+    INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
+    WHERE ([d].[parent_object_id] = OBJECT_ID(N'[Reserve]') AND [c].[name] = N'ServiceScheduleId');
+    IF @var5 IS NOT NULL EXEC(N'ALTER TABLE [Reserve] DROP CONSTRAINT [' + @var5 + '];');
+    ALTER TABLE [Reserve] DROP COLUMN [ServiceScheduleId];
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260516201300_FlattenServiceDropServiceSchedule'
+)
+BEGIN
+    EXEC sp_rename N'[Service].[StartDay]', N'DayOfWeek', N'COLUMN';
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260516201300_FlattenServiceDropServiceSchedule'
+)
+BEGIN
+    DECLARE @var6 sysname;
+    SELECT @var6 = [d].[name]
+    FROM [sys].[default_constraints] [d]
+    INNER JOIN [sys].[columns] [c] ON [d].[parent_column_id] = [c].[column_id] AND [d].[parent_object_id] = [c].[object_id]
+    WHERE ([d].[parent_object_id] = OBJECT_ID(N'[Service]') AND [c].[name] = N'Status');
+    IF @var6 IS NOT NULL EXEC(N'ALTER TABLE [Service] DROP CONSTRAINT [' + @var6 + '];');
+    ALTER TABLE [Service] ALTER COLUMN [Status] VARCHAR(20) NOT NULL;
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260516201300_FlattenServiceDropServiceSchedule'
+)
+BEGIN
+    ALTER TABLE [Service] ADD [DepartureHour] time NOT NULL DEFAULT '00:00:00';
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260516201300_FlattenServiceDropServiceSchedule'
+)
+BEGIN
+    ALTER TABLE [Service] ADD [IsHoliday] bit NOT NULL DEFAULT CAST(0 AS bit);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260516201300_FlattenServiceDropServiceSchedule'
+)
+BEGIN
+    EXEC(N'UPDATE [Role] SET [CreatedDate] = ''2026-05-16T20:13:00.1522225Z''
+    WHERE [RoleId] = 1;
+    SELECT @@ROWCOUNT');
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260516201300_FlattenServiceDropServiceSchedule'
+)
+BEGIN
+    EXEC(N'UPDATE [Role] SET [CreatedDate] = ''2026-05-16T20:13:00.1522226Z''
+    WHERE [RoleId] = 2;
+    SELECT @@ROWCOUNT');
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260516201300_FlattenServiceDropServiceSchedule'
+)
+BEGIN
+    EXEC(N'UPDATE [Role] SET [CreatedDate] = ''2026-05-16T20:13:00.1522227Z''
+    WHERE [RoleId] = 3;
+    SELECT @@ROWCOUNT');
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260516201300_FlattenServiceDropServiceSchedule'
+)
+BEGIN
+    EXEC(N'CREATE UNIQUE INDEX [IX_Service_TenantId_TripId_DayOfWeek_DepartureHour] ON [Service] ([TenantId], [TripId], [DayOfWeek], [DepartureHour]) WHERE [Status] = ''Active''');
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260516201300_FlattenServiceDropServiceSchedule'
+)
+BEGIN
+    EXEC(N'CREATE UNIQUE INDEX [IX_Reserve_TenantId_TripId_ReserveDate_DepartureHour] ON [Reserve] ([TenantId], [TripId], [ReserveDate], [DepartureHour]) WHERE [Status] <> ''Cancelled'' AND [Status] <> ''Expired''');
+END;
+GO 
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260516201300_FlattenServiceDropServiceSchedule'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20260516201300_FlattenServiceDropServiceSchedule', N'8.0.14');
+END;
+GO
+
+COMMIT;
+GO
+
+BEGIN TRANSACTION;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260517011858_AddFrequentSubscriptionRemoveServiceCustomer'
+)
+BEGIN
+    DROP TABLE [ServiceCustomer];
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260517011858_AddFrequentSubscriptionRemoveServiceCustomer'
+)
+BEGIN
+    ALTER TABLE [Passenger] ADD [FrequentSubscriptionId] int NULL;
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260517011858_AddFrequentSubscriptionRemoveServiceCustomer'
+)
+BEGIN
+    CREATE TABLE [FrequentSubscription] (
+        [FrequentSubscriptionId] int NOT NULL IDENTITY,
+        [TenantId] int NOT NULL DEFAULT 1,
+        [CustomerId] int NOT NULL,
+        [ReserveTypeId] VARCHAR(20) NOT NULL,
+        [OutboundServiceId] int NOT NULL,
+        [InboundServiceId] int NULL,
+        [OutboundPickupLocationId] int NOT NULL,
+        [OutboundDropoffLocationId] int NOT NULL,
+        [InboundPickupLocationId] int NULL,
+        [InboundDropoffLocationId] int NULL,
+        [StartDate] date NOT NULL,
+        [EndDate] date NULL,
+        [Status] VARCHAR(20) NOT NULL,
+        [CreatedBy] VARCHAR(256) NOT NULL DEFAULT 'System',
+        [UpdatedBy] VARCHAR(256) NULL,
+        [CreatedDate] datetime2 NOT NULL DEFAULT (GETDATE()),
+        [UpdatedDate] datetime2 NULL,
+        CONSTRAINT [PK_FrequentSubscription] PRIMARY KEY ([FrequentSubscriptionId]),
+        CONSTRAINT [FK_FrequentSubscription_Customer_CustomerId] FOREIGN KEY ([CustomerId]) REFERENCES [Customer] ([CustomerId]) ON DELETE NO ACTION,
+        CONSTRAINT [FK_FrequentSubscription_Direction_InboundDropoffLocationId] FOREIGN KEY ([InboundDropoffLocationId]) REFERENCES [Direction] ([DirectionId]) ON DELETE NO ACTION,
+        CONSTRAINT [FK_FrequentSubscription_Direction_InboundPickupLocationId] FOREIGN KEY ([InboundPickupLocationId]) REFERENCES [Direction] ([DirectionId]) ON DELETE NO ACTION,
+        CONSTRAINT [FK_FrequentSubscription_Direction_OutboundDropoffLocationId] FOREIGN KEY ([OutboundDropoffLocationId]) REFERENCES [Direction] ([DirectionId]) ON DELETE NO ACTION,
+        CONSTRAINT [FK_FrequentSubscription_Direction_OutboundPickupLocationId] FOREIGN KEY ([OutboundPickupLocationId]) REFERENCES [Direction] ([DirectionId]) ON DELETE NO ACTION,
+        CONSTRAINT [FK_FrequentSubscription_Service_InboundServiceId] FOREIGN KEY ([InboundServiceId]) REFERENCES [Service] ([ServiceId]) ON DELETE NO ACTION,
+        CONSTRAINT [FK_FrequentSubscription_Service_OutboundServiceId] FOREIGN KEY ([OutboundServiceId]) REFERENCES [Service] ([ServiceId]) ON DELETE NO ACTION,
+        CONSTRAINT [FK_FrequentSubscription_Tenant_TenantId] FOREIGN KEY ([TenantId]) REFERENCES [Tenant] ([TenantId]) ON DELETE NO ACTION
+    );
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260517011858_AddFrequentSubscriptionRemoveServiceCustomer'
+)
+BEGIN
+    EXEC(N'UPDATE [Role] SET [CreatedDate] = ''2026-05-17T01:18:57.6693639Z''
+    WHERE [RoleId] = 1;
+    SELECT @@ROWCOUNT');
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260517011858_AddFrequentSubscriptionRemoveServiceCustomer'
+)
+BEGIN
+    EXEC(N'UPDATE [Role] SET [CreatedDate] = ''2026-05-17T01:18:57.6693641Z''
+    WHERE [RoleId] = 2;
+    SELECT @@ROWCOUNT');
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260517011858_AddFrequentSubscriptionRemoveServiceCustomer'
+)
+BEGIN
+    EXEC(N'UPDATE [Role] SET [CreatedDate] = ''2026-05-17T01:18:57.6693642Z''
+    WHERE [RoleId] = 3;
+    SELECT @@ROWCOUNT');
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260517011858_AddFrequentSubscriptionRemoveServiceCustomer'
+)
+BEGIN
+    CREATE INDEX [IX_Passenger_FrequentSubscriptionId] ON [Passenger] ([FrequentSubscriptionId]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260517011858_AddFrequentSubscriptionRemoveServiceCustomer'
+)
+BEGIN
+    CREATE INDEX [IX_FrequentSubscription_CustomerId] ON [FrequentSubscription] ([CustomerId]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260517011858_AddFrequentSubscriptionRemoveServiceCustomer'
+)
+BEGIN
+    CREATE INDEX [IX_FrequentSubscription_InboundDropoffLocationId] ON [FrequentSubscription] ([InboundDropoffLocationId]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260517011858_AddFrequentSubscriptionRemoveServiceCustomer'
+)
+BEGIN
+    CREATE INDEX [IX_FrequentSubscription_InboundPickupLocationId] ON [FrequentSubscription] ([InboundPickupLocationId]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260517011858_AddFrequentSubscriptionRemoveServiceCustomer'
+)
+BEGIN
+    CREATE INDEX [IX_FrequentSubscription_InboundServiceId] ON [FrequentSubscription] ([InboundServiceId]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260517011858_AddFrequentSubscriptionRemoveServiceCustomer'
+)
+BEGIN
+    CREATE INDEX [IX_FrequentSubscription_OutboundDropoffLocationId] ON [FrequentSubscription] ([OutboundDropoffLocationId]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260517011858_AddFrequentSubscriptionRemoveServiceCustomer'
+)
+BEGIN
+    CREATE INDEX [IX_FrequentSubscription_OutboundPickupLocationId] ON [FrequentSubscription] ([OutboundPickupLocationId]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260517011858_AddFrequentSubscriptionRemoveServiceCustomer'
+)
+BEGIN
+    CREATE INDEX [IX_FrequentSubscription_OutboundServiceId] ON [FrequentSubscription] ([OutboundServiceId]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260517011858_AddFrequentSubscriptionRemoveServiceCustomer'
+)
+BEGIN
+    CREATE INDEX [IX_FrequentSubscription_TenantId] ON [FrequentSubscription] ([TenantId]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260517011858_AddFrequentSubscriptionRemoveServiceCustomer'
+)
+BEGIN
+    EXEC(N'CREATE UNIQUE INDEX [IX_FrequentSubscription_TenantId_CustomerId_OutboundServiceId] ON [FrequentSubscription] ([TenantId], [CustomerId], [OutboundServiceId]) WHERE [Status] = ''Active''');
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260517011858_AddFrequentSubscriptionRemoveServiceCustomer'
+)
+BEGIN
+    CREATE INDEX [IX_FrequentSubscription_TenantId_InboundServiceId_Status] ON [FrequentSubscription] ([TenantId], [InboundServiceId], [Status]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260517011858_AddFrequentSubscriptionRemoveServiceCustomer'
+)
+BEGIN
+    CREATE INDEX [IX_FrequentSubscription_TenantId_OutboundServiceId_Status] ON [FrequentSubscription] ([TenantId], [OutboundServiceId], [Status]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260517011858_AddFrequentSubscriptionRemoveServiceCustomer'
+)
+BEGIN
+    ALTER TABLE [Passenger] ADD CONSTRAINT [FK_Passenger_FrequentSubscription_FrequentSubscriptionId] FOREIGN KEY ([FrequentSubscriptionId]) REFERENCES [FrequentSubscription] ([FrequentSubscriptionId]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260517011858_AddFrequentSubscriptionRemoveServiceCustomer'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20260517011858_AddFrequentSubscriptionRemoveServiceCustomer', N'8.0.14');
+END;
+GO
+
+COMMIT;
+GO

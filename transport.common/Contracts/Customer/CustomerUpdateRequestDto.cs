@@ -5,5 +5,4 @@ public record CustomerUpdateRequestDto(
     string LastName,
     string Email,
     string Phone1,
-    string? Phone2,
-    List<int>? ServiceIds = null);
+    string? Phone2);

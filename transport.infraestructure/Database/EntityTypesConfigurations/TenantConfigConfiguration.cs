@@ -39,6 +39,10 @@ public class TenantConfigConfiguration : IEntityTypeConfiguration<TenantConfig>
             .IsRequired()
             .HasDefaultValue(true);
 
+        builder.Property(tc => tc.ReserveGenerationDays)
+            .IsRequired()
+            .HasDefaultValue(15);
+
         builder.HasIndex(tc => tc.TenantId).IsUnique();
 
         builder.HasOne(tc => tc.Tenant)

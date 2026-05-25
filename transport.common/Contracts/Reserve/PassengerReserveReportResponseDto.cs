@@ -1,8 +1,9 @@
-﻿namespace Transport.SharedKernel.Contracts.Reserve;
+namespace Transport.SharedKernel.Contracts.Reserve;
 
 public record PassengerReserveReportResponseDto(
     int PassengerId,
     int? CustomerId,
+    int? FrequentSubscriptionId,
     string FullName,
     string DocumentNumber,
     string Email,
