@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Transport.Business.Authentication;
 using Transport.Business.Data;
 using Transport.Domain.Customers;
 using Transport.Domain.FrequentSubscriptions;
@@ -18,24 +19,27 @@ public class FrequentPassengerBusiness : IFrequentPassengerBusiness
     private readonly IApplicationDbContext _context;
     private readonly IReserveOption _reserveOption;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly ITenantContext _tenantContext;
     private readonly ILogger<FrequentPassengerBusiness>? _logger;
 
     public FrequentPassengerBusiness(
         IApplicationDbContext context,
         IReserveOption reserveOption,
         IDateTimeProvider dateTimeProvider,
+        ITenantContext tenantContext,
         ILogger<FrequentPassengerBusiness>? logger = null)
     {
         _context = context;
         _reserveOption = reserveOption;
         _dateTimeProvider = dateTimeProvider;
+        _tenantContext = tenantContext;
         _logger = logger;
     }
 
     public async Task<Result<bool>> GenerateFrequentPassengersAsync()
     {
         var today = _dateTimeProvider.UtcNow.Date;
-        var windowEnd = today.AddDays(_reserveOption.ReserveGenerationDays);
+        var windowEnd = today.AddDays(await GetReserveGenerationDaysAsync());
 
         var subscriptions = await _context.FrequentSubscriptions
             .Where(s => s.Status == EntityStatusEnum.Active
@@ -60,7 +64,7 @@ public class FrequentPassengerBusiness : IFrequentPassengerBusiness
     public async Task<Result<bool>> GenerateForSubscriptionAsync(int frequentSubscriptionId)
     {
         var today = _dateTimeProvider.UtcNow.Date;
-        var windowEnd = today.AddDays(_reserveOption.ReserveGenerationDays);
+        var windowEnd = today.AddDays(await GetReserveGenerationDaysAsync());
 
         _logger?.LogInformation(
             "FrequentPassenger auto-apply START — subscriptionId={Id}, today={Today}, windowEnd={WindowEnd}",
@@ -408,5 +412,19 @@ public class FrequentPassengerBusiness : IFrequentPassengerBusiness
 
         var basePrice = relevant.FirstOrDefault(p => p.CityId == destinationId && p.DirectionId == null);
         return basePrice?.Price;
+    }
+
+    // Lee el ReserveGenerationDays del TenantConfig del tenant actual. Si por alguna razón
+    // no existe TenantConfig (deuda histórica, tenant recién creado), cae al default global
+    // de IReserveOption como red de seguridad.
+    // NOTA: TenantConfig NO implementa ITenantScoped — hay que filtrar explícito por TenantId,
+    // el global query filter no aplica acá.
+    private async Task<int> GetReserveGenerationDaysAsync()
+    {
+        var configValue = await _context.TenantConfigs
+            .Where(tc => tc.TenantId == _tenantContext.TenantId)
+            .Select(tc => (int?)tc.ReserveGenerationDays)
+            .FirstOrDefaultAsync();
+        return configValue ?? _reserveOption.ReserveGenerationDays;
     }
 }

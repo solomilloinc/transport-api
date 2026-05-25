@@ -7,6 +7,7 @@ using Transport.Domain.Cities;
 using Transport.Domain.FrequentSubscriptions;
 using Transport.Domain.Reserves;
 using Transport.Domain.Services;
+using Transport.Domain.Tenants;
 using Transport.Domain.Vehicles;
 using Transport.SharedKernel;
 using Transport.SharedKernel.Configuration;
@@ -32,7 +33,14 @@ public class ServiceBusinessTests : TestBase
         _dateTimeProviderMock = new Mock<IDateTimeProvider>();
         _dateTimeProviderMock.Setup(x => x.UtcNow).Returns(new DateTime(2025, 05, 12)); // Monday
 
-        _serviceBusiness = new ServiceBusiness(_contextMock.Object, reserveOptionMock.Object, _dateTimeProviderMock.Object);
+        // TenantConfigs vacío por default → GetReserveGenerationDaysAsync cae al IReserveOption (15).
+        _contextMock.Setup(c => c.TenantConfigs).Returns(GetQueryableMockDbSet(new List<TenantConfig>()));
+
+        _serviceBusiness = new ServiceBusiness(
+            _contextMock.Object,
+            reserveOptionMock.Object,
+            _dateTimeProviderMock.Object,
+            new FakeTenantContext { TenantId = 1 });
     }
 
     private static ServiceCreateRequestDto BuildRequest(
@@ -370,7 +378,7 @@ public class ServiceBusinessTests : TestBase
         _contextMock.Setup(x => x.Holidays).Returns(GetMockDbSetWithIdentity(new List<Holiday>()));
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
-        var serviceBusiness = new ServiceBusiness(_contextMock.Object, reserveOptionMock.Object, dateProviderMock.Object);
+        var serviceBusiness = new ServiceBusiness(_contextMock.Object, reserveOptionMock.Object, dateProviderMock.Object, new FakeTenantContext { TenantId = 1 });
 
         await serviceBusiness.GenerateFutureReservesAsync();
 
@@ -411,7 +419,7 @@ public class ServiceBusinessTests : TestBase
         _contextMock.Setup(x => x.Holidays).Returns(GetMockDbSetWithIdentity(holidays));
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
-        var serviceBusiness = new ServiceBusiness(_contextMock.Object, reserveOptionMock.Object, dateProviderMock.Object);
+        var serviceBusiness = new ServiceBusiness(_contextMock.Object, reserveOptionMock.Object, dateProviderMock.Object, new FakeTenantContext { TenantId = 1 });
 
         await serviceBusiness.GenerateFutureReservesAsync();
 
@@ -452,7 +460,7 @@ public class ServiceBusinessTests : TestBase
         _contextMock.Setup(x => x.Holidays).Returns(GetMockDbSetWithIdentity(holidays));
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
-        var serviceBusiness = new ServiceBusiness(_contextMock.Object, reserveOptionMock.Object, dateProviderMock.Object);
+        var serviceBusiness = new ServiceBusiness(_contextMock.Object, reserveOptionMock.Object, dateProviderMock.Object, new FakeTenantContext { TenantId = 1 });
 
         await serviceBusiness.GenerateFutureReservesAsync();
 

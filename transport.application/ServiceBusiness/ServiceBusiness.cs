@@ -1,5 +1,6 @@
 using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
+using Transport.Business.Authentication;
 using Transport.Business.Data;
 using Transport.Domain.Reserves;
 using Transport.Domain.Services;
@@ -17,12 +18,18 @@ public class ServiceBusiness : IServiceBusiness
     private readonly IApplicationDbContext _context;
     private readonly IReserveOption _reserveOption;
     private readonly IDateTimeProvider dateTimeProvider;
+    private readonly ITenantContext _tenantContext;
 
-    public ServiceBusiness(IApplicationDbContext context, IReserveOption reserveOption, IDateTimeProvider dateTimeProvider)
+    public ServiceBusiness(
+        IApplicationDbContext context,
+        IReserveOption reserveOption,
+        IDateTimeProvider dateTimeProvider,
+        ITenantContext tenantContext)
     {
         _context = context;
         _reserveOption = reserveOption;
         this.dateTimeProvider = dateTimeProvider;
+        _tenantContext = tenantContext;
     }
 
     public async Task<Result<int>> Create(ServiceCreateRequestDto requestDto)
@@ -277,7 +284,7 @@ public class ServiceBusiness : IServiceBusiness
         await MarkOldReservesAsExpiredAsync();
 
         var today = dateTimeProvider.UtcNow;
-        var endDate = today.AddDays(_reserveOption.ReserveGenerationDays);
+        var endDate = today.AddDays(await GetReserveGenerationDaysAsync());
 
         var services = await _context.Services
             .Where(s => s.Status == EntityStatusEnum.Active)
@@ -393,5 +400,17 @@ public class ServiceBusiness : IServiceBusiness
             .ToListAsync();
 
         return Result.Success(services);
+    }
+
+    // Lee el ReserveGenerationDays del TenantConfig del tenant actual. Si no existe TenantConfig
+    // (tenant recién creado, deuda histórica), cae al default global de IReserveOption.
+    // NOTA: TenantConfig NO implementa ITenantScoped — hay que filtrar explícito por TenantId.
+    private async Task<int> GetReserveGenerationDaysAsync()
+    {
+        var configValue = await _context.TenantConfigs
+            .Where(tc => tc.TenantId == _tenantContext.TenantId)
+            .Select(tc => (int?)tc.ReserveGenerationDays)
+            .FirstOrDefaultAsync();
+        return configValue ?? _reserveOption.ReserveGenerationDays;
     }
 }

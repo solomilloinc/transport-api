@@ -9,6 +9,7 @@ using Transport.Domain.FrequentSubscriptions;
 using Transport.Domain.Passengers;
 using Transport.Domain.Reserves;
 using Transport.Domain.Services;
+using Transport.Domain.Tenants;
 using Transport.Domain.Trips;
 using Transport.Domain.Vehicles;
 using Transport.SharedKernel;
@@ -35,7 +36,15 @@ public class FrequentPassengerBusinessTest : TestBase
         _clock = new Mock<IDateTimeProvider>();
         _clock.Setup(c => c.UtcNow).Returns(Today);
 
-        _business = new FrequentPassengerBusiness(_ctx.Object, _reserveOption.Object, _clock.Object);
+        // TenantConfigs vacío por default → GetReserveGenerationDaysAsync cae al IReserveOption (15).
+        // Cada test que quiera testear el override per-tenant puede sobreescribir este setup.
+        _ctx.Setup(c => c.TenantConfigs).Returns(GetQueryableMockDbSet(new List<TenantConfig>()));
+
+        _business = new FrequentPassengerBusiness(
+            _ctx.Object,
+            _reserveOption.Object,
+            _clock.Object,
+            new FakeTenantContext { TenantId = 1 });
     }
 
     private static Customer Maria => new()
