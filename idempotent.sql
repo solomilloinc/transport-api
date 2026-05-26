@@ -2704,7 +2704,7 @@ IF NOT EXISTS (
 BEGIN
     EXEC(N'CREATE UNIQUE INDEX [IX_Reserve_TenantId_TripId_ReserveDate_DepartureHour] ON [Reserve] ([TenantId], [TripId], [ReserveDate], [DepartureHour]) WHERE [Status] <> ''Cancelled'' AND [Status] <> ''Expired''');
 END;
-GO 
+GO
 
 IF NOT EXISTS (
     SELECT * FROM [__EFMigrationsHistory]
@@ -2938,3 +2938,62 @@ GO
 
 COMMIT;
 GO
+
+BEGIN TRANSACTION;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260525225633_AddReserveGenerationDaysToTenantConfig'
+)
+BEGIN
+    ALTER TABLE [TenantConfig] ADD [ReserveGenerationDays] int NOT NULL DEFAULT 15;
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260525225633_AddReserveGenerationDaysToTenantConfig'
+)
+BEGIN
+    EXEC(N'UPDATE [Role] SET [CreatedDate] = ''2026-05-25T22:56:33.1847701Z''
+    WHERE [RoleId] = 1;
+    SELECT @@ROWCOUNT');
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260525225633_AddReserveGenerationDaysToTenantConfig'
+)
+BEGIN
+    EXEC(N'UPDATE [Role] SET [CreatedDate] = ''2026-05-25T22:56:33.1847702Z''
+    WHERE [RoleId] = 2;
+    SELECT @@ROWCOUNT');
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260525225633_AddReserveGenerationDaysToTenantConfig'
+)
+BEGIN
+    EXEC(N'UPDATE [Role] SET [CreatedDate] = ''2026-05-25T22:56:33.1847704Z''
+    WHERE [RoleId] = 3;
+    SELECT @@ROWCOUNT');
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260525225633_AddReserveGenerationDaysToTenantConfig'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20260525225633_AddReserveGenerationDaysToTenantConfig', N'8.0.14');
+END;
+GO
+
+COMMIT;
+GO
+
