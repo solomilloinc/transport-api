@@ -25,6 +25,7 @@ public class AuthorizationMiddleware : IFunctionsWorkerMiddleware
             "ReserveSlotLockCleanup",
             "RefreshTokenCleanup",
             "ResolveTenant",
+            "GenerateFutureReservesTimerFunction",
         };
     public AuthorizationMiddleware(IAuthorizationService service, ITokenProvider tokenProvider)
     {

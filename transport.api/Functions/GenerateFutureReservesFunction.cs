@@ -41,13 +41,36 @@ public class GenerateFutureReservesFunction
     [OpenApiOperation(operationId: "GenerateFutureReserves", tags: new[] { "Reserves" })]
     [OpenApiResponseWithoutBody(statusCode: HttpStatusCode.OK, Description = "Future reserves generated successfully")]
     public async Task<HttpResponseData> Run(
-     [HttpTrigger(AuthorizationLevel.Anonymous, "get", "post")] HttpRequestData req)
+     [HttpTrigger(AuthorizationLevel.Anonymous, "get", "post")] HttpRequestData req,
+     CancellationToken cancellationToken)
     {
-        _logger.LogInformation("GenerateFutureReserves triggered at: {time}", DateTime.UtcNow);
+        _logger.LogInformation("GenerateFutureReserves HTTP triggered at: {time}", DateTime.UtcNow);
 
+        var tenantCount = await ExecuteAsync(cancellationToken);
+
+        var response = req.CreateResponse(HttpStatusCode.OK);
+        await response.WriteStringAsync($"Reserves generated for {tenantCount} tenants");
+        return response;
+    }
+
+    [Function("GenerateFutureReservesTimerFunction")]
+    public async Task RunTimer(
+        [TimerTrigger("%GenerateFutureReservesCron%")] TimerInfo timer,
+        CancellationToken cancellationToken)
+    {
+        _logger.LogInformation(
+            "GenerateFutureReserves timer triggered at: {time}. Next scheduled at: {next}",
+            DateTime.UtcNow,
+            timer.ScheduleStatus?.Next);
+
+        await ExecuteAsync(cancellationToken);
+    }
+
+    private async Task<int> ExecuteAsync(CancellationToken cancellationToken)
+    {
         var tenants = await _dbContext.Tenants
             .Where(t => t.Status == EntityStatusEnum.Active)
-            .ToListAsync();
+            .ToListAsync(cancellationToken);
 
         foreach (var tenant in tenants)
         {
@@ -81,8 +104,6 @@ public class GenerateFutureReservesFunction
             }
         }
 
-        var response = req.CreateResponse(HttpStatusCode.OK);
-        await response.WriteStringAsync($"Reserves generated for {tenants.Count} tenants");
-        return response;
+        return tenants.Count;
     }
 }
