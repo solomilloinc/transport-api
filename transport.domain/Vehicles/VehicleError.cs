@@ -5,18 +5,18 @@ namespace Transport.Domain.Vehicles;
 public static class VehicleError
 {
     public static readonly Error VehicleNotFound = new(
-        "VehicleNotFound",
+        "Vehicle.NotFound",
         "The vehicle you are looking for does not exist",
         ErrorType.NotFound
     );
     public static readonly Error VehicleAlreadyExists = new(
-        "VehicleAlreadyExists",
+        "Vehicle.AlreadyExists",
         "The vehicle with the same internal number already exists.",
         ErrorType.Validation
     );
 
     public static readonly Error VehicleNotAvailable = new(
-        "VehicleNotAvailable",
+        "Vehicle.NotActive",
         "El Véhiculo no se encuentra Activo",
         ErrorType.Validation
     );

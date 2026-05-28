@@ -5,7 +5,7 @@ namespace Transport.Domain.Services;
 public static class ServiceError
 {
     public static readonly Error ServiceNotFound = new(
-            "ServiceNotFound",
+            "Service.NotFound",
             "The service you are looking for does not exist",
             ErrorType.NotFound
         );
