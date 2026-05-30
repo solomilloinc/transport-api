@@ -49,11 +49,6 @@ namespace Transport.Business.ReserveBusiness.Validation
             RuleForEach(x => x.Passengers).SetValidator(new PassengerBookingDtoValidator());
             RuleForEach(x => x.Payments).SetValidator(new PaymentCreateRequestValidator());
 
-            // IdaVuelta requires payment association
-            RuleFor(x => x.Payments)
-                .NotEmpty()
-                .WithMessage("Los viajes de ida y vuelta requieren un pago asociado")
-                .When(x => x.ReserveTypeId == (int)ReserveTypeIdEnum.IdaVuelta);
         }
     }
 }
