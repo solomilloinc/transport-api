@@ -60,4 +60,10 @@ public static class ReserveError
             "Reserve.SlotAlreadyTaken",
             $"Ya existe una reserva para el tramo {tripId} el {reserveDate:yyyy-MM-dd} a las {departureHour:hh\\:mm}."
         );
+
+    public static Error HasActivePassengers(int activeCount) =>
+        Error.Validation(
+            "Reserve.HasActivePassengers",
+            $"No se puede cancelar la reserva: tiene {activeCount} pasajero(s) activo(s). Cancelá primero a todos los pasajeros."
+        );
 }

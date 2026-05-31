@@ -884,6 +884,7 @@ public class ReserveBusiness : IReserveBusiness
     public async Task<Result<bool>> UpdateReserveAsync(int reserveId, ReserveUpdateRequestDto request)
     {
         var reserve = await _context.Reserves
+            .Include(r => r.Passengers)
             .FirstOrDefaultAsync(r => r.ReserveId == reserveId);
 
         if (reserve is null)
@@ -910,7 +911,23 @@ public class ReserveBusiness : IReserveBusiness
 
         if (request.Status != null)
         {
-            reserve.Status = (ReserveStatusEnum)request.Status;
+            var newStatus = (ReserveStatusEnum)request.Status;
+
+            // Guard: no permitir cancelar una Reserve que todavía tiene pasajeros activos.
+            // El operador debe cancelar primero a cada pasajero (ver ADR-0005). Alcance por-Reserve:
+            // en un IdaVuelta, cancelar una pierna no toca la otra.
+            if (newStatus == ReserveStatusEnum.Cancelled &&
+                reserve.Status != ReserveStatusEnum.Cancelled)
+            {
+                var activeCount = reserve.Passengers.Count(p =>
+                    p.Status == PassengerStatusEnum.PendingPayment ||
+                    p.Status == PassengerStatusEnum.Confirmed);
+
+                if (activeCount > 0)
+                    return Result.Failure<bool>(ReserveError.HasActivePassengers(activeCount));
+            }
+
+            reserve.Status = newStatus;
         }
 
         _context.Reserves.Update(reserve);

@@ -38,7 +38,7 @@ public class FrequentPassengerBusiness : IFrequentPassengerBusiness
 
     public async Task<Result<bool>> GenerateFrequentPassengersAsync()
     {
-        var today = _dateTimeProvider.UtcNow.Date;
+        var today = _dateTimeProvider.LocalNow.Date;
         var windowEnd = today.AddDays(await GetReserveGenerationDaysAsync());
 
         var subscriptions = await _context.FrequentSubscriptions
@@ -63,7 +63,7 @@ public class FrequentPassengerBusiness : IFrequentPassengerBusiness
 
     public async Task<Result<bool>> GenerateForSubscriptionAsync(int frequentSubscriptionId)
     {
-        var today = _dateTimeProvider.UtcNow.Date;
+        var today = _dateTimeProvider.LocalNow.Date;
         var windowEnd = today.AddDays(await GetReserveGenerationDaysAsync());
 
         _logger?.LogInformation(

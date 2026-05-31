@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using System.Linq.Expressions;
 using Transport.Business.Data;
+using Transport.Domain.Customers;
 using Transport.Domain.Passengers;
 using Transport.Domain.Reserves;
 using Transport.Domain.Reserves.Abstraction;
@@ -14,33 +15,67 @@ namespace Transport.Business.ReserveReportBusiness;
 public class ReserveReportBusiness : IReserveReportBusiness
 {
     private readonly IApplicationDbContext _context;
+    private readonly IDateTimeProvider _dateTimeProvider;
 
-    public ReserveReportBusiness(IApplicationDbContext context)
+    public ReserveReportBusiness(IApplicationDbContext context, IDateTimeProvider dateTimeProvider)
     {
         _context = context;
+        _dateTimeProvider = dateTimeProvider;
     }
 
-    public async Task<Result<PagedReportResponseDto<ReserveReportResponseDto>>> GetReserveReport(
-        DateTime reserveDate, PagedReportRequestDto<ReserveReportFilterRequestDto> requestDto)
+    /// <summary>
+    /// Una <see cref="Reserve"/> "ya partió" cuando su datetime de salida ya pasó.
+    /// Se combina <c>ReserveDate.Date</c> con <c>DepartureHour</c> (wall-clock local, porque las
+    /// reservas manuales no embeben la hora en <c>ReserveDate</c>) y se compara contra
+    /// <c>LocalNow</c> — ambos en hora local, sin comparar nunca contra <c>UtcNow</c>
+    /// (ver CONTEXT.md → Reserva partida).
+    /// </summary>
+    private bool HasDeparted(Reserve reserve) =>
+        reserve.ReserveDate.Date + reserve.DepartureHour < _dateTimeProvider.LocalNow;
+
+    public async Task<Result<ReserveDayReportResponseDto>> GetReserveReport(
+        DateTime reserveDate, PagedReportRequestDto<ReserveDayReportFilterDto> requestDto)
     {
         var date = reserveDate.Date;
 
-        var baseQuery = _context.Reserves
+        var dateQuery = _context.Reserves
             .Include(r => r.Passengers)
             .Include(r => r.Vehicle)
             .Where(r => r.Status == ReserveStatusEnum.Confirmed)
             .Where(r => r.ReserveDate.Date == date);
 
-        var totalCount = await baseQuery.CountAsync();
+        // Facet del Select: Trips distintos con reservas ese día, calculado SIN aplicar el
+        // filtro de Trip para que las opciones no cambien al elegir una (ver CONTEXT.md → Trip).
+        var dateTripIds = await dateQuery
+            .Select(r => r.TripId)
+            .Distinct()
+            .ToListAsync();
+
+        var tripDescriptions = await _context.Trips
+            .Where(t => dateTripIds.Contains(t.TripId))
+            .ToDictionaryAsync(t => t.TripId, t => t.Description);
+
+        var availableTrips = dateTripIds
+            .Select(id => new ReserveTripOptionDto(id, tripDescriptions.GetValueOrDefault(id) ?? "Unknown Trip"))
+            .OrderBy(t => t.Description)
+            .ToList();
+
+        // Filtro por Trip (Select por Travel / pierna de vuelta con Trip inverso). Null/0 ⇒ todas.
+        var tripId = requestDto.Filters?.TripId;
+        var filteredQuery = tripId is > 0
+            ? dateQuery.Where(r => r.TripId == tripId)
+            : dateQuery;
+
+        var totalCount = await filteredQuery.CountAsync();
 
         var sortBy = requestDto.SortBy?.ToLower() ?? "reservedate";
         var sortDesc = requestDto.SortDescending;
 
         IOrderedQueryable<Reserve> orderedQuery = sortBy switch
         {
-            "serviceorigin" => sortDesc ? baseQuery.OrderByDescending(r => r.OriginName) : baseQuery.OrderBy(r => r.OriginName),
-            "servicedest" => sortDesc ? baseQuery.OrderByDescending(r => r.DestinationName) : baseQuery.OrderBy(r => r.DestinationName),
-            _ => sortDesc ? baseQuery.OrderByDescending(r => r.ReserveDate) : baseQuery.OrderBy(r => r.ReserveDate)
+            "serviceorigin" => sortDesc ? filteredQuery.OrderByDescending(r => r.OriginName) : filteredQuery.OrderBy(r => r.OriginName),
+            "servicedest" => sortDesc ? filteredQuery.OrderByDescending(r => r.DestinationName) : filteredQuery.OrderBy(r => r.DestinationName),
+            _ => sortDesc ? filteredQuery.OrderByDescending(r => r.ReserveDate) : filteredQuery.OrderBy(r => r.ReserveDate)
         };
 
         var pageNumber = requestDto.PageNumber > 0 ? requestDto.PageNumber : 1;
@@ -50,12 +85,6 @@ public class ReserveReportBusiness : IReserveReportBusiness
             .Skip((pageNumber - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync();
-
-        var tripIds = reserves.Select(r => r.TripId).Distinct().ToList();
-
-        var tripDescriptions = await _context.Trips
-            .Where(t => tripIds.Contains(t.TripId))
-            .ToDictionaryAsync(t => t.TripId, t => t.Description);
 
         var items = reserves.Select(r =>
         {
@@ -72,11 +101,12 @@ public class ReserveReportBusiness : IReserveReportBusiness
                 r.DepartureHour.ToString(@"hh\:mm"),
                 r.VehicleId,
                 r.DriverId.GetValueOrDefault(),
-                r.ReserveDate
+                r.ReserveDate,
+                HasDeparted(r)
             );
         }).ToList();
 
-        var pagedResult = new PagedReportResponseDto<ReserveReportResponseDto>
+        var pagedReserves = new PagedReportResponseDto<ReserveReportResponseDto>
         {
             Items = items,
             TotalRecords = totalCount,
@@ -84,7 +114,13 @@ public class ReserveReportBusiness : IReserveReportBusiness
             PageSize = pageSize
         };
 
-        return Result.Success(pagedResult);
+        var response = new ReserveDayReportResponseDto
+        {
+            Reserves = pagedReserves,
+            AvailableTrips = availableTrips
+        };
+
+        return Result.Success(response);
     }
 
     public async Task<Result<ReserveGroupedPagedReportResponseDto>> GetReserveReport(
@@ -371,6 +407,30 @@ public class ReserveReportBusiness : IReserveReportBusiness
             }
         }
 
+        // Deuda vencida (OverdueBalance): porción del saldo de cuenta corriente atribuible solo a
+        // reservas YA PARTIDAS (misma definición que el flag amarillo). Excluye cargos de viajes
+        // que el pasajero todavía no realizó, para no inflar lo cobrable (ver CONTEXT.md → Deuda vencida).
+        var customerIds = passengers
+            .Where(p => p.CustomerId.HasValue)
+            .Select(p => p.CustomerId!.Value)
+            .Distinct()
+            .ToList();
+
+        var overdueByCustomer = new Dictionary<int, decimal>();
+        if (customerIds.Count > 0)
+        {
+            var transactions = await _context.CustomerAccountTransactions
+                .AsNoTracking()
+                .Where(t => customerIds.Contains(t.CustomerId) && t.RelatedReserveId != null)
+                .Include(t => t.RelatedReserve)
+                .ToListAsync();
+
+            overdueByCustomer = transactions
+                .Where(t => t.RelatedReserve != null && HasDeparted(t.RelatedReserve))
+                .GroupBy(t => t.CustomerId)
+                .ToDictionary(g => g.Key, g => g.Sum(t => SignedAmount(t.Type, t.Amount)));
+        }
+
         var allItems = passengers.Select(p =>
         {
             var paymentInfo = p.CustomerId.HasValue && paymentsByCustomer.ContainsKey(p.CustomerId.Value)
@@ -400,6 +460,9 @@ public class ReserveReportBusiness : IReserveReportBusiness
                 p.PickupLocationId ?? 0,
                 p.PickupAddress,
                 p.Customer?.CurrentBalance ?? 0,
+                p.CustomerId.HasValue
+                    ? overdueByCustomer.GetValueOrDefault(p.CustomerId.Value, 0m)
+                    : (decimal?)null,
                 p.Reserve.Vehicle.AvailableQuantity - totalPassengersInReserve,
                 paymentInfo.Methods,
                 paidAmount,
@@ -462,6 +525,11 @@ public class ReserveReportBusiness : IReserveReportBusiness
 
         return Result.Success(result);
     }
+
+    // Charge/Adjustment suman a la deuda; Payment/Refund la reducen. Coincide con cómo se ajusta
+    // Customer.CurrentBalance en cada transacción (cargo +, pago/refund −).
+    private static decimal SignedAmount(TransactionType type, decimal amount) =>
+        type is TransactionType.Payment or TransactionType.Refund ? -amount : amount;
 
     private static string GetPaymentMethodName(PaymentMethodEnum method)
     {

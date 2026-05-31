@@ -13,4 +13,5 @@ public record ReserveReportResponseDto(
     string DepartureHour,
     int VehicleId,
     int DriverId,
-    DateTime ReserveDate);
+    DateTime ReserveDate,
+    bool HasDeparted);

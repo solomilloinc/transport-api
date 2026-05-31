@@ -151,6 +151,114 @@ public class ReserveBusinessTests : TestBase
         reserve.DepartureHour.Should().Be(TimeSpan.FromHours(10));
         reserve.Status.Should().Be(ReserveStatusEnum.Confirmed);
     }
+
+    [Fact]
+    public async Task UpdateReserveAsync_ShouldFail_WhenCancellingWithActivePassengers()
+    {
+        // El guard filtra reserve.Passengers (poblado vía Include en prod).
+        var reserve = new Reserve
+        {
+            ReserveId = 1,
+            Status = ReserveStatusEnum.Confirmed,
+            Passengers = new List<Passenger>
+            {
+                new Passenger { PassengerId = 1, ReserveId = 1, Status = PassengerStatusEnum.Confirmed },
+                new Passenger { PassengerId = 2, ReserveId = 1, Status = PassengerStatusEnum.PendingPayment },
+                new Passenger { PassengerId = 3, ReserveId = 1, Status = PassengerStatusEnum.Cancelled },
+            }
+        };
+        _contextMock.Setup(x => x.Reserves)
+            .Returns(GetQueryableMockDbSet(new List<Reserve> { reserve }));
+
+        var dto = new ReserveUpdateRequestDto(null, null, null, null, (int)ReserveStatusEnum.Cancelled);
+        var result = await _reserveBusiness.UpdateReserveAsync(1, dto);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Be(ReserveError.HasActivePassengers(2));
+        reserve.Status.Should().Be(ReserveStatusEnum.Confirmed);
+    }
+
+    [Fact]
+    public async Task UpdateReserveAsync_ShouldSucceed_WhenCancellingWithNoActivePassengers()
+    {
+        // Solo estados terminales: no deben bloquear la cancelación.
+        var reserve = new Reserve
+        {
+            ReserveId = 1,
+            Status = ReserveStatusEnum.Confirmed,
+            Passengers = new List<Passenger>
+            {
+                new Passenger { PassengerId = 1, ReserveId = 1, Status = PassengerStatusEnum.Cancelled },
+                new Passenger { PassengerId = 2, ReserveId = 1, Status = PassengerStatusEnum.Traveled },
+                new Passenger { PassengerId = 3, ReserveId = 1, Status = PassengerStatusEnum.NoShow },
+                new Passenger { PassengerId = 4, ReserveId = 1, Status = PassengerStatusEnum.Refunded },
+            }
+        };
+        _contextMock.Setup(x => x.Reserves)
+            .Returns(GetQueryableMockDbSet(new List<Reserve> { reserve }));
+
+        _contextMock.Setup(x => x.SaveChangesWithOutboxAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+
+        var dto = new ReserveUpdateRequestDto(null, null, null, null, (int)ReserveStatusEnum.Cancelled);
+        var result = await _reserveBusiness.UpdateReserveAsync(1, dto);
+
+        result.IsSuccess.Should().BeTrue();
+        reserve.Status.Should().Be(ReserveStatusEnum.Cancelled);
+    }
+
+    [Fact]
+    public async Task UpdateReserveAsync_ShouldIgnoreActivePassengers_WhenStatusIsNotCancel()
+    {
+        var reserve = new Reserve
+        {
+            ReserveId = 1,
+            Status = ReserveStatusEnum.Available,
+            Passengers = new List<Passenger>
+            {
+                new Passenger { PassengerId = 1, ReserveId = 1, Status = PassengerStatusEnum.Confirmed },
+            }
+        };
+        _contextMock.Setup(x => x.Reserves)
+            .Returns(GetQueryableMockDbSet(new List<Reserve> { reserve }));
+
+        _contextMock.Setup(x => x.SaveChangesWithOutboxAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+
+        // Confirmed: el guard sólo aplica a transiciones hacia Cancelled.
+        var dto = new ReserveUpdateRequestDto(null, null, null, null, (int)ReserveStatusEnum.Confirmed);
+        var result = await _reserveBusiness.UpdateReserveAsync(1, dto);
+
+        result.IsSuccess.Should().BeTrue();
+        reserve.Status.Should().Be(ReserveStatusEnum.Confirmed);
+    }
+
+    [Fact]
+    public async Task UpdateReserveAsync_ShouldSucceed_WhenAlreadyCancelledWithActivePassengers()
+    {
+        // Idempotencia: si ya está Cancelled, no se re-evalúa el guard.
+        var reserve = new Reserve
+        {
+            ReserveId = 1,
+            Status = ReserveStatusEnum.Cancelled,
+            Passengers = new List<Passenger>
+            {
+                new Passenger { PassengerId = 1, ReserveId = 1, Status = PassengerStatusEnum.Confirmed },
+            }
+        };
+        _contextMock.Setup(x => x.Reserves)
+            .Returns(GetQueryableMockDbSet(new List<Reserve> { reserve }));
+
+        _contextMock.Setup(x => x.SaveChangesWithOutboxAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+
+        var dto = new ReserveUpdateRequestDto(null, null, null, null, (int)ReserveStatusEnum.Cancelled);
+        var result = await _reserveBusiness.UpdateReserveAsync(1, dto);
+
+        result.IsSuccess.Should().BeTrue();
+        reserve.Status.Should().Be(ReserveStatusEnum.Cancelled);
+    }
+
     [Theory]
     [InlineData(1, 1)]
     [InlineData(1, 2)]

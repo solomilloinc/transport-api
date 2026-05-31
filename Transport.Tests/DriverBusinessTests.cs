@@ -23,7 +23,9 @@ public class DriverBusinessTests : TestBase
     {
         _contextMock = new Mock<IApplicationDbContext>();
 
-        _driverBusiness = new DriverBusiness(_contextMock.Object);
+        var dateTimeProviderMock = new Mock<IDateTimeProvider>();
+        dateTimeProviderMock.Setup(x => x.LocalNow).Returns(() => DateTime.UtcNow.AddHours(-3));
+        _driverBusiness = new DriverBusiness(_contextMock.Object, dateTimeProviderMock.Object);
     }
 
     [Fact]
@@ -161,6 +163,33 @@ public class DriverBusinessTests : TestBase
         // Assert
         result.IsSuccess.Should().BeTrue();
         driver.Status.Should().Be(EntityStatusEnum.Deleted);
+    }
+
+    [Fact]
+    public async Task Delete_ShouldBlock_ReserveDatedTodayLocal_EvenWhenUtcIsAlreadyTomorrow()
+    {
+        // Borde de medianoche: LocalNow = 30-may 22:00 (en UTC ya es 31-may 01:00).
+        // Una reserva del 30-may (HOY local) debe bloquear el delete. Comparar contra UtcNow.Date
+        // (31-may) la trataría como "pasada" y dejaría borrar — el bug que LocalNow corrige.
+        var clock = new Mock<IDateTimeProvider>();
+        clock.Setup(x => x.LocalNow).Returns(new DateTime(2026, 5, 30, 22, 0, 0, DateTimeKind.Unspecified));
+        var business = new DriverBusiness(_contextMock.Object, clock.Object);
+
+        var driver = new Driver { DriverId = 1, Status = EntityStatusEnum.Active };
+        var todayLocalReserve = new Reserve
+        {
+            DriverId = 1,
+            ReserveDate = new DateTime(2026, 5, 30),
+            Status = ReserveStatusEnum.Confirmed
+        };
+        _contextMock.Setup(x => x.Drivers).Returns(GetQueryableMockDbSet(new List<Driver> { driver }));
+        _contextMock.Setup(x => x.Reserves).Returns(GetQueryableMockDbSet(new List<Reserve> { todayLocalReserve }));
+
+        var result = await business.Delete(1);
+
+        result.IsSuccess.Should().BeFalse("una reserva de hoy local todavía cuenta como futura/hoy");
+        result.Error.Should().Be(DriverError.HasFutureReserves);
+        driver.Status.Should().Be(EntityStatusEnum.Active);
     }
 
     [Fact]

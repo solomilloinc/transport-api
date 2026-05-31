@@ -86,16 +86,17 @@ public class ReservesFunction : FunctionBase
 
     [Function("GetReserveReport")]
     [Authorize("Admin")]
-    [OpenApiOperation(operationId: "reserve-report", tags: new[] { "Reserve" }, Summary = "Get Reserve Report", Description = "Returns paginated list of reserve", Visibility = OpenApiVisibilityType.Important)]
-    [OpenApiRequestBody("application/json", typeof(PagedReportRequestDto<ReserveReportFilterRequestDto>), Required = true)]
-    [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(PagedReportResponseDto<ReserveReportResponseDto>), Summary = "Reserve Report")]
+    [OpenApiOperation(operationId: "reserve-report", tags: new[] { "Reserve" }, Summary = "Get Reserve Report", Description = "Returns paginated list of reserves for a date (optionally filtered by Trip) plus the distinct Trips that have reserves that day for the Select.", Visibility = OpenApiVisibilityType.Important)]
+    [OpenApiRequestBody("application/json", typeof(PagedReportRequestDto<ReserveDayReportFilterDto>), Required = true)]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(ReserveDayReportResponseDto), Summary = "Reserve Report")]
     public async Task<HttpResponseData> GetReserveReport(
     [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "reserve-report/{reserveDate}")] HttpRequestData req, string reserveDate)
     {
         if (!DateTime.TryParseExact(reserveDate, "yyyyMMdd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsedDate))
             return req.CreateResponse(HttpStatusCode.BadRequest);
 
-        var filter = await req.ReadFromJsonAsync<PagedReportRequestDto<ReserveReportFilterRequestDto>>();
+        var filter = await req.ReadFromJsonAsync<PagedReportRequestDto<ReserveDayReportFilterDto>>()
+                     ?? new PagedReportRequestDto<ReserveDayReportFilterDto>();
         var result = await _reportBusiness.GetReserveReport(parsedDate, filter);
         return await MatchResultAsync(req, result);
     }

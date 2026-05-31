@@ -15,10 +15,12 @@ namespace Transport.Business.DriverBusiness;
 public class DriverBusiness : IDriverBusiness
 {
     private readonly IApplicationDbContext _context;
+    private readonly IDateTimeProvider _dateTimeProvider;
 
-    public DriverBusiness(IApplicationDbContext context)
+    public DriverBusiness(IApplicationDbContext context, IDateTimeProvider dateTimeProvider)
     {
         _context = context;
+        _dateTimeProvider = dateTimeProvider;
     }
 
     public async Task<Result<int>> Create(DriverCreateRequestDto dto)
@@ -58,7 +60,7 @@ public class DriverBusiness : IDriverBusiness
             return Result.Failure<bool>(DriverError.DriverNotFound);
         }
 
-        var today = DateTime.UtcNow.Date;
+        var today = _dateTimeProvider.LocalNow.Date;
         var hasFutureReserves = await _context.Reserves
             .AnyAsync(r => r.DriverId == driverId
                         && r.ReserveDate >= today

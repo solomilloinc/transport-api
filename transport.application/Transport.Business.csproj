@@ -18,4 +18,8 @@
 		<ProjectReference Include="..\transport.domain\Transport.Domain.csproj" />
 	</ItemGroup>
 
+	<ItemGroup>
+		<InternalsVisibleTo Include="Transport.Tests" />
+	</ItemGroup>
+
 </Project>

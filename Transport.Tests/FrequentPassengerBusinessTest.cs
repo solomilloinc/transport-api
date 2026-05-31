@@ -35,6 +35,7 @@ public class FrequentPassengerBusinessTest : TestBase
 
         _clock = new Mock<IDateTimeProvider>();
         _clock.Setup(c => c.UtcNow).Returns(Today);
+        _clock.Setup(c => c.LocalNow).Returns(Today);
 
         // TenantConfigs vacío por default → GetReserveGenerationDaysAsync cae al IReserveOption (15).
         // Cada test que quiera testear el override per-tenant puede sobreescribir este setup.

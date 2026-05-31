@@ -1,11 +1,12 @@
 ﻿using FluentValidation;
+using Transport.SharedKernel;
 using Transport.SharedKernel.Contracts.Reserve;
 
 namespace Transport.Business.ReserveBusiness.Validation;
 
 internal class ReserveUpdateRequestDtoValidator : AbstractValidator<ReserveUpdateRequestDto>
 {
-    public ReserveUpdateRequestDtoValidator()
+    public ReserveUpdateRequestDtoValidator(IDateTimeProvider dateTimeProvider)
     {
         RuleFor(x => x.VehicleId)
             .GreaterThan(0).When(x => x.VehicleId.HasValue)
@@ -16,7 +17,7 @@ internal class ReserveUpdateRequestDtoValidator : AbstractValidator<ReserveUpdat
             .WithMessage("DriverId must be greater than 0.");
 
         RuleFor(x => x.ReserveDate)
-            .GreaterThanOrEqualTo(DateTime.Today).When(x => x.ReserveDate.HasValue)
+            .GreaterThanOrEqualTo(_ => dateTimeProvider.LocalNow.Date).When(x => x.ReserveDate.HasValue)
             .WithMessage("ReserveDate cannot be in the past.");
 
         RuleFor(x => x.DepartureHour)

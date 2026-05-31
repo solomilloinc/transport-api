@@ -283,7 +283,7 @@ public class ServiceBusiness : IServiceBusiness
     {
         await MarkOldReservesAsExpiredAsync();
 
-        var today = dateTimeProvider.UtcNow;
+        var today = dateTimeProvider.LocalNow;
         var endDate = today.AddDays(await GetReserveGenerationDaysAsync());
 
         var services = await _context.Services
@@ -360,7 +360,7 @@ public class ServiceBusiness : IServiceBusiness
 
     private async Task MarkOldReservesAsExpiredAsync()
     {
-        var now = dateTimeProvider.UtcNow;
+        var now = dateTimeProvider.LocalNow;
 
         var oldAvailableReserves = await _context.Reserves
             .Where(r => r.Status == ReserveStatusEnum.Available && r.ReserveDate < now)
