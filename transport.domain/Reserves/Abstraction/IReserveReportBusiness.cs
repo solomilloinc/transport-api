@@ -6,9 +6,9 @@ namespace Transport.Domain.Reserves.Abstraction;
 
 public interface IReserveReportBusiness
 {
-    Task<Result<PagedReportResponseDto<ReserveReportResponseDto>>> GetReserveReport(
+    Task<Result<ReserveDayReportResponseDto>> GetReserveReport(
         DateTime reserveDate,
-        PagedReportRequestDto<ReserveReportFilterRequestDto> requestDto);
+        PagedReportRequestDto<ReserveDayReportFilterDto> requestDto);
 
     Task<Result<ReserveGroupedPagedReportResponseDto>> GetReserveReport(
         PagedReportRequestDto<ReserveReportFilterRequestDto> requestDto);

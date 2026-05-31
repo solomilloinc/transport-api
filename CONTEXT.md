@@ -7,8 +7,8 @@ Glossary canónico del dominio de transporte de pasajeros. Define el lenguaje ub
 ### Rutas y precios
 
 **Trip**:
-Ruta direccional entre dos ciudades con sus precios asociados. Es una definición abstracta, no un viaje físico.
-_Avoid_: Route, Itinerary, Viaje.
+Ruta direccional entre dos ciudades con sus precios asociados. Es una definición abstracta, no un viaje físico. En la UI admin, el filtro "buscar reservas por Travel/Viaje" es un filtro por `Trip` (la ruta), no por la fila listada (que es una `Reserve`).
+_Avoid_: Route, Itinerary, Viaje, Travel.
 
 **TripPrice**:
 Precio para un tramo de un `Trip`, identificado por ciudad-destino, opcional `Direction`, y `ReserveType`. Es la fuente de verdad del precio al momento de crear un `Passenger`.
@@ -22,11 +22,23 @@ _Avoid_: Stop, Address, Parada.
 Clasificación del tramo desde la perspectiva del pasajero: `Ida`, `Vuelta`, o `IdaVuelta`. Determina qué `TripPrice` aplica.
 _Avoid_: Direction (ya tomado), TripDirection, Sense.
 
+**Trip inverso (ruta de vuelta)**:
+Dado un `Trip` A→B, su inverso es el `Trip` activo B→A (Origin/Destination intercambiados) — el que provee las `Reserve`s de la pierna de vuelta de un IdaVuelta. Se identifica por el swap `(OriginCityId, DestinationCityId)`; puede no existir, porque no toda ruta tiene su vuelta configurada.
+_Avoid_: Vuelta (eso es un `ReserveType`), ReturnTrip como entidad propia (no existe; es otro `Trip`).
+
 ### Capacidad y horarios
 
 **Reserve**:
 Espacio reservado para una fecha, horario y vehículo específicos. Es un **contenedor de pasajeros**, no se cobra en sí mismo.
 _Avoid_: Reservation, Booking, Slot.
+
+**Reserva partida (ya salió)**:
+Estado *derivado* (no persistido) de una `Reserve` cuya hora de salida ya pasó: se compara `ReserveDate.Date + DepartureHour` (**hora de operación local**) contra `IDateTimeProvider.LocalNow` (el "ahora" ya pasado a hora local) — ambos en local, nunca contra `UtcNow`. Se calcula en el reporte para que el frontend la distinga visualmente (amarillo). **No es lo mismo que `Expired`**: `Expired` designa un slot que quedó `Available` (nadie lo usó) y se le venció la fecha; una reserva partida sigue siendo `Confirmed`. `ReserveDate` por sí solo no alcanza para decidirlo porque las reservas manuales no le embeben la hora — siempre se combina con `DepartureHour`.
+_Avoid_: Expired (ese es el slot muerto), Completed (viaje terminado, no solo partido), Departed-as-status (es derivado, no persistido).
+
+**Hora de operación (wall-clock local)**:
+Los horarios de *agenda* del dominio — `Service.DepartureHour`, `Reserve.DepartureHour` y el día de `ReserveDate` — representan **hora local de operación** (Argentina, **UTC−3 fijo, sin horario de verano**) y **se guardan así en la base**, no en UTC. Los *instantes* en cambio (`UtcNow`, `CreatedDate`, expiraciones de token, webhooks) son UTC. La base (`datetime2`) es timezone-naive: guarda los ticks que le mandás, sin convertir; la disciplina es de la app. **Regla:** una columna de agenda se compara contra `IDateTimeProvider.LocalNow`; un instante se compara contra `UtcNow`. La conversión UTC→local ocurre en **un único lugar** (`LocalNow` en `DateTimeProvider`, offset app-wide; podría volverse per-tenant). No hace falta convertir para guardar ni para mostrar agenda (ya está en local); solo al compararla contra "ahora". Comparar una agenda local contra `UtcNow` es un bug.
+_Avoid_: asumir que `DepartureHour`/`ReserveDate` están en UTC.
 
 **Service**:
 Slot semanal recurrente (un `Trip`, un `DayOfWeek`, una `DepartureHour`) que genera una `Reserve` por semana para los próximos N días. No tiene precio (los precios viven en `Trip`/`TripPrice`).
@@ -54,6 +66,14 @@ _Avoid_: ServiceCustomer (concepto previo, eliminado), Membership, Recurring boo
 Registro de cobro asociado a una o más `Passenger` de una `Reserve`. Incluye estado (`Pending`/`Confirmed`/`Failed`) y referencia al gateway externo (MercadoPago).
 _Avoid_: Payment (genérico), Charge, Transaction (eso es de cuenta corriente).
 
+**Saldo de cuenta corriente**:
+Resultado neto de los `CustomerAccountTransaction` (cargos menos pagos y refunds) de un `Customer`. Es el total que el cliente debe en todo momento, **sin distinguir si los viajes ya ocurrieron**. Se materializa en `Customer.CurrentBalance`.
+_Avoid_: Balance (a secas), Deuda (ambiguo con la vencida).
+
+**Deuda vencida**:
+Porción del saldo de cuenta corriente atribuible a `Reserve`s **ya partidas** — misma definición que el flag amarillo del reporte (`ReserveDate.Date + DepartureHour < ahora`, ver **Reserva partida**). Es lo que un operador puede cobrar sin riesgo de confundir al pasajero, porque **excluye cargos de viajes que todavía no se realizaron**. Como hoy toda transacción lleva `RelatedReserveId`, el corte por fecha siempre es computable. En código se expone como un campo aparte (`OverdueBalance`), nunca pisando `CurrentBalance`.
+_Avoid_: Saldo (ese es el total), Deuda total, Deuda (a secas).
+
 **ReserveSlotLock**:
 Bloqueo temporal de cupos durante el flujo de pago externo. Expira automáticamente; previene overbooking.
 _Avoid_: Hold, Reservation lock, Cart.
@@ -69,7 +89,7 @@ _Avoid_: Hold, Reservation lock, Cart.
 - Un **Customer** tiene cero o más **FrequentSubscription**. Cada una referencia 1 `Service` (Outbound) y, opcionalmente, otro `Service` (Inbound) si el tipo es `IdaVuelta`.
 - Una **FrequentSubscription** activa fuerza, en cada corrida del batch, la creación de un `Passenger` confirmado por cada `Reserve` generada en sus `Service(s)` dentro de la vigencia.
 - Un **Passenger** referencia opcionalmente un **Customer**.
-- Un **Passenger** referencia opcionalmente otro **Passenger** (via `ReserveRelatedId`) cuando es `IdaVuelta`.
+- Un **Passenger** referencia opcionalmente la **Reserve** de la otra pierna (via `ReserveRelatedId`) cuando es `IdaVuelta` — es un vínculo flojo por id hacia la otra `Reserve`, no hacia otro `Passenger`.
 - Una **ReservePayment** referencia exactamente una **Reserve**.
 
 ### IdaVuelta en concreto
@@ -83,7 +103,7 @@ Un "pasaje IdaVuelta" del negocio se modela como **dos Reserves** (la de ida y l
 > **Dev:** "Si una familia de 4 compra IdaVuelta, ¿cuántas Reserves se crean?"
 > **Negocio:** "Dos. Una para el viaje de ida y otra para el de vuelta."
 > **Dev:** "¿Y los pasajeros?"
-> **Negocio:** "Cuatro en cada Reserve, ocho en total. Cada persona aparece dos veces, una en la ida y otra en la vuelta. Internamente quedan emparejados con `ReserveRelatedId`."
+> **Negocio:** "Cuatro en cada Reserve, ocho en total. Cada persona aparece dos veces, una en la ida y otra en la vuelta. Internamente cada Passenger apunta a la Reserve de la otra pierna vía `ReserveRelatedId`."
 > **Dev:** "¿Y la compra? ¿Cómo la veo como una unidad?"
 > **Negocio:** "Por ahora no se ve como unidad. Tenés un `ReservePayment` que cobra los 8 pasajeros juntos, pero no existe un 'Booking' que agrupe las dos Reserves. Si querés cancelar 'la mitad de un IdaVuelta' hoy no hay un flujo claro."
 > **Dev:** "Ok, entonces para el sistema actual la unidad de cobro es **Passenger**, no Reserve ni Booking."

@@ -19,12 +19,21 @@ namespace Transport.Tests;
 public class ReserveReportBusinessTest : TestBase
 {
     private readonly Mock<IApplicationDbContext> _contextMock;
+    private readonly Mock<IDateTimeProvider> _dateTimeProviderMock;
     private readonly ReserveReportBusiness _reserveBusiness;
+
+    // "Ahora" controlable para los tests de HasDeparted / OverdueBalance. La lambda re-evalúa el
+    // field en cada llamada, así un test puede ajustarlo antes del Act.
+    private DateTime _utcNow = new DateTime(2026, 5, 30, 12, 0, 0, DateTimeKind.Utc);
 
     public ReserveReportBusinessTest()
     {
         _contextMock = new Mock<IApplicationDbContext>();
-        _reserveBusiness = new ReserveReportBusiness(_contextMock.Object);
+        _dateTimeProviderMock = new Mock<IDateTimeProvider>();
+        _dateTimeProviderMock.Setup(x => x.UtcNow).Returns(() => _utcNow);
+        // LocalNow = ahora en hora Argentina (UTC−3): UtcNow − 3h.
+        _dateTimeProviderMock.Setup(x => x.LocalNow).Returns(() => _utcNow.AddHours(-3));
+        _reserveBusiness = new ReserveReportBusiness(_contextMock.Object, _dateTimeProviderMock.Object);
     }
 
     [Fact]
@@ -83,7 +92,7 @@ public class ReserveReportBusinessTest : TestBase
         }
     };
 
-        var request = new PagedReportRequestDto<ReserveReportFilterRequestDto>
+        var request = new PagedReportRequestDto<ReserveDayReportFilterDto>
         {
             PageNumber = 1,
             PageSize = 10
@@ -99,7 +108,7 @@ public class ReserveReportBusinessTest : TestBase
 
         // Assert
         Assert.True(result.IsSuccess);
-        var item = result.Value.Items.Single();
+        var item = result.Value.Reserves.Items.Single();
         Assert.Equal("Buenos Aires", item.OriginName);
         Assert.Equal("Córdoba", item.DestinationName);
         Assert.Equal(3, item.AvailableQuantity);
@@ -159,7 +168,7 @@ public class ReserveReportBusinessTest : TestBase
         }
     };
 
-        var request = new PagedReportRequestDto<ReserveReportFilterRequestDto>
+        var request = new PagedReportRequestDto<ReserveDayReportFilterDto>
         {
             PageNumber = 1,
             PageSize = 10
@@ -175,9 +184,9 @@ public class ReserveReportBusinessTest : TestBase
 
         // Assert
         Assert.True(result.IsSuccess);
-        Assert.Equal(2, result.Value.Items.Count);
-        Assert.Contains(result.Value.Items, r => r.OriginName == "Rosario");
-        Assert.Contains(result.Value.Items, r => r.OriginName == "Mendoza");
+        Assert.Equal(2, result.Value.Reserves.Items.Count);
+        Assert.Contains(result.Value.Reserves.Items, r => r.OriginName == "Rosario");
+        Assert.Contains(result.Value.Reserves.Items, r => r.OriginName == "Mendoza");
     }
 
 
@@ -209,7 +218,7 @@ public class ReserveReportBusinessTest : TestBase
         }
     };
 
-        var request = new PagedReportRequestDto<ReserveReportFilterRequestDto>
+        var request = new PagedReportRequestDto<ReserveDayReportFilterDto>
         {
             PageNumber = 1,
             PageSize = 10
@@ -225,7 +234,7 @@ public class ReserveReportBusinessTest : TestBase
 
         // Assert
         Assert.True(result.IsSuccess);
-        Assert.Empty(result.Value.Items);
+        Assert.Empty(result.Value.Reserves.Items);
     }
 
     [Fact]
@@ -256,7 +265,7 @@ public class ReserveReportBusinessTest : TestBase
         }
     };
 
-        var request = new PagedReportRequestDto<ReserveReportFilterRequestDto>
+        var request = new PagedReportRequestDto<ReserveDayReportFilterDto>
         {
             PageNumber = 1,
             PageSize = 10
@@ -272,7 +281,104 @@ public class ReserveReportBusinessTest : TestBase
 
         // Assert
         Assert.True(result.IsSuccess);
-        Assert.Empty(result.Value.Items);
+        Assert.Empty(result.Value.Reserves.Items);
+    }
+
+    [Fact]
+    public async Task GetReserveReport_ShouldFilterReservesByTrip_ButKeepAllTripsInFacet()
+    {
+        // Arrange — dos reservas del mismo día en sentidos opuestos (Trips 10 y 20)
+        var reserveDate = new DateTime(2026, 5, 31);
+        var vehicle = new Vehicle { AvailableQuantity = 4 };
+
+        var reserves = new List<Reserve>
+        {
+            new Reserve
+            {
+                ReserveId = 1, ReserveDate = reserveDate, Status = ReserveStatusEnum.Confirmed,
+                Vehicle = vehicle, TripId = 10,
+                OriginName = "Lobos", DestinationName = "Capital Federal",
+                Passengers = new List<Passenger>()
+            },
+            new Reserve
+            {
+                ReserveId = 2, ReserveDate = reserveDate, Status = ReserveStatusEnum.Confirmed,
+                Vehicle = vehicle, TripId = 20,
+                OriginName = "Capital Federal", DestinationName = "Lobos",
+                Passengers = new List<Passenger>()
+            }
+        };
+
+        var trips = new List<Trip>
+        {
+            new Trip { TripId = 10, Description = "Lobos → Capital Federal" },
+            new Trip { TripId = 20, Description = "Capital Federal → Lobos" }
+        };
+
+        var request = new PagedReportRequestDto<ReserveDayReportFilterDto>
+        {
+            PageNumber = 1,
+            PageSize = 10,
+            Filters = new ReserveDayReportFilterDto(TripId: 20) // pierna de vuelta: Trip inverso
+        };
+
+        _contextMock.Setup(x => x.Reserves).Returns(GetQueryableMockDbSet(reserves));
+        _contextMock.Setup(x => x.Trips).Returns(GetQueryableMockDbSet(trips));
+
+        // Act
+        var result = await _reserveBusiness.GetReserveReport(reserveDate, request);
+
+        // Assert
+        Assert.True(result.IsSuccess);
+
+        // La lista trae SOLO la reserva del Trip filtrado (la inversa), no ambos sentidos
+        var reserve = result.Value.Reserves.Items.Single();
+        Assert.Equal(2, reserve.ReserveId);
+        Assert.Equal("Capital Federal", reserve.OriginName);
+        Assert.Equal("Lobos", reserve.DestinationName);
+
+        // El facet expone los dos Trips del día, independiente del filtro aplicado
+        Assert.Equal(2, result.Value.AvailableTrips.Count);
+        Assert.Contains(result.Value.AvailableTrips, t => t.TripId == 10 && t.Description == "Lobos → Capital Federal");
+        Assert.Contains(result.Value.AvailableTrips, t => t.TripId == 20 && t.Description == "Capital Federal → Lobos");
+    }
+
+    [Fact]
+    public async Task GetReserveReport_ShouldReturnAllReservesOfDay_WhenNoTripFilter()
+    {
+        // Arrange
+        var reserveDate = new DateTime(2026, 5, 31);
+        var vehicle = new Vehicle { AvailableQuantity = 4 };
+
+        var reserves = new List<Reserve>
+        {
+            new Reserve { ReserveId = 1, ReserveDate = reserveDate, Status = ReserveStatusEnum.Confirmed, Vehicle = vehicle, TripId = 10, OriginName = "Lobos", DestinationName = "Capital Federal", Passengers = new List<Passenger>() },
+            new Reserve { ReserveId = 2, ReserveDate = reserveDate, Status = ReserveStatusEnum.Confirmed, Vehicle = vehicle, TripId = 20, OriginName = "Capital Federal", DestinationName = "Lobos", Passengers = new List<Passenger>() }
+        };
+
+        var trips = new List<Trip>
+        {
+            new Trip { TripId = 10, Description = "Lobos → Capital Federal" },
+            new Trip { TripId = 20, Description = "Capital Federal → Lobos" }
+        };
+
+        var request = new PagedReportRequestDto<ReserveDayReportFilterDto>
+        {
+            PageNumber = 1,
+            PageSize = 10,
+            Filters = new ReserveDayReportFilterDto(TripId: null) // página de Reservas sin selección ⇒ todas
+        };
+
+        _contextMock.Setup(x => x.Reserves).Returns(GetQueryableMockDbSet(reserves));
+        _contextMock.Setup(x => x.Trips).Returns(GetQueryableMockDbSet(trips));
+
+        // Act
+        var result = await _reserveBusiness.GetReserveReport(reserveDate, request);
+
+        // Assert
+        Assert.True(result.IsSuccess);
+        Assert.Equal(2, result.Value.Reserves.Items.Count);
+        Assert.Equal(2, result.Value.AvailableTrips.Count);
     }
 
     [Fact]
@@ -882,6 +988,7 @@ public class ReserveReportBusinessTest : TestBase
         _contextMock.Setup(c => c.ReservePayments).Returns(GetQueryableMockDbSet(payments));
         _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(new List<Reserve> { reserve1 }));
         _contextMock.Setup(c => c.Trips).Returns(GetQueryableMockDbSet(trips));
+        _contextMock.Setup(c => c.CustomerAccountTransactions).Returns(GetQueryableMockDbSet(new List<CustomerAccountTransaction>()));
 
         var request = new PagedReportRequestDto<PassengerReserveReportFilterRequestDto>
         {
@@ -978,6 +1085,172 @@ public class ReserveReportBusinessTest : TestBase
         var reportIdaVuelta = result.Value.Items.First(i => i.PassengerId == passengerIdUnpaidIdaVuelta);
         reportIdaVuelta.PaidAmount.Should().Be(2500, "Debe mostrar el precio de IdaVuelta del servicio");
         reportIdaVuelta.IsPayment.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task GetReservePassengerReport_OverdueBalance_CountsOnlyDepartedReservesNetOfPayments()
+    {
+        // Arrange: hoy = 30-may 12:00. La reserva pasada (27-may) ya viajó; la futura (2-jun) no.
+        _utcNow = new DateTime(2026, 5, 30, 12, 0, 0, DateTimeKind.Utc);
+        var reserveId = 1;
+        var customerId = 10;
+
+        var vehicle = new Vehicle { AvailableQuantity = 10 };
+        var reserve1 = new Reserve { ReserveId = reserveId, Vehicle = vehicle, TripId = 1, Passengers = new List<Passenger>() };
+
+        var customer = new Customer
+        {
+            CustomerId = customerId,
+            FirstName = "Ana",
+            LastName = "Lopez",
+            DocumentNumber = "1",
+            Email = "ana@example.com",
+            Phone1 = "1",
+            CurrentBalance = 1200 // total histórico (1000 + 500 - 300), incluye la futura
+        };
+
+        var passengers = new List<Passenger>
+        {
+            new Passenger
+            {
+                PassengerId = 1,
+                ReserveId = reserveId,
+                CustomerId = customerId,
+                Customer = customer,
+                FirstName = "Ana",
+                LastName = "Lopez",
+                DocumentNumber = "1",
+                Reserve = reserve1
+            }
+        };
+        reserve1.Passengers = passengers;
+
+        var pastReserve = new Reserve { ReserveId = 50, ReserveDate = new DateTime(2026, 5, 27), DepartureHour = new TimeSpan(8, 0, 0) };
+        var futureReserve = new Reserve { ReserveId = 51, ReserveDate = new DateTime(2026, 6, 2), DepartureHour = new TimeSpan(8, 0, 0) };
+
+        var transactions = new List<CustomerAccountTransaction>
+        {
+            new CustomerAccountTransaction { CustomerId = customerId, Type = TransactionType.Charge, Amount = 1000, RelatedReserveId = 50, RelatedReserve = pastReserve },
+            new CustomerAccountTransaction { CustomerId = customerId, Type = TransactionType.Payment, Amount = 300, RelatedReserveId = 50, RelatedReserve = pastReserve },
+            new CustomerAccountTransaction { CustomerId = customerId, Type = TransactionType.Charge, Amount = 500, RelatedReserveId = 51, RelatedReserve = futureReserve }
+        };
+
+        var trips = new List<Trip> { new Trip { TripId = 1, Status = EntityStatusEnum.Active, Prices = new List<TripPrice>() } };
+
+        _contextMock.Setup(c => c.Passengers).Returns(GetQueryableMockDbSet(passengers));
+        _contextMock.Setup(c => c.ReservePayments).Returns(GetQueryableMockDbSet(new List<ReservePayment>()));
+        _contextMock.Setup(c => c.Trips).Returns(GetQueryableMockDbSet(trips));
+        _contextMock.Setup(c => c.CustomerAccountTransactions).Returns(GetQueryableMockDbSet(transactions));
+
+        var request = new PagedReportRequestDto<PassengerReserveReportFilterRequestDto>
+        {
+            Filters = new PassengerReserveReportFilterRequestDto(null, null, null)
+        };
+
+        // Act
+        var result = await _reserveBusiness.GetReservePassengerReport(reserveId, request);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        var item = result.Value.Items.Single();
+        item.CurrentBalance.Should().Be(1200, "el saldo total no se toca");
+        item.OverdueBalance.Should().Be(700, "solo la reserva ya partida: 1000 cargo - 300 pago; la futura (500) se excluye");
+    }
+
+    [Fact]
+    public async Task GetReservePassengerReport_OverdueBalance_IsNull_ForPassengerWithoutCustomer()
+    {
+        // Arrange
+        _utcNow = new DateTime(2026, 5, 30, 12, 0, 0, DateTimeKind.Utc);
+        var reserveId = 1;
+
+        var vehicle = new Vehicle { AvailableQuantity = 10 };
+        var reserve1 = new Reserve { ReserveId = reserveId, Vehicle = vehicle, TripId = 1, Passengers = new List<Passenger>() };
+
+        var passengers = new List<Passenger>
+        {
+            new Passenger { PassengerId = 1, ReserveId = reserveId, FirstName = "Sin", LastName = "Cliente", DocumentNumber = "9", Reserve = reserve1 }
+        };
+        reserve1.Passengers = passengers;
+
+        var trips = new List<Trip> { new Trip { TripId = 1, Status = EntityStatusEnum.Active, Prices = new List<TripPrice>() } };
+
+        _contextMock.Setup(c => c.Passengers).Returns(GetQueryableMockDbSet(passengers));
+        _contextMock.Setup(c => c.ReservePayments).Returns(GetQueryableMockDbSet(new List<ReservePayment>()));
+        _contextMock.Setup(c => c.Trips).Returns(GetQueryableMockDbSet(trips));
+        _contextMock.Setup(c => c.CustomerAccountTransactions).Returns(GetQueryableMockDbSet(new List<CustomerAccountTransaction>()));
+
+        var request = new PagedReportRequestDto<PassengerReserveReportFilterRequestDto>
+        {
+            Filters = new PassengerReserveReportFilterRequestDto(null, null, null)
+        };
+
+        // Act
+        var result = await _reserveBusiness.GetReservePassengerReport(reserveId, request);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Items.Single().OverdueBalance.Should().BeNull("un pasajero sin Customer no tiene cuenta corriente");
+    }
+
+    [Fact]
+    public async Task GetReserveReport_FlagsHasDeparted_InterpretingDepartureAsLocalTime()
+    {
+        // Arrange: now = 12:00 UTC ⇒ LocalNow = 09:00 local Argentina (UTC−3).
+        // La de 08:00 local ya salió; la de 10:00 local TODAVÍA NO (recién a las 09:00 local).
+        // El caso de 10:00 es discriminante: comparar el local contra UtcNow (10 < 12) lo
+        // marcaría partido por error; comparar contra LocalNow (10 > 09) no.
+        _utcNow = new DateTime(2026, 5, 30, 12, 0, 0, DateTimeKind.Utc);
+        var date = new DateTime(2026, 5, 30);
+
+        var vehicle = new Vehicle { AvailableQuantity = 5 };
+        var departed = new Reserve
+        {
+            ReserveId = 1,
+            ReserveDate = date,
+            DepartureHour = new TimeSpan(8, 0, 0),
+            Status = ReserveStatusEnum.Confirmed,
+            Vehicle = vehicle,
+            TripId = 1,
+            OriginName = "A",
+            DestinationName = "B",
+            Passengers = new List<Passenger>()
+        };
+        var notYetDeparted = new Reserve
+        {
+            ReserveId = 2,
+            ReserveDate = date,
+            DepartureHour = new TimeSpan(10, 0, 0),
+            Status = ReserveStatusEnum.Confirmed,
+            Vehicle = vehicle,
+            TripId = 1,
+            OriginName = "A",
+            DestinationName = "B",
+            Passengers = new List<Passenger>()
+        };
+        var reserves = new List<Reserve> { departed, notYetDeparted };
+
+        var trips = new List<Trip> { new Trip { TripId = 1, Description = "A-B" } };
+
+        _contextMock.Setup(c => c.Reserves).Returns(GetQueryableMockDbSet(reserves));
+        _contextMock.Setup(c => c.Trips).Returns(GetQueryableMockDbSet(trips));
+
+        var request = new PagedReportRequestDto<ReserveDayReportFilterDto>
+        {
+            PageNumber = 1,
+            PageSize = 10,
+            Filters = new ReserveDayReportFilterDto(null)
+        };
+
+        // Act
+        var result = await _reserveBusiness.GetReserveReport(date, request);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        var items = result.Value.Reserves.Items;
+        items.Should().HaveCount(2);
+        items.Single(i => i.ReserveId == 1).HasDeparted.Should().BeTrue("08:00 local ya pasó las 09:00 local actuales");
+        items.Single(i => i.ReserveId == 2).HasDeparted.Should().BeFalse("10:00 local todavía no llega (son las 09:00 local), aunque 10 < 12 en UTC");
     }
 
     #endregion

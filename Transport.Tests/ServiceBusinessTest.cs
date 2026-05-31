@@ -32,6 +32,7 @@ public class ServiceBusinessTests : TestBase
 
         _dateTimeProviderMock = new Mock<IDateTimeProvider>();
         _dateTimeProviderMock.Setup(x => x.UtcNow).Returns(new DateTime(2025, 05, 12)); // Monday
+        _dateTimeProviderMock.Setup(x => x.LocalNow).Returns(new DateTime(2025, 05, 12)); // mismo "hoy" local
 
         // TenantConfigs vacío por default → GetReserveGenerationDaysAsync cae al IReserveOption (15).
         _contextMock.Setup(c => c.TenantConfigs).Returns(GetQueryableMockDbSet(new List<TenantConfig>()));
@@ -309,6 +310,30 @@ public class ServiceBusinessTests : TestBase
     }
 
     [Fact]
+    public async Task MarkOldReservesAsExpired_UsesLocalDeparture_NotUtc()
+    {
+        // Borde de medianoche: LocalNow = 30-may 22:00 (en UTC ya es 31-may 01:00).
+        // Available que sale 30-may 23:30 → NO debe expirar (no partió). Que salió 21:00 → SÍ.
+        // Comparar ReserveDate < UtcNow expiraría la de 23:30 por error (dato corrupto).
+        _dateTimeProviderMock.Setup(x => x.LocalNow).Returns(new DateTime(2026, 5, 30, 22, 0, 0, DateTimeKind.Unspecified));
+        _dateTimeProviderMock.Setup(x => x.UtcNow).Returns(new DateTime(2026, 5, 31, 1, 0, 0, DateTimeKind.Utc));
+
+        var notDeparted = new Reserve { ReserveId = 1, Status = ReserveStatusEnum.Available, ReserveDate = new DateTime(2026, 5, 30, 23, 30, 0) };
+        var departed = new Reserve { ReserveId = 2, Status = ReserveStatusEnum.Available, ReserveDate = new DateTime(2026, 5, 30, 21, 0, 0) };
+        var reserves = new List<Reserve> { notDeparted, departed };
+
+        _contextMock.Setup(x => x.Services).Returns(GetMockDbSetWithIdentity(new List<Service>()));
+        _contextMock.Setup(x => x.Reserves).Returns(GetMockDbSetWithIdentity(reserves));
+        _contextMock.Setup(x => x.Holidays).Returns(GetMockDbSetWithIdentity(new List<Holiday>()));
+        SetupSaveChangesWithOutboxAsync(_contextMock);
+
+        await _serviceBusiness.GenerateFutureReservesAsync();
+
+        notDeparted.Status.Should().Be(ReserveStatusEnum.Available, "23:30 todavía no partió a las 22:00 local");
+        departed.Status.Should().Be(ReserveStatusEnum.Expired, "21:00 ya partió");
+    }
+
+    [Fact]
     public async Task GenerateFutureReserves_ShouldCreateOnePerMatchingWeekday()
     {
         var today = _dateTimeProviderMock.Object.UtcNow; // Monday
@@ -354,6 +379,7 @@ public class ServiceBusinessTests : TestBase
         var today = new DateTime(2025, 05, 12); // Monday
         var dateProviderMock = new Mock<IDateTimeProvider>();
         dateProviderMock.Setup(x => x.UtcNow).Returns(today);
+        dateProviderMock.Setup(x => x.LocalNow).Returns(today);
 
         var reserveOptionMock = new Mock<IReserveOption>();
         reserveOptionMock.Setup(x => x.ReserveGenerationDays).Returns(3); // Tuesday-Thursday
@@ -392,6 +418,7 @@ public class ServiceBusinessTests : TestBase
         var feriado = today.AddDays(7); // Following Monday
         var dateProviderMock = new Mock<IDateTimeProvider>();
         dateProviderMock.Setup(x => x.UtcNow).Returns(today);
+        dateProviderMock.Setup(x => x.LocalNow).Returns(today);
 
         var reserveOptionMock = new Mock<IReserveOption>();
         reserveOptionMock.Setup(x => x.ReserveGenerationDays).Returns(10);
@@ -433,6 +460,7 @@ public class ServiceBusinessTests : TestBase
         var feriado = today.AddDays(7); // Following Monday
         var dateProviderMock = new Mock<IDateTimeProvider>();
         dateProviderMock.Setup(x => x.UtcNow).Returns(today);
+        dateProviderMock.Setup(x => x.LocalNow).Returns(today);
 
         var reserveOptionMock = new Mock<IReserveOption>();
         reserveOptionMock.Setup(x => x.ReserveGenerationDays).Returns(10);

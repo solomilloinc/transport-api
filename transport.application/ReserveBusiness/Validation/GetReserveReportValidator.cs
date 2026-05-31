@@ -1,11 +1,12 @@
 ﻿using FluentValidation;
+using Transport.SharedKernel;
 using Transport.SharedKernel.Contracts.Reserve;
 
 namespace Transport.Business.ReserveBusiness.Validation;
 
 public class GetReserveReportValidator : AbstractValidator<ReserveReportFilterRequestDto>
 {
-    public GetReserveReportValidator()
+    public GetReserveReportValidator(IDateTimeProvider dateTimeProvider)
     {
         RuleFor(x => x.TripId)
             .GreaterThan(0).WithMessage("TripId must be greater than zero.");
@@ -14,7 +15,7 @@ public class GetReserveReportValidator : AbstractValidator<ReserveReportFilterRe
             .GreaterThan(0).WithMessage("Passengers must be greater than zero.");
 
         RuleFor(x => x.DepartureDate)
-            .Must(date => date.Date >= DateTime.Today)
+            .Must(date => date.Date >= dateTimeProvider.LocalNow.Date)
             .WithMessage("DepartureDate must be today or later.");
 
         When(x => x.ReturnDate.HasValue, () =>

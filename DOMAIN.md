@@ -95,7 +95,7 @@ Reserve
 ├── DriverId (FK → Driver)     // Opcional
 ├── DepartureHour
 ├── EstimatedDuration
-├── Status                     // Pending, Confirmed, InProgress, Completed, Cancelled
+├── Status                     // Available, Confirmed, Cancelled, Completed, Rejected, Expired
 ├── RowVersion                 // Concurrencia optimista
 ├── OriginName, DestinationName, ServiceName  // Desnormalizados
 └── Passengers[] → Passenger
@@ -110,9 +110,11 @@ Reserve
 
 **Estados de Reserve:**
 ```
-Pending → Confirmed → InProgress → Completed
-    ↓         ↓           ↓
-    └─────────┴───────────┴──→ Cancelled
+Available → Confirmed → Completed
+    │           │
+    ├───────────┴──→ Cancelled / Rejected
+    │
+    └──→ Expired   (Available con fecha pasada sin confirmar)
 ```
 
 ### Passenger (Pasajero)
@@ -132,7 +134,7 @@ Passenger
 ├── PickupAddress, DropoffAddress
 ├── Price                            // Precio calculado
 ├── HasTraveled
-└── Status                           // Confirmed, Cancelled
+└── Status                           // PendingPayment, Confirmed, Cancelled, Traveled, NoShow, Refunded
 ```
 
 **Reglas de Negocio:**
@@ -183,7 +185,6 @@ Service
 ├── IsHoliday                 // Si corre en feriado
 ├── Status
 ├── AllowedDirections[] → ServiceDirection
-├── Customers[] → ServiceCustomer
 └── Reserves[] → Reserve
 ```
 
@@ -293,30 +294,36 @@ Service
 
 ### ReserveStatusEnum
 ```csharp
-Pending = 1,      // Reserva creada, sin confirmar
-Confirmed = 2,    // Reserva confirmada
-InProgress = 3,   // Viaje en curso
-Completed = 4,    // Viaje completado
-Cancelled = 5     // Reserva cancelada
+Available = 0,    // Reserva disponible (creada, sin pasajeros confirmados)
+Confirmed = 1,    // Reserva confirmada (con pasajeros/pago)
+Cancelled = 2,    // Reserva cancelada
+Completed = 3,    // Viaje completado
+Rejected = 4,     // Reserva rechazada
+Expired = 5       // Reserva expirada (fecha pasada sin confirmar)
 ```
 
 ### ReserveTypeIdEnum
 ```csharp
 Ida = 1,          // Solo ida
-Vuelta = 2,       // Solo vuelta
-IdaVuelta = 3     // Ida y vuelta (requiere dos reserves)
+IdaVuelta = 2     // Ida y vuelta (requiere dos reserves)
 ```
 
 ### PassengerStatusEnum
 ```csharp
-Confirmed = 1,    // Pasajero confirmado
-Cancelled = 2     // Pasajero cancelado
+PendingPayment = 1, // Creado, pago aún no confirmado
+Confirmed = 2,      // Pago procesado, lugar confirmado
+Cancelled = 3,      // Pasajero o reserva cancelada
+Traveled = 4,       // El pasajero efectivamente viajó
+NoShow = 5,         // Confirmado pero no se presentó al viaje
+Refunded = 6        // Reembolso en proceso
 ```
 
 ### EntityStatusEnum
 ```csharp
 Active = 1,       // Entidad activa
-Inactive = 2      // Entidad inactiva (soft delete)
+Inactive = 2,     // Entidad inactiva
+Deleted = 3,      // Entidad eliminada (soft delete)
+Suspended = 4     // Entidad suspendida
 ```
 
 ---

@@ -32,6 +32,7 @@ public class FrequentSubscriptionBusinessTest : TestBase
         _uow = new Mock<IUnitOfWork>();
         _clock = new Mock<IDateTimeProvider>();
         _clock.Setup(c => c.UtcNow).Returns(new DateTime(2026, 05, 17));
+        _clock.Setup(c => c.LocalNow).Returns(new DateTime(2026, 05, 17));
 
         _passengers = new Mock<IFrequentPassengerBusiness>();
         _passengers.Setup(p => p.GenerateForSubscriptionAsync(It.IsAny<int>()))
@@ -351,6 +352,89 @@ public class FrequentSubscriptionBusinessTest : TestBase
 
         result.IsSuccess.Should().BeFalse();
         result.Error.Should().Be(FrequentSubscriptionError.AlreadyCancelled);
+    }
+
+    [Fact]
+    public async Task Cancel_ShouldRefund_ReserveDepartingLateTodayLocal_NotSkipAsPast()
+    {
+        // Borde de medianoche: LocalNow = 30-may 22:00 (en UTC ya es 31-may 01:00).
+        // Una reserva que sale 30-may 23:30 TODAVÍA NO partió → debe cancelarse y refundarse.
+        // Comparar contra UtcNow la trataría como pasada (23:30 < 01:00 del 31) y NO refundaría: error de plata.
+        _clock.Setup(c => c.LocalNow).Returns(new DateTime(2026, 5, 30, 22, 0, 0, DateTimeKind.Unspecified));
+        _clock.Setup(c => c.UtcNow).Returns(new DateTime(2026, 5, 31, 1, 0, 0, DateTimeKind.Utc));
+
+        var customer = ActiveCustomer();
+        customer.CurrentBalance = 500m;
+
+        var subscription = new FrequentSubscription
+        {
+            FrequentSubscriptionId = 7,
+            CustomerId = customer.CustomerId,
+            ReserveTypeId = ReserveTypeIdEnum.Ida,
+            OutboundServiceId = 10,
+            Status = EntityStatusEnum.Active
+        };
+
+        var lateTodayReserve = new Reserve
+        {
+            ReserveId = 50,
+            ReserveDate = new DateTime(2026, 5, 30, 23, 30, 0),
+            Status = ReserveStatusEnum.Confirmed
+        };
+        var passenger = new Passenger
+        {
+            PassengerId = 100,
+            ReserveId = 50,
+            Reserve = lateTodayReserve,
+            CustomerId = customer.CustomerId,
+            FrequentSubscriptionId = 7,
+            Price = 200m,
+            Status = PassengerStatusEnum.Confirmed,
+            FirstName = "x", LastName = "x", DocumentNumber = "x"
+        };
+
+        var transactions = new List<CustomerAccountTransaction>();
+        _ctx.Setup(c => c.FrequentSubscriptions).Returns(GetQueryableMockDbSet(new List<FrequentSubscription> { subscription }));
+        _ctx.Setup(c => c.Passengers).Returns(GetQueryableMockDbSet(new List<Passenger> { passenger }));
+        _ctx.Setup(c => c.Customers).Returns(GetQueryableMockDbSet(new List<Customer> { customer }));
+        _ctx.Setup(c => c.CustomerAccountTransactions).Returns(GetMockDbSetWithIdentity(transactions));
+        SetupSaveChangesWithOutboxAsync(_ctx);
+
+        var result = await _business.Cancel(7);
+
+        result.IsSuccess.Should().BeTrue();
+        passenger.Status.Should().Be(PassengerStatusEnum.Cancelled, "todavía no partió, se cancela");
+        customer.CurrentBalance.Should().Be(300m, "se refunda 200 (500 - 200), no se saltea como pasada");
+        transactions.Should().ContainSingle(t => t.Type == TransactionType.Refund && t.RelatedReserveId == 50);
+    }
+
+    [Fact]
+    public async Task GetCancelPreview_ShouldCount_ReserveDepartingLateTodayLocal()
+    {
+        // Mismo borde: la reserva de 30-may 23:30 debe contar como futura (no partió).
+        _clock.Setup(c => c.LocalNow).Returns(new DateTime(2026, 5, 30, 22, 0, 0, DateTimeKind.Unspecified));
+        _clock.Setup(c => c.UtcNow).Returns(new DateTime(2026, 5, 31, 1, 0, 0, DateTimeKind.Utc));
+
+        var subscription = new FrequentSubscription
+        {
+            FrequentSubscriptionId = 7,
+            CustomerId = 1,
+            Status = EntityStatusEnum.Active
+        };
+        var lateTodayReserve = new Reserve { ReserveId = 1, ReserveDate = new DateTime(2026, 5, 30, 23, 30, 0) };
+        var passengers = new List<Passenger>
+        {
+            new() { ReserveId = 1, Reserve = lateTodayReserve, FrequentSubscriptionId = 7, Price = 200m, Status = PassengerStatusEnum.Confirmed, FirstName="x", LastName="x", DocumentNumber="x" }
+        };
+
+        _ctx.Setup(c => c.FrequentSubscriptions).Returns(GetQueryableMockDbSet(new List<FrequentSubscription> { subscription }));
+        _ctx.Setup(c => c.Passengers).Returns(GetQueryableMockDbSet(passengers));
+
+        var result = await _business.GetCancelPreview(7);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.PassengersToCancel.Should().Be(1, "23:30 local todavía no partió a las 22:00");
+        result.Value.TotalRefundAmount.Should().Be(200m);
     }
 
     [Fact]

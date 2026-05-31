@@ -45,7 +45,7 @@ public class FrequentSubscriptionBusiness : IFrequentSubscriptionBusiness
         var shapeError = ValidateReserveTypeShape(reserveType, dto);
         if (shapeError is not null) return Result.Failure<int>(shapeError);
 
-        var startDate = (dto.StartDate ?? _dateTimeProvider.UtcNow).Date;
+        var startDate = (dto.StartDate ?? _dateTimeProvider.LocalNow).Date;
         var endDate = dto.EndDate?.Date;
         if (endDate.HasValue && endDate.Value < startDate)
             return Result.Failure<int>(FrequentSubscriptionError.InvalidDateRange);
@@ -163,7 +163,7 @@ public class FrequentSubscriptionBusiness : IFrequentSubscriptionBusiness
                         subscription.InboundServiceId!.Value, dto.InboundDropoffLocationId.Value, SubscriptionLeg.Inbound, DirectionKind.Dropoff));
         }
 
-        var today = _dateTimeProvider.UtcNow.Date;
+        var today = _dateTimeProvider.LocalNow.Date;
         if (dto.StartDate.HasValue)
         {
             if (subscription.StartDate <= today && dto.StartDate.Value.Date != subscription.StartDate)
@@ -220,7 +220,8 @@ public class FrequentSubscriptionBusiness : IFrequentSubscriptionBusiness
 
             subscription.Status = EntityStatusEnum.Deleted;
 
-            var now = _dateTimeProvider.UtcNow;
+            var now = _dateTimeProvider.UtcNow;        // instante UTC: para el Date del refund
+            var localNow = _dateTimeProvider.LocalNow; // hora local: para comparar ReserveDate (agenda)
             var futurePassengers = await _context.Passengers
                 .Where(p => p.FrequentSubscriptionId == frequentSubscriptionId
                          && !p.HasTraveled
@@ -235,7 +236,7 @@ public class FrequentSubscriptionBusiness : IFrequentSubscriptionBusiness
 
             foreach (var passenger in futurePassengers)
             {
-                if (passenger.Reserve.ReserveDate < now) continue;
+                if (passenger.Reserve.ReserveDate < localNow) continue;
 
                 passenger.Status = PassengerStatusEnum.Cancelled;
 
@@ -276,7 +277,7 @@ public class FrequentSubscriptionBusiness : IFrequentSubscriptionBusiness
         if (subscription.Status != EntityStatusEnum.Active)
             return Result.Failure<FrequentSubscriptionCancelPreviewDto>(FrequentSubscriptionError.AlreadyCancelled);
 
-        var now = _dateTimeProvider.UtcNow;
+        var localNow = _dateTimeProvider.LocalNow;
 
         // Mismo filtro que aplica Cancel: futuros, no-viajados, no-cancelados.
         var preview = await _context.Passengers
@@ -284,7 +285,7 @@ public class FrequentSubscriptionBusiness : IFrequentSubscriptionBusiness
                      && !p.HasTraveled
                      && p.Status != PassengerStatusEnum.Cancelled
                      && p.Status != PassengerStatusEnum.Traveled
-                     && p.Reserve.ReserveDate >= now)
+                     && p.Reserve.ReserveDate >= localNow)
             .GroupBy(_ => 1)
             .Select(g => new
             {
