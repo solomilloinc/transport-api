@@ -200,4 +200,55 @@ public class CustomerBusinessTest : TestBase
         Assert.True(result.IsSuccess);
         Assert.Equal(EntityStatusEnum.Active, customer.Status);
     }
+
+    [Fact]
+    public async Task GetCustomerAccountSummaryAsync_ShouldIncludeTransactionsOnFinalDay_WhenToDateAtMidnight()
+    {
+        // Arrange: el front envía ToDate a medianoche (00:00:00) del día final. Una transacción
+        // ese mismo día pero más tarde (14:00) debe quedar incluida; la del día siguiente, no.
+        var customer = new Customer { CustomerId = 1, FirstName = "John", LastName = "Doe" };
+
+        var transactions = new List<CustomerAccountTransaction>
+        {
+            new CustomerAccountTransaction
+            {
+                CustomerAccountTransactionId = 1,
+                CustomerId = 1,
+                Date = new DateTime(2026, 05, 31, 14, 0, 0),
+                Type = TransactionType.Charge,
+                Amount = 100,
+                Description = "Cargo del día final"
+            },
+            new CustomerAccountTransaction
+            {
+                CustomerAccountTransactionId = 2,
+                CustomerId = 1,
+                Date = new DateTime(2026, 06, 01, 9, 0, 0),
+                Type = TransactionType.Charge,
+                Amount = 200,
+                Description = "Cargo del día siguiente"
+            }
+        };
+
+        _mockContext.Setup(x => x.Customers)
+            .Returns(GetQueryableMockDbSet(new List<Customer> { customer }));
+        _mockContext.Setup(x => x.CustomerAccountTransactions)
+            .Returns(GetQueryableMockDbSet(transactions));
+
+        var requestDto = new PagedReportRequestDto<CustomerTransactionReportFilterRequestDto>
+        {
+            Filters = new CustomerTransactionReportFilterRequestDto(
+                TransactionType: null,
+                FromDate: null,
+                ToDate: new DateTime(2026, 05, 31))
+        };
+
+        // Act
+        var result = await _customerBusiness.GetCustomerAccountSummaryAsync(1, requestDto);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Transactions.Items.Should().ContainSingle()
+            .Which.Id.Should().Be(1);
+    }
 }

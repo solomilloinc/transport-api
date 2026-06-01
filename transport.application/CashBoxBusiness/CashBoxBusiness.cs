@@ -94,7 +94,12 @@ public class CashBoxBusiness : ICashBoxBusiness
             query = query.Where(c => c.OpenedAt >= requestDto.Filters.FromDate);
 
         if (requestDto.Filters?.ToDate is not null)
-            query = query.Where(c => c.OpenedAt <= requestDto.Filters.ToDate);
+        {
+            // El front envía ToDate a medianoche (00:00:00); extendemos hasta el último instante
+            // del día (23:59:59.9999999) para abarcar todas las cajas abiertas en esa fecha final.
+            var toDateEndOfDay = requestDto.Filters.ToDate.Value.Date.AddDays(1).AddTicks(-1);
+            query = query.Where(c => c.OpenedAt <= toDateEndOfDay);
+        }
 
         if (!string.IsNullOrWhiteSpace(requestDto.Filters?.Status))
         {

@@ -1128,10 +1128,11 @@ public class ReserveReportBusinessTest : TestBase
         var pastReserve = new Reserve { ReserveId = 50, ReserveDate = new DateTime(2026, 5, 27), DepartureHour = new TimeSpan(8, 0, 0) };
         var futureReserve = new Reserve { ReserveId = 51, ReserveDate = new DateTime(2026, 6, 2), DepartureHour = new TimeSpan(8, 0, 0) };
 
+        // Amount viene firmado: Charge +, Payment − (igual que en la base).
         var transactions = new List<CustomerAccountTransaction>
         {
             new CustomerAccountTransaction { CustomerId = customerId, Type = TransactionType.Charge, Amount = 1000, RelatedReserveId = 50, RelatedReserve = pastReserve },
-            new CustomerAccountTransaction { CustomerId = customerId, Type = TransactionType.Payment, Amount = 300, RelatedReserveId = 50, RelatedReserve = pastReserve },
+            new CustomerAccountTransaction { CustomerId = customerId, Type = TransactionType.Payment, Amount = -300, RelatedReserveId = 50, RelatedReserve = pastReserve },
             new CustomerAccountTransaction { CustomerId = customerId, Type = TransactionType.Charge, Amount = 500, RelatedReserveId = 51, RelatedReserve = futureReserve }
         };
 
@@ -1155,6 +1156,63 @@ public class ReserveReportBusinessTest : TestBase
         var item = result.Value.Items.Single();
         item.CurrentBalance.Should().Be(1200, "el saldo total no se toca");
         item.OverdueBalance.Should().Be(700, "solo la reserva ya partida: 1000 cargo - 300 pago; la futura (500) se excluye");
+    }
+
+    [Fact]
+    public async Task GetReservePassengerReport_OverdueBalance_IsZero_WhenDepartedReserveFullyPaid_AndDebtIsFutureOnly()
+    {
+        // Caso real reportado: reserva #1 ya partida y PAGADA (Cargo +10000, Pago -10000 = 0),
+        // más reserva #2003 a futuro impaga (Cargo +10000). La deuda vencida debe ser 0
+        // (no se cobra el viaje futuro); CurrentBalance total = 10000. La versión buggy daba 20000.
+        _utcNow = new DateTime(2026, 5, 31, 12, 0, 0, DateTimeKind.Utc); // LocalNow = 31-may 09:00
+        var reserveId = 2003;
+        var customerId = 1;
+
+        var vehicle = new Vehicle { AvailableQuantity = 10 };
+        var viewedReserve = new Reserve { ReserveId = reserveId, Vehicle = vehicle, TripId = 1, Passengers = new List<Passenger>() };
+
+        var customer = new Customer
+        {
+            CustomerId = customerId, FirstName = "Agustin", LastName = "Yuse",
+            DocumentNumber = "37976806", Email = "a@a.com", Phone1 = "1", CurrentBalance = 10000m
+        };
+
+        var passengers = new List<Passenger>
+        {
+            new Passenger { PassengerId = 1002, ReserveId = reserveId, CustomerId = customerId, Customer = customer,
+                FirstName = "Agustin", LastName = "Yuse", DocumentNumber = "37976806", Reserve = viewedReserve,
+                Status = PassengerStatusEnum.PendingPayment }
+        };
+        viewedReserve.Passengers = passengers;
+
+        var departedReserve = new Reserve { ReserveId = 1, ReserveDate = new DateTime(2026, 5, 30), DepartureHour = TimeSpan.Zero };
+        var futureReserveTx = new Reserve { ReserveId = 2003, ReserveDate = new DateTime(2026, 6, 5), DepartureHour = TimeSpan.Zero };
+
+        var transactions = new List<CustomerAccountTransaction>
+        {
+            new CustomerAccountTransaction { CustomerId = customerId, Type = TransactionType.Charge, Amount = 10000, RelatedReserveId = 1, RelatedReserve = departedReserve },
+            new CustomerAccountTransaction { CustomerId = customerId, Type = TransactionType.Payment, Amount = -10000, RelatedReserveId = 1, RelatedReserve = departedReserve },
+            new CustomerAccountTransaction { CustomerId = customerId, Type = TransactionType.Charge, Amount = 10000, RelatedReserveId = 2003, RelatedReserve = futureReserveTx }
+        };
+
+        var trips = new List<Trip> { new Trip { TripId = 1, Status = EntityStatusEnum.Active, Prices = new List<TripPrice>() } };
+
+        _contextMock.Setup(c => c.Passengers).Returns(GetQueryableMockDbSet(passengers));
+        _contextMock.Setup(c => c.ReservePayments).Returns(GetQueryableMockDbSet(new List<ReservePayment>()));
+        _contextMock.Setup(c => c.Trips).Returns(GetQueryableMockDbSet(trips));
+        _contextMock.Setup(c => c.CustomerAccountTransactions).Returns(GetQueryableMockDbSet(transactions));
+
+        var request = new PagedReportRequestDto<PassengerReserveReportFilterRequestDto>
+        {
+            Filters = new PassengerReserveReportFilterRequestDto(null, null, null)
+        };
+
+        var result = await _reserveBusiness.GetReservePassengerReport(reserveId, request);
+
+        result.IsSuccess.Should().BeTrue();
+        var item = result.Value.Items.Single();
+        item.CurrentBalance.Should().Be(10000m, "saldo total incluye el viaje futuro");
+        item.OverdueBalance.Should().Be(0m, "la #1 partida está paga (10000 - 10000); la #2003 futura se excluye");
     }
 
     [Fact]

@@ -1,7 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using System.Linq.Expressions;
 using Transport.Business.Data;
-using Transport.Domain.Customers;
 using Transport.Domain.Passengers;
 using Transport.Domain.Reserves;
 using Transport.Domain.Reserves.Abstraction;
@@ -425,10 +424,12 @@ public class ReserveReportBusiness : IReserveReportBusiness
                 .Include(t => t.RelatedReserve)
                 .ToListAsync();
 
+            // Amount ya viene firmado: Charge positivo, Payment/Refund negativo (igual que
+            // CurrentBalance, que es la suma directa). Se suma tal cual, sin re-aplicar signo.
             overdueByCustomer = transactions
                 .Where(t => t.RelatedReserve != null && HasDeparted(t.RelatedReserve))
                 .GroupBy(t => t.CustomerId)
-                .ToDictionary(g => g.Key, g => g.Sum(t => SignedAmount(t.Type, t.Amount)));
+                .ToDictionary(g => g.Key, g => g.Sum(t => t.Amount));
         }
 
         var allItems = passengers.Select(p =>
@@ -525,11 +526,6 @@ public class ReserveReportBusiness : IReserveReportBusiness
 
         return Result.Success(result);
     }
-
-    // Charge/Adjustment suman a la deuda; Payment/Refund la reducen. Coincide con cómo se ajusta
-    // Customer.CurrentBalance en cada transacción (cargo +, pago/refund −).
-    private static decimal SignedAmount(TransactionType type, decimal amount) =>
-        type is TransactionType.Payment or TransactionType.Refund ? -amount : amount;
 
     private static string GetPaymentMethodName(PaymentMethodEnum method)
     {
