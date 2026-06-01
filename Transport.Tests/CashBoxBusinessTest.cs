@@ -8,6 +8,7 @@ using Transport.Domain.CashBoxes;
 using Transport.Domain.Users;
 using Transport.Domain.Reserves;
 using Transport.Domain.Customers;
+using Transport.SharedKernel;
 using Transport.SharedKernel.Contracts.CashBox;
 
 namespace Transport.Tests.CashBoxBusinessTests;
@@ -187,5 +188,53 @@ public class CashBoxBusinessTests : TestBase
         var onlineBreakdown = result.Value.PaymentsByMethod.FirstOrDefault(p => p.PaymentMethodName == "Online");
         onlineBreakdown.Should().NotBeNull();
         onlineBreakdown!.Amount.Should().Be(150);
+    }
+
+    [Fact]
+    public async Task GetCashBoxReport_ShouldIncludeCashBoxOpenedOnFinalDay_WhenToDateAtMidnight()
+    {
+        // Arrange: el front envía ToDate a medianoche (00:00:00) del día final. Una caja abierta
+        // ese mismo día pero más tarde (14:00) debe quedar incluida; la del día siguiente, no.
+        var user = new User { UserId = 1, Email = "admin@test.com" };
+        var cashBoxes = new List<CashBox>
+        {
+            new CashBox
+            {
+                CashBoxId = 1,
+                Status = CashBoxStatusEnum.Closed,
+                OpenedByUserId = 1,
+                OpenedByUser = user,
+                OpenedAt = new DateTime(2026, 05, 31, 14, 0, 0)
+            },
+            new CashBox
+            {
+                CashBoxId = 2,
+                Status = CashBoxStatusEnum.Open,
+                OpenedByUserId = 1,
+                OpenedByUser = user,
+                OpenedAt = new DateTime(2026, 06, 01, 9, 0, 0)
+            }
+        };
+        var payments = new List<ReservePayment>();
+
+        _contextMock.Setup(c => c.CashBoxes).Returns(GetQueryableMockDbSet(cashBoxes));
+        _contextMock.Setup(c => c.ReservePayments).Returns(GetQueryableMockDbSet(payments));
+
+        var requestDto = new PagedReportRequestDto<CashBoxReportFilterRequestDto>
+        {
+            Filters = new CashBoxReportFilterRequestDto(
+                FromDate: null,
+                ToDate: new DateTime(2026, 05, 31),
+                Status: null)
+        };
+
+        // Act
+        var result = await _cashBoxBusiness.GetCashBoxReport(requestDto);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        result.Value.TotalRecords.Should().Be(1);
+        result.Value.Items.Should().ContainSingle()
+            .Which.CashBoxId.Should().Be(1);
     }
 }
