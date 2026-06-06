@@ -247,6 +247,11 @@ public class FrequentPassengerBusiness : IFrequentPassengerBusiness
             relatedReserveId: outboundReserve.ReserveId);
         _context.Passengers.Add(inboundPassenger);
 
+        // Vínculo pasajero↔pasajero (las dos piernas de la MISMA persona). Vía navegación porque
+        // los PassengerId no existen hasta el SaveChanges; EF resuelve el FK al guardar.
+        outboundPassenger.RelatedPassenger = inboundPassenger;
+        inboundPassenger.RelatedPassenger = outboundPassenger;
+
         ChargeCustomer(subscription, packagePrice.Value,
             $"Pasajero frecuente IdaVuelta (suscripción {subscription.FrequentSubscriptionId}) reservas {outboundReserve.ReserveId}/{inboundReserve.ReserveId}.",
             outboundReserve.ReserveId);

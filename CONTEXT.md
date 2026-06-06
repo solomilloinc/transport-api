@@ -78,6 +78,16 @@ _Avoid_: Saldo (ese es el total), Deuda total, Deuda (a secas).
 Bloqueo temporal de cupos durante el flujo de pago externo. Expira automáticamente; previene overbooking.
 _Avoid_: Hold, Reservation lock, Cart.
 
+### Operaciones sobre Passenger
+
+**Cancelar Passenger**:
+Dar de baja un `Passenger` individual. Pasa a `Status = Cancelled` (estado terminal **único**: no se usa `Refunded`, que queda deprecado — el "cuánto se devolvió" vive en el ledger, no en el enum) y **revierte su deuda** mediante un `CustomerAccountTransaction` tipo `Refund` por `-Price` que baja `Customer.CurrentBalance` — mismo patrón que el cascade de `FrequentSubscription.Cancel`. **No toca la Caja**: la plata cobrada ya ingresó (regla de negocio "caja en cero") y no se devuelve efectivo; si el pasajero ya había pagado, el `Refund` deja `CurrentBalance` negativo = **saldo a favor** para futuros viajes. Solo aplica a pasajeros activos (`PendingPayment`/`Confirmed`) cuya `Reserve` no partió. En un par IdaVuelta cancela **ambas piernas** de esa persona (vía `RelatedPassengerId`) y revierte el `packagePrice` una sola vez. Cierra la deuda técnica del ADR 0005 ("cancelar un `Passenger` hoy no genera refund ni ajuste de cuenta corriente").
+_Avoid_: cancelar la `Reserve` (otra operación, ver ADR 0005), borrar, eliminar pasajero, reembolso en efectivo (no existe; siempre es saldo a favor).
+
+**Pierna (leg)**:
+Cada uno de los dos tramos de un IdaVuelta — la **pierna de ida** (Origin→Destination) y la **pierna de vuelta** (Destination→Origin). Cada pierna es un `Passenger` propio en su `Reserve`. Las dos piernas de **la misma persona** se enlazan directamente por `Passenger.RelatedPassengerId` (vínculo pasajero↔pasajero, además del `ReserveRelatedId` que enlaza las `Reserve`). Por convención de pricing (ADR 0004) la pierna outbound lleva el `packagePrice` completo y la inbound lleva `0`.
+_Avoid_: tramo (ambiguo con parada intermedia), leg sin traducir.
+
 ---
 
 ## Relationships
@@ -89,12 +99,12 @@ _Avoid_: Hold, Reservation lock, Cart.
 - Un **Customer** tiene cero o más **FrequentSubscription**. Cada una referencia 1 `Service` (Outbound) y, opcionalmente, otro `Service` (Inbound) si el tipo es `IdaVuelta`.
 - Una **FrequentSubscription** activa fuerza, en cada corrida del batch, la creación de un `Passenger` confirmado por cada `Reserve` generada en sus `Service(s)` dentro de la vigencia.
 - Un **Passenger** referencia opcionalmente un **Customer**.
-- Un **Passenger** referencia opcionalmente la **Reserve** de la otra pierna (via `ReserveRelatedId`) cuando es `IdaVuelta` — es un vínculo flojo por id hacia la otra `Reserve`, no hacia otro `Passenger`.
+- Un **Passenger** referencia opcionalmente la **Reserve** de la otra pierna (via `ReserveRelatedId`) cuando es `IdaVuelta`, y referencia opcionalmente al **Passenger** hermano de esa otra pierna (via `RelatedPassengerId`) — este último es el vínculo preciso persona↔persona usado para cancelar el par correcto.
 - Una **ReservePayment** referencia exactamente una **Reserve**.
 
 ### IdaVuelta en concreto
 
-Un "pasaje IdaVuelta" del negocio se modela como **dos Reserves** (la de ida y la de vuelta) y, por cada persona viajando, **dos Passengers** linkeados entre sí por `ReserveRelatedId`. No existe una entidad única que represente la compra IdaVuelta — la unión es implícita.
+Un "pasaje IdaVuelta" del negocio se modela como **dos Reserves** (la de ida y la de vuelta) y, por cada persona viajando, **dos Passengers**. Las dos `Reserve` se enlazan por `ReserveRelatedId`; los dos `Passenger` de la misma persona se enlazan además por `RelatedPassengerId` (vínculo directo pierna↔pierna, necesario porque en el alta admin todas las piernas comparten el documento y el `CustomerId` del pagador). No existe una entidad única que represente la compra IdaVuelta — la unión es implícita.
 
 ---
 

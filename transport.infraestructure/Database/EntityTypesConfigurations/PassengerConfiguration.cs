@@ -64,6 +64,13 @@ public class PassengerConfiguration : IEntityTypeConfiguration<Passenger>
                .HasForeignKey(p => p.ReserveRelatedId)
                .OnDelete(DeleteBehavior.NoAction);
 
+        // Pasajero hermano en un par IdaVuelta (self-reference). Vínculo directo pierna↔pierna
+        // usado para cancelar el par correcto cuando un mismo cliente paga varios IdaVuelta.
+        builder.HasOne(p => p.RelatedPassenger)
+               .WithMany()
+               .HasForeignKey(p => p.RelatedPassengerId)
+               .OnDelete(DeleteBehavior.NoAction);
+
         builder.HasOne(p => p.Customer)
                .WithMany(c => c.Passengers)
                .HasForeignKey(p => p.CustomerId)
@@ -97,6 +104,7 @@ public class PassengerConfiguration : IEntityTypeConfiguration<Passenger>
         // Índices
         builder.HasIndex(p => p.ReserveId);
         builder.HasIndex(p => p.ReserveRelatedId);
+        builder.HasIndex(p => p.RelatedPassengerId);
         builder.HasIndex(p => p.CustomerId);
         builder.HasIndex(p => p.Status);
         builder.HasIndex(p => p.FrequentSubscriptionId);
