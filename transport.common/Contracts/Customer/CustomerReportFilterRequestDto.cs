@@ -9,4 +9,5 @@ public record CustomerReportFilterRequestDto(
     string? Phone2,
     DateTime? CreatedFrom,
     DateTime? CreatedTo,
-    EntityStatusEnum? Status = null);
+    EntityStatusEnum? Status = null,
+    string? Search = null);

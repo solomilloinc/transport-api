@@ -12,6 +12,10 @@ public static class CustomerError
         "Customer.AlreadyExists",
         "Ya existe un cliente con ese número de documento.");
 
+    public static readonly Error EmailAlreadyExists = Error.Conflict(
+        "Customer.EmailAlreadyExists",
+        "Ya existe un cliente con ese correo electrónico.");
+
     public static readonly Error Inactive = Error.Validation(
         "Customer.Inactive",
         "El cliente no se encuentra activo.");

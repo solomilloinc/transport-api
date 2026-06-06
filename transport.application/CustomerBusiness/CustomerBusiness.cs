@@ -22,11 +22,15 @@ public class CustomerBusiness : ICustomerBusiness
     public async Task<Result<int>> Create(CustomerCreateRequestDto dto)
     {
         var existing = await _context.Customers
-            .SingleOrDefaultAsync(x => x.DocumentNumber == dto.DocumentNumber);
+            .Where(x => x.DocumentNumber == dto.DocumentNumber || x.Email == dto.Email)
+            .Select(x => new { x.DocumentNumber, x.Email })
+            .FirstOrDefaultAsync();
 
-        if (existing != null)
+        if (existing is not null)
         {
-            return Result.Failure<int>(CustomerError.AlreadyExists);
+            return existing.DocumentNumber == dto.DocumentNumber
+                ? Result.Failure<int>(CustomerError.AlreadyExists)
+                : Result.Failure<int>(CustomerError.EmailAlreadyExists);
         }
 
         var customer = new Customer
@@ -71,6 +75,14 @@ public class CustomerBusiness : ICustomerBusiness
         var query = _context.Customers
             .AsNoTracking()
             .AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(requestDto.Filters?.Search))
+        {
+            var term = requestDto.Filters.Search.Trim().ToLower();
+            query = query.Where(x =>
+                x.DocumentNumber.ToLower().Contains(term) ||
+                (x.FirstName + " " + x.LastName).ToLower().Contains(term));
+        }
 
         if (!string.IsNullOrWhiteSpace(requestDto.Filters?.FirstName))
             query = query.Where(x => x.FirstName.Contains(requestDto.Filters.FirstName));
