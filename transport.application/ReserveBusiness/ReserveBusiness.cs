@@ -43,6 +43,7 @@ public class ReserveBusiness : IReserveBusiness
     private readonly IReserveOption _reserveOptions;
     private readonly ICashBoxBusiness _cashBoxBusiness;
     private readonly IReserveSlotLockBusiness _slotLockBusiness;
+    private readonly IDateTimeProvider _dateTimeProvider;
 
     public ReserveBusiness(IApplicationDbContext context,
         IUnitOfWork unitOfWork,
@@ -52,7 +53,8 @@ public class ReserveBusiness : IReserveBusiness
         ICustomerBusiness customerBusiness,
         IReserveOption reserveOptions,
         ICashBoxBusiness cashBoxBusiness,
-        IReserveSlotLockBusiness slotLockBusiness)
+        IReserveSlotLockBusiness slotLockBusiness,
+        IDateTimeProvider dateTimeProvider)
     {
         _context = context;
         _unitOfWork = unitOfWork;
@@ -63,6 +65,7 @@ public class ReserveBusiness : IReserveBusiness
         _reserveOptions = reserveOptions;
         _cashBoxBusiness = cashBoxBusiness;
         _slotLockBusiness = slotLockBusiness;
+        _dateTimeProvider = dateTimeProvider;
     }
 
     public async Task<Result<int>> CreateReserve(ReserveCreateDto dto)
@@ -268,6 +271,11 @@ public class ReserveBusiness : IReserveBusiness
                     var returnResult = await CreatePassengerAdminEntity(
                         returnReserve, outboundReserve.ReserveId, pax, pax.Return, payer);
                     if (returnResult.IsFailure) return Result.Failure<bool>(returnResult.Error);
+
+                    // Vínculo pasajero↔pasajero (las dos piernas de esta misma persona). Vía
+                    // navegación porque los PassengerId no existen hasta el SaveChanges.
+                    outboundResult.Value.RelatedPassenger = returnResult.Value;
+                    returnResult.Value.RelatedPassenger = outboundResult.Value;
                 }
             }
 
@@ -568,6 +576,11 @@ public class ReserveBusiness : IReserveBusiness
                     $"Pasaje de {pax.FirstName} {pax.LastName}",
                     pax.Return.Price,
                     $"Reserva {returnReserve.ReserveId}"));
+
+                // Vínculo pasajero↔pasajero (las dos piernas de esta misma persona). Vía
+                // navegación porque los PassengerId no existen hasta el SaveChanges.
+                outboundResult.Value.RelatedPassenger = returnResult.Value;
+                returnResult.Value.RelatedPassenger = outboundResult.Value;
             }
         }
 
@@ -973,6 +986,105 @@ public class ReserveBusiness : IReserveBusiness
         await _context.SaveChangesWithOutboxAsync();
 
         return Result.Success(true);
+    }
+
+    /// <summary>
+    /// Cancela un Passenger individual: lo pasa a Cancelled y revierte su deuda
+    /// (CustomerAccountTransaction tipo Refund por -Price, baja CurrentBalance). NO toca la Caja:
+    /// la plata cobrada ya ingresó (regla "caja en cero"); si ya estaba pago, el Refund deja saldo
+    /// a favor. En un par IdaVuelta cancela ambas piernas (vía RelatedPassengerId) revirtiendo el
+    /// packagePrice una sola vez. Solo aplica a pasajeros activos cuya reserva no partió.
+    /// </summary>
+    public async Task<Result<bool>> CancelPassengerAsync(int passengerId)
+    {
+        return await _unitOfWork.ExecuteInTransactionAsync(async () =>
+        {
+            var passenger = await _context.Passengers
+                .Include(p => p.Reserve)
+                .SingleOrDefaultAsync(p => p.PassengerId == passengerId);
+
+            if (passenger is null)
+                return Result.Failure<bool>(PassengerError.NotFound);
+
+            var eligibility = ValidatePassengerCancelable(passenger);
+            if (eligibility.IsFailure)
+                return Result.Failure<bool>(eligibility.Error);
+
+            // Reunir las piernas a cancelar: este Passenger y, si es IdaVuelta, su pierna hermana.
+            // El vínculo es directo pasajero↔pasajero (RelatedPassengerId), no por CustomerId: un
+            // mismo cliente puede pagar varios pasajeros IdaVuelta y el match por CustomerId
+            // cancelaría la pierna de la persona equivocada.
+            var passengersToCancel = new List<Passenger> { passenger };
+            if (passenger.RelatedPassengerId.HasValue)
+            {
+                var related = await _context.Passengers
+                    .Include(p => p.Reserve)
+                    .Where(p => p.PassengerId == passenger.RelatedPassengerId.Value
+                             && p.Status != PassengerStatusEnum.Cancelled)
+                    .FirstOrDefaultAsync();
+
+                if (related is not null)
+                    passengersToCancel.Add(related);
+            }
+
+            await CancelPassengersAndRevertDebtAsync(passengersToCancel);
+
+            await _context.SaveChangesWithOutboxAsync();
+            return Result.Success(true);
+        });
+    }
+
+    /// <summary>
+    /// Valida que un Passenger sea cancelable: debe estar activo (PendingPayment o Confirmed) y
+    /// su Reserve no haber partido (ReserveDate.Date + DepartureHour > LocalNow).
+    /// </summary>
+    private Result ValidatePassengerCancelable(Passenger passenger)
+    {
+        if (passenger.Status != PassengerStatusEnum.PendingPayment &&
+            passenger.Status != PassengerStatusEnum.Confirmed)
+            return Result.Failure(PassengerError.NotActive(passenger.Status));
+
+        var departure = passenger.Reserve.ReserveDate.Date + passenger.Reserve.DepartureHour;
+        if (departure < _dateTimeProvider.LocalNow)
+            return Result.Failure(PassengerError.ReserveDeparted);
+
+        return Result.Success();
+    }
+
+    /// <summary>
+    /// Pasa cada Passenger a Cancelled y, si tiene Price > 0, genera un Refund por -Price a la
+    /// cuenta corriente del cliente (baja CurrentBalance). No toca la Caja. El cargo apunta a la
+    /// Reserve del propio passenger (RelatedReserveId) para que la deuda vencida se atribuya bien.
+    /// </summary>
+    private async Task CancelPassengersAndRevertDebtAsync(IEnumerable<Passenger> passengers)
+    {
+        var now = _dateTimeProvider.UtcNow;
+
+        foreach (var passenger in passengers)
+        {
+            passenger.Status = PassengerStatusEnum.Cancelled;
+            _context.Passengers.Update(passenger);
+
+            if (passenger.Price <= 0 || passenger.CustomerId is null)
+                continue;
+
+            var customer = await _context.Customers
+                .FirstOrDefaultAsync(c => c.CustomerId == passenger.CustomerId.Value);
+            if (customer is null)
+                continue;
+
+            _context.CustomerAccountTransactions.Add(new CustomerAccountTransaction
+            {
+                CustomerId = customer.CustomerId,
+                Date = now,
+                Type = TransactionType.Refund,
+                Amount = -passenger.Price,
+                Description = $"Cancelación de pasajero {passenger.FirstName} {passenger.LastName} en reserva {passenger.ReserveId}.",
+                RelatedReserveId = passenger.ReserveId
+            });
+            customer.CurrentBalance -= passenger.Price;
+            _context.Customers.Update(customer);
+        }
     }
 
     public async Task<Result<List<CustomerPendingReserveDto>>> GetCustomerPendingReservesAsync(int customerId)

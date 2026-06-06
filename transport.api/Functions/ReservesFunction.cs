@@ -210,6 +210,26 @@ public class ReservesFunction : FunctionBase
         return await MatchResultAsync(req, result);
     }
 
+    [Function("CancelPassenger")]
+    [Authorize("Admin")]
+    [OpenApiOperation(
+    operationId: "passenger-cancel",
+    tags: new[] { "passenger" },
+    Summary = "Cancel a passenger",
+    Description = "Cancels an individual passenger, reverting its account-current debt as a credit balance (refund). Does not touch the cash box. If the passenger is part of a round-trip (IdaVuelta), both legs are cancelled.",
+    Visibility = OpenApiVisibilityType.Important)]
+    [OpenApiParameter(name: "passengerId", In = ParameterLocation.Path, Required = true, Type = typeof(int), Summary = "ID of the passenger to cancel")]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(Result<bool>), Summary = "Passenger cancelled successfully.")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Summary = "Passenger not found.")]
+    public async Task<HttpResponseData> CancelPassenger(
+    [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "passenger-cancel/{passengerId:int}")] HttpRequestData req,
+    int passengerId)
+    {
+        var result = await _reserveBusiness.CancelPassengerAsync(passengerId);
+
+        return await MatchResultAsync(req, result);
+    }
+
     [Function("LockReserveSlots")]
     [AllowAnonymous]
     [OpenApiOperation(

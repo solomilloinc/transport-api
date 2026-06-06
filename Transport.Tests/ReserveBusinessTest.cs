@@ -45,6 +45,7 @@ public class ReserveBusinessTests : TestBase
     private readonly Mock<ICustomerBusiness> _customerBusinessMock;
     private readonly Mock<ICashBoxBusiness> _cashBoxBusinessMock;
     private readonly Mock<IReserveSlotLockBusiness> _slotLockBusinessMock;
+    private readonly Mock<IDateTimeProvider> _dateTimeProviderMock;
     private readonly ReserveBusiness _reserveBusiness;
     private readonly ReservePaymentBusiness _paymentBusiness;
 
@@ -57,11 +58,24 @@ public class ReserveBusinessTests : TestBase
         _customerBusinessMock = new Mock<ICustomerBusiness>();
         _cashBoxBusinessMock = new Mock<ICashBoxBusiness>();
         _slotLockBusinessMock = new Mock<IReserveSlotLockBusiness>();
+        _dateTimeProviderMock = new Mock<IDateTimeProvider>();
+        // LocalNow por defecto en el pasado lejano: las reservas de los tests (fechas mayores)
+        // cuentan como "no partidas". Tests puntuales pueden re-setear LocalNow.
+        _dateTimeProviderMock.Setup(x => x.LocalNow).Returns(new DateTime(2020, 1, 1));
+        _dateTimeProviderMock.Setup(x => x.UtcNow).Returns(new DateTime(2020, 1, 1, 3, 0, 0, DateTimeKind.Utc));
 
         // Setup default open CashBox
         var openCashBox = new CashBox { CashBoxId = 1, Status = CashBoxStatusEnum.Open };
         _cashBoxBusinessMock.Setup(x => x.GetOpenCashBoxEntity())
             .ReturnsAsync(Result.Success(openCashBox));
+
+        // Default: ejecutar el delegate de la transacción tal cual (overload Result<bool>).
+        // Tests que necesiten otro comportamiento lo re-setean localmente.
+        _unitOfWorkMock
+            .Setup(uow => uow.ExecuteInTransactionAsync<bool>(
+                It.IsAny<Func<Task<Result<bool>>>>(),
+                It.IsAny<IsolationLevel>()))
+            .Returns<Func<Task<Result<bool>>>, IsolationLevel>((func, _) => func());
 
         _reserveBusiness = new ReserveBusiness(_contextMock.Object,
             _unitOfWorkMock.Object,
@@ -71,7 +85,8 @@ public class ReserveBusinessTests : TestBase
             _customerBusinessMock.Object,
             new FakeReserveOption(),
             _cashBoxBusinessMock.Object,
-            _slotLockBusinessMock.Object);
+            _slotLockBusinessMock.Object,
+            _dateTimeProviderMock.Object);
 
         _paymentBusiness = new ReservePaymentBusiness(
             _contextMock.Object,
@@ -549,7 +564,8 @@ public class ReserveBusinessTests : TestBase
             _customerBusinessMock.Object,
             new FakeReserveOption(),
             _cashBoxBusinessMock.Object,
-            _slotLockBusinessMock.Object);
+            _slotLockBusinessMock.Object,
+            _dateTimeProviderMock.Object);
 
         var paymentBusiness = new ReservePaymentBusiness(
             _contextMock.Object,
@@ -2295,6 +2311,228 @@ public class ReserveBusinessTests : TestBase
 
         result.IsValid.Should().BeFalse();
         result.Errors.Should().Contain(e => e.ErrorMessage.Contains("ReturnReserveId no debe enviarse"));
+    }
+
+    #endregion
+
+    #region CancelPassengerAsync
+
+    // LocalNow del ctor de test = 2020-01-01, así que estas fechas cuentan como "no partidas".
+    private static readonly DateTime CancelFutureDate = new(2026, 5, 25);
+
+    private static Reserve CancelFutureReserve(int reserveId = 50) => new()
+    {
+        ReserveId = reserveId,
+        ReserveDate = CancelFutureDate,
+        DepartureHour = TimeSpan.FromHours(9),
+        Status = ReserveStatusEnum.Confirmed
+    };
+
+    [Fact]
+    public async Task CancelPassengerAsync_ShouldFail_WhenPassengerNotFound()
+    {
+        _contextMock.Setup(x => x.Passengers).Returns(GetQueryableMockDbSet(new List<Passenger>()));
+
+        var result = await _reserveBusiness.CancelPassengerAsync(999);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Be(PassengerError.NotFound);
+    }
+
+    [Theory]
+    [InlineData(PassengerStatusEnum.Cancelled)]
+    [InlineData(PassengerStatusEnum.Traveled)]
+    [InlineData(PassengerStatusEnum.NoShow)]
+    [InlineData(PassengerStatusEnum.Refunded)]
+    public async Task CancelPassengerAsync_ShouldFail_WhenPassengerNotActive(PassengerStatusEnum status)
+    {
+        var passenger = new Passenger
+        {
+            PassengerId = 1, ReserveId = 50, Reserve = CancelFutureReserve(),
+            CustomerId = 5, Price = 200m, Status = status,
+            FirstName = "x", LastName = "x", DocumentNumber = "x"
+        };
+        _contextMock.Setup(x => x.Passengers).Returns(GetQueryableMockDbSet(new List<Passenger> { passenger }));
+
+        var result = await _reserveBusiness.CancelPassengerAsync(1);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Be(PassengerError.NotActive(status));
+    }
+
+    [Fact]
+    public async Task CancelPassengerAsync_ShouldFail_WhenReserveAlreadyDeparted()
+    {
+        var departed = new Reserve
+        {
+            ReserveId = 50,
+            ReserveDate = new DateTime(2019, 12, 31), // anterior a LocalNow (2020-01-01)
+            DepartureHour = TimeSpan.FromHours(9),
+            Status = ReserveStatusEnum.Confirmed
+        };
+        var passenger = new Passenger
+        {
+            PassengerId = 1, ReserveId = 50, Reserve = departed,
+            CustomerId = 5, Price = 200m, Status = PassengerStatusEnum.Confirmed,
+            FirstName = "x", LastName = "x", DocumentNumber = "x"
+        };
+        _contextMock.Setup(x => x.Passengers).Returns(GetQueryableMockDbSet(new List<Passenger> { passenger }));
+
+        var result = await _reserveBusiness.CancelPassengerAsync(1);
+
+        result.IsSuccess.Should().BeFalse();
+        result.Error.Should().Be(PassengerError.ReserveDeparted);
+    }
+
+    [Fact]
+    public async Task CancelPassengerAsync_ShouldCancelAndRefundDebt_WhenSingleIda()
+    {
+        var customer = new Customer { CustomerId = 5, CurrentBalance = 200m, FirstName = "A", LastName = "B", DocumentNumber = "1" };
+        var passenger = new Passenger
+        {
+            PassengerId = 1, ReserveId = 50, Reserve = CancelFutureReserve(),
+            CustomerId = 5, Price = 200m, Status = PassengerStatusEnum.Confirmed,
+            FirstName = "x", LastName = "x", DocumentNumber = "x"
+        };
+        var transactions = new List<CustomerAccountTransaction>();
+
+        _contextMock.Setup(x => x.Passengers).Returns(GetQueryableMockDbSet(new List<Passenger> { passenger }));
+        _contextMock.Setup(x => x.Customers).Returns(GetQueryableMockDbSet(new List<Customer> { customer }));
+        _contextMock.Setup(x => x.CustomerAccountTransactions).Returns(GetMockDbSetWithIdentity(transactions));
+        SetupSaveChangesWithOutboxAsync(_contextMock);
+
+        var result = await _reserveBusiness.CancelPassengerAsync(1);
+
+        result.IsSuccess.Should().BeTrue();
+        passenger.Status.Should().Be(PassengerStatusEnum.Cancelled);
+        customer.CurrentBalance.Should().Be(0m);
+        transactions.Should().HaveCount(1);
+        transactions[0].Type.Should().Be(TransactionType.Refund);
+        transactions[0].Amount.Should().Be(-200m);
+        transactions[0].RelatedReserveId.Should().Be(50);
+    }
+
+    [Fact]
+    public async Task CancelPassengerAsync_ShouldLeaveCreditBalance_WhenAlreadyPaid()
+    {
+        // Pagado: CurrentBalance 0 antes; el Refund lo deja en -200 (saldo a favor). No toca caja.
+        var customer = new Customer { CustomerId = 5, CurrentBalance = 0m, FirstName = "A", LastName = "B", DocumentNumber = "1" };
+        var passenger = new Passenger
+        {
+            PassengerId = 1, ReserveId = 50, Reserve = CancelFutureReserve(),
+            CustomerId = 5, Price = 200m, Status = PassengerStatusEnum.Confirmed,
+            FirstName = "x", LastName = "x", DocumentNumber = "x"
+        };
+        var transactions = new List<CustomerAccountTransaction>();
+
+        _contextMock.Setup(x => x.Passengers).Returns(GetQueryableMockDbSet(new List<Passenger> { passenger }));
+        _contextMock.Setup(x => x.Customers).Returns(GetQueryableMockDbSet(new List<Customer> { customer }));
+        _contextMock.Setup(x => x.CustomerAccountTransactions).Returns(GetMockDbSetWithIdentity(transactions));
+        SetupSaveChangesWithOutboxAsync(_contextMock);
+
+        var result = await _reserveBusiness.CancelPassengerAsync(1);
+
+        result.IsSuccess.Should().BeTrue();
+        customer.CurrentBalance.Should().Be(-200m);
+    }
+
+    [Fact]
+    public async Task CancelPassengerAsync_ShouldNotCreateRefund_WhenPriceIsZero()
+    {
+        // Pierna inbound de un package IdaVuelta (Price = 0): no genera Refund.
+        var customer = new Customer { CustomerId = 5, CurrentBalance = 0m, FirstName = "A", LastName = "B", DocumentNumber = "1" };
+        var passenger = new Passenger
+        {
+            PassengerId = 1, ReserveId = 50, Reserve = CancelFutureReserve(),
+            CustomerId = 5, Price = 0m, Status = PassengerStatusEnum.Confirmed,
+            FirstName = "x", LastName = "x", DocumentNumber = "x"
+        };
+        var transactions = new List<CustomerAccountTransaction>();
+
+        _contextMock.Setup(x => x.Passengers).Returns(GetQueryableMockDbSet(new List<Passenger> { passenger }));
+        _contextMock.Setup(x => x.Customers).Returns(GetQueryableMockDbSet(new List<Customer> { customer }));
+        _contextMock.Setup(x => x.CustomerAccountTransactions).Returns(GetMockDbSetWithIdentity(transactions));
+        SetupSaveChangesWithOutboxAsync(_contextMock);
+
+        var result = await _reserveBusiness.CancelPassengerAsync(1);
+
+        result.IsSuccess.Should().BeTrue();
+        passenger.Status.Should().Be(PassengerStatusEnum.Cancelled);
+        transactions.Should().BeEmpty();
+        customer.CurrentBalance.Should().Be(0m);
+    }
+
+    [Fact]
+    public async Task CancelPassengerAsync_ShouldCancelBothLegs_WhenIdaVuelta()
+    {
+        // Par IdaVuelta de una persona: outbound (Price=packagePrice) + inbound (Price=0) linkeados
+        // por RelatedPassengerId. Cancelar cualquiera cancela ambas y revierte el package una vez.
+        var customer = new Customer { CustomerId = 5, CurrentBalance = 12000m, FirstName = "A", LastName = "B", DocumentNumber = "1" };
+        var outboundReserve = CancelFutureReserve(50);
+        var inboundReserve = CancelFutureReserve(60);
+
+        var outbound = new Passenger
+        {
+            PassengerId = 1, ReserveId = 50, Reserve = outboundReserve, ReserveRelatedId = 60, RelatedPassengerId = 2,
+            CustomerId = 5, Price = 12000m, Status = PassengerStatusEnum.Confirmed,
+            FirstName = "x", LastName = "x", DocumentNumber = "x"
+        };
+        var inbound = new Passenger
+        {
+            PassengerId = 2, ReserveId = 60, Reserve = inboundReserve, ReserveRelatedId = 50, RelatedPassengerId = 1,
+            CustomerId = 5, Price = 0m, Status = PassengerStatusEnum.Confirmed,
+            FirstName = "x", LastName = "x", DocumentNumber = "x"
+        };
+        var transactions = new List<CustomerAccountTransaction>();
+
+        _contextMock.Setup(x => x.Passengers).Returns(GetQueryableMockDbSet(new List<Passenger> { outbound, inbound }));
+        _contextMock.Setup(x => x.Customers).Returns(GetQueryableMockDbSet(new List<Customer> { customer }));
+        _contextMock.Setup(x => x.CustomerAccountTransactions).Returns(GetMockDbSetWithIdentity(transactions));
+        SetupSaveChangesWithOutboxAsync(_contextMock);
+
+        // Cancelar la pierna INBOUND (Price=0) debe arrastrar la outbound y revertir 12000.
+        var result = await _reserveBusiness.CancelPassengerAsync(2);
+
+        result.IsSuccess.Should().BeTrue();
+        outbound.Status.Should().Be(PassengerStatusEnum.Cancelled);
+        inbound.Status.Should().Be(PassengerStatusEnum.Cancelled);
+        transactions.Should().HaveCount(1);
+        transactions[0].Amount.Should().Be(-12000m);
+        customer.CurrentBalance.Should().Be(0m);
+    }
+
+    [Fact]
+    public async Task CancelPassengerAsync_ShouldCancelCorrectSibling_WhenSameCustomerHasMultipleIdaVuelta()
+    {
+        // Caso "matrimonio": el mismo Customer paga DOS personas IdaVuelta. La reserva de vuelta
+        // tiene dos pasajeros con CustomerId=5. El vínculo correcto es RelatedPassengerId, no
+        // CustomerId — sino se cancela la pierna de la persona equivocada.
+        var customer = new Customer { CustomerId = 5, CurrentBalance = 24000m, FirstName = "A", LastName = "B", DocumentNumber = "1" };
+        var outboundReserve = CancelFutureReserve(50);
+        var inboundReserve = CancelFutureReserve(60);
+
+        var out1 = new Passenger { PassengerId = 1, ReserveId = 50, Reserve = outboundReserve, ReserveRelatedId = 60, RelatedPassengerId = 2, CustomerId = 5, Price = 12000m, Status = PassengerStatusEnum.Confirmed, FirstName = "P1", LastName = "x", DocumentNumber = "d1" };
+        var in1 = new Passenger { PassengerId = 2, ReserveId = 60, Reserve = inboundReserve, ReserveRelatedId = 50, RelatedPassengerId = 1, CustomerId = 5, Price = 0m, Status = PassengerStatusEnum.Confirmed, FirstName = "P1", LastName = "x", DocumentNumber = "d1" };
+        var out2 = new Passenger { PassengerId = 3, ReserveId = 50, Reserve = outboundReserve, ReserveRelatedId = 60, RelatedPassengerId = 4, CustomerId = 5, Price = 12000m, Status = PassengerStatusEnum.Confirmed, FirstName = "P2", LastName = "y", DocumentNumber = "d2" };
+        var in2 = new Passenger { PassengerId = 4, ReserveId = 60, Reserve = inboundReserve, ReserveRelatedId = 50, RelatedPassengerId = 3, CustomerId = 5, Price = 0m, Status = PassengerStatusEnum.Confirmed, FirstName = "P2", LastName = "y", DocumentNumber = "d2" };
+
+        var transactions = new List<CustomerAccountTransaction>();
+        _contextMock.Setup(x => x.Passengers).Returns(GetQueryableMockDbSet(new List<Passenger> { out1, in1, out2, in2 }));
+        _contextMock.Setup(x => x.Customers).Returns(GetQueryableMockDbSet(new List<Customer> { customer }));
+        _contextMock.Setup(x => x.CustomerAccountTransactions).Returns(GetMockDbSetWithIdentity(transactions));
+        SetupSaveChangesWithOutboxAsync(_contextMock);
+
+        // Cancelar la persona 1 (out1) debe cancelar SOLO out1 + in1, dejando intacta la persona 2.
+        var result = await _reserveBusiness.CancelPassengerAsync(1);
+
+        result.IsSuccess.Should().BeTrue();
+        out1.Status.Should().Be(PassengerStatusEnum.Cancelled);
+        in1.Status.Should().Be(PassengerStatusEnum.Cancelled);
+        out2.Status.Should().Be(PassengerStatusEnum.Confirmed, "la persona 2 no debe tocarse");
+        in2.Status.Should().Be(PassengerStatusEnum.Confirmed, "la persona 2 no debe tocarse");
+        transactions.Should().HaveCount(1);
+        transactions[0].Amount.Should().Be(-12000m);
+        customer.CurrentBalance.Should().Be(12000m, "solo se revierte el paquete de la persona 1");
     }
 
     #endregion

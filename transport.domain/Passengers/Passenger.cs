@@ -22,6 +22,14 @@ public class Passenger : Entity, IAuditable, ITenantScoped
     /// </summary>
     public int? ReserveRelatedId { get; set; }
 
+    /// <summary>
+    /// ID del Passenger hermano en un par IdaVuelta (la otra pierna de la MISMA persona).
+    /// Vínculo directo pasajero↔pasajero que evita emparejar por CustomerId/DocumentNumber
+    /// (frágil: en el alta admin todas las piernas comparten el documento y el CustomerId del
+    /// pagador). Null para pasajeros de Ida simple.
+    /// </summary>
+    public int? RelatedPassengerId { get; set; }
+
     public string FirstName { get; set; }
     public string LastName { get; set; }
     public string DocumentNumber { get; set; }
@@ -47,6 +55,7 @@ public class Passenger : Entity, IAuditable, ITenantScoped
     // Navegación
     public Reserve Reserve { get; set; }
     public Reserve? ReserveRelated { get; set; }
+    public Passenger? RelatedPassenger { get; set; }
     public Customer? Customer { get; set; }
     public Direction? PickupLocation { get; set; }
     public Direction? DropoffLocation { get; set; }

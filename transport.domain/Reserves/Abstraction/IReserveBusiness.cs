@@ -14,5 +14,7 @@ public interface IReserveBusiness
     Task<Result<bool>> UpdatePassengerReserveAsync(int customerReserveId, PassengerReserveUpdateRequestDto request);
     Task<Result<List<CustomerPendingReserveDto>>> GetCustomerPendingReservesAsync(int customerId);
 
+    Task<Result<bool>> CancelPassengerAsync(int passengerId);
+
     Task<Result<CreateReserveExternalResult>> CreatePassengerReservesWithLock(CreateReserveWithLockRequestDto request);
 }

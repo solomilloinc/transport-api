@@ -102,7 +102,7 @@ public class CityBusiness : ICityBusiness
 
         var pagedResult = await query.ToPagedReportAsync<CityReportResponseDto, City, CityReportFilterRequestDto>(
             requestDto,
-            selector: v => new CityReportResponseDto(v.CityId, v.Name, v.Code, v.Directions.Select(d => new DirectionsReportDto(
+            selector: v => new CityReportResponseDto(v.CityId, v.Name, v.Code, v.Status.ToString(), v.Directions.Select(d => new DirectionsReportDto(
                         d.DirectionId,
                         d.Name,
                         d.Lat,
