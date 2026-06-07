@@ -65,6 +65,8 @@ public class CityBusiness : ICityBusiness
 
         city.Status = EntityStatusEnum.Deleted;
 
+        _context.Cities.Update(city);
+
         await _context.SaveChangesWithOutboxAsync();
 
         return Result.Success(true);

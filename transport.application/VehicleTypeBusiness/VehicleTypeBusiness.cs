@@ -69,6 +69,9 @@ public class VehicleTypeBusiness : IVehicleTypeBusiness
         }
 
         vehicleType.Status = EntityStatusEnum.Deleted;
+
+        _context.VehicleTypes.Update(vehicleType);
+
         await _context.SaveChangesWithOutboxAsync();
 
         return Result.Success(true);

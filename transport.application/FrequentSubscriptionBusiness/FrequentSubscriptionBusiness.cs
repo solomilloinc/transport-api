@@ -219,6 +219,7 @@ public class FrequentSubscriptionBusiness : IFrequentSubscriptionBusiness
                 return Result.Failure<bool>(FrequentSubscriptionError.AlreadyCancelled);
 
             subscription.Status = EntityStatusEnum.Deleted;
+            _context.FrequentSubscriptions.Update(subscription);
 
             var now = _dateTimeProvider.UtcNow;        // instante UTC: para el Date del refund
             var localNow = _dateTimeProvider.LocalNow; // hora local: para comparar ReserveDate (agenda)
@@ -239,6 +240,7 @@ public class FrequentSubscriptionBusiness : IFrequentSubscriptionBusiness
                 if (passenger.Reserve.ReserveDate < localNow) continue;
 
                 passenger.Status = PassengerStatusEnum.Cancelled;
+                _context.Passengers.Update(passenger);
 
                 if (passenger.Price > 0)
                 {
