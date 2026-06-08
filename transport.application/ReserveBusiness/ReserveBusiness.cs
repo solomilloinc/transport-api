@@ -219,6 +219,12 @@ public class ReserveBusiness : IReserveBusiness
 
             decimal totalExpectedAmount = 0m;
 
+            // Pares de piernas IdaVuelta de una misma persona, para linkear vía RelatedPassengerId
+            // recién DESPUÉS del primer SaveChanges: ambos Passenger son [Added] y referenciarse
+            // entre sí antes de existir en la base genera una dependencia circular que EF rechaza
+            // ("Unable to save changes because a circular dependency was detected").
+            var relatedPassengerPairs = new List<(Passenger Outbound, Passenger Return)>();
+
             foreach (var pax in request.Passengers)
             {
                 // Price validation depends on the EFFECTIVE reserve type:
@@ -272,14 +278,19 @@ public class ReserveBusiness : IReserveBusiness
                         returnReserve, outboundReserve.ReserveId, pax, pax.Return, payer);
                     if (returnResult.IsFailure) return Result.Failure<bool>(returnResult.Error);
 
-                    // Vínculo pasajero↔pasajero (las dos piernas de esta misma persona). Vía
-                    // navegación porque los PassengerId no existen hasta el SaveChanges.
-                    outboundResult.Value.RelatedPassenger = returnResult.Value;
-                    returnResult.Value.RelatedPassenger = outboundResult.Value;
+                    // Vínculo pasajero↔pasajero (las dos piernas de esta misma persona). Se resuelve
+                    // después del primer SaveChanges, una vez que ambos tienen PassengerId real.
+                    relatedPassengerPairs.Add((outboundResult.Value, returnResult.Value));
                 }
             }
 
             await _context.SaveChangesWithOutboxAsync();
+
+            foreach (var (outboundPassenger, returnPassenger) in relatedPassengerPairs)
+            {
+                outboundPassenger.RelatedPassengerId = returnPassenger.PassengerId;
+                returnPassenger.RelatedPassengerId = outboundPassenger.PassengerId;
+            }
 
             var reserveIds = reserveMap.Keys.OrderBy(x => x).ToList();
             var description = BuildDescription(reserveIds, reserveMap, servicesCache, requestedType);
@@ -517,6 +528,12 @@ public class ReserveBusiness : IReserveBusiness
         decimal totalExpectedAmount = 0m;
         var preferenceItems = new List<PaymentPreferenceItemDto>();
 
+        // Pares de piernas IdaVuelta de una misma persona, para linkear vía RelatedPassengerId
+        // recién DESPUÉS del primer SaveChanges: ambos Passenger son [Added] y referenciarse
+        // entre sí antes de existir en la base genera una dependencia circular que EF rechaza
+        // ("Unable to save changes because a circular dependency was detected").
+        var relatedPassengerPairs = new List<(Passenger Outbound, Passenger Return)>();
+
         foreach (var pax in request.Passengers)
         {
             // Same pricing model as the admin flow:
@@ -577,14 +594,19 @@ public class ReserveBusiness : IReserveBusiness
                     pax.Return.Price,
                     $"Reserva {returnReserve.ReserveId}"));
 
-                // Vínculo pasajero↔pasajero (las dos piernas de esta misma persona). Vía
-                // navegación porque los PassengerId no existen hasta el SaveChanges.
-                outboundResult.Value.RelatedPassenger = returnResult.Value;
-                returnResult.Value.RelatedPassenger = outboundResult.Value;
+                // Vínculo pasajero↔pasajero (las dos piernas de esta misma persona). Se resuelve
+                // después del primer SaveChanges, una vez que ambos tienen PassengerId real.
+                relatedPassengerPairs.Add((outboundResult.Value, returnResult.Value));
             }
         }
 
         await _context.SaveChangesWithOutboxAsync();
+
+        foreach (var (outboundPassenger, returnPassenger) in relatedPassengerPairs)
+        {
+            outboundPassenger.RelatedPassengerId = returnPassenger.PassengerId;
+            returnPassenger.RelatedPassengerId = outboundPassenger.PassengerId;
+        }
 
         if (request.Payment is null)
         {
