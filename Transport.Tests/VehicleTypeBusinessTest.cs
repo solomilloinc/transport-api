@@ -1,4 +1,4 @@
-﻿using FluentAssertions;
+using FluentAssertions;
 using Moq;
 using Transport.Domain.Vehicles;
 using Transport.SharedKernel;
@@ -36,7 +36,7 @@ public class VehicleTypeBusinessTests : TestBase
         var result = await _vehicleTypeBusiness.Create(dto);
 
         result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Be(VehicleError.VehicleAlreadyExists);
+        result.Error.Should().Be(VehicleTypeError.VehicleTypeAlreadyExists);
     }
 
     [Fact]
@@ -102,7 +102,7 @@ public class VehicleTypeBusinessTests : TestBase
         var result = await _vehicleTypeBusiness.Delete(1);
 
         result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Be(VehicleError.VehicleNotFound);
+        result.Error.Should().Be(VehicleTypeError.VehicleTypeNotFound);
     }
 
     [Fact]
@@ -149,7 +149,7 @@ public class VehicleTypeBusinessTests : TestBase
         var result = await _vehicleTypeBusiness.Update(1, dto);
 
         result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Be(VehicleError.VehicleNotFound);
+        result.Error.Should().Be(VehicleTypeError.VehicleTypeNotFound);
     }
 
     [Fact]
@@ -176,7 +176,7 @@ public class VehicleTypeBusinessTests : TestBase
         var result = await _vehicleTypeBusiness.UpdateStatus(9, EntityStatusEnum.Inactive);
 
         result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Be(VehicleError.VehicleNotFound);
+        result.Error.Should().Be(VehicleTypeError.VehicleTypeNotFound);
     }
 
     [Fact]

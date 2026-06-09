@@ -709,6 +709,121 @@ public class ReserveBusinessTests : TestBase
         Assert.Equal(StatusPaymentEnum.Paid, walletParentPayment.Status);
     }
 
+    [Fact]
+    public async Task CreatePassengerReservesExternal_ShouldRegisterPayingCustomer_WhenPayerDoesNotExist()
+    {
+        // Arrange: usuario final compra una Ida y el que paga (IsPayment) NO está
+        // registrado todavía. El alta debe dar de alta al Customer del pagador y
+        // dejar vinculados el Passenger del pagador y el ReservePayment.
+        var trip = new Trip
+        {
+            TripId = 1,
+            OriginCityId = 1,
+            DestinationCityId = 2,
+            OriginCity = new City { CityId = 1, Name = "Córdoba" },
+            DestinationCity = new City { CityId = 2, Name = "Rosario" }
+        };
+        var reserve = new Reserve
+        {
+            ReserveId = 1,
+            Status = ReserveStatusEnum.Confirmed,
+            Passengers = new List<Passenger>(),
+            VehicleId = 1,
+            ServiceId = 1,
+            TripId = 1,
+            Trip = trip,
+            Driver = new Driver { FirstName = "Mario", LastName = "Bros" }
+        };
+        var vehicle = new Vehicle { VehicleId = 1, AvailableQuantity = 10 };
+        var service = new Service { ServiceId = 1, Trip = trip };
+        var trips = new List<Trip>
+        {
+            new Trip { TripId = 1, OriginCityId = 1, DestinationCityId = 2, Status = EntityStatusEnum.Active, Prices = new List<TripPrice> {
+                new TripPrice { ReserveTypeId = ReserveTypeIdEnum.Ida, CityId = 2, Price = 100, Status = EntityStatusEnum.Active }
+            }}
+        };
+        var origin = new Direction { DirectionId = 1, Name = "Pickup" };
+        var destination = new Direction { DirectionId = 2, Name = "Dropoff" };
+
+        var customers = new List<Customer>(); // El pagador todavía no existe
+        var passengers = new List<Passenger>();
+        var reservePayments = new List<ReservePayment>();
+
+        _contextMock.Setup(c => c.Reserves).Returns(GetMockDbSetWithIdentity(new List<Reserve> { reserve }));
+        _contextMock.Setup(c => c.Vehicles).Returns(GetQueryableMockDbSet(new List<Vehicle> { vehicle }));
+        _contextMock.Setup(c => c.Services).Returns(GetMockDbSetWithIdentity(new List<Service> { service }));
+        _contextMock.Setup(c => c.Directions).Returns(GetQueryableMockDbSet(new List<Direction> { origin, destination }));
+        _contextMock.Setup(c => c.Passengers).Returns(GetMockDbSetWithIdentity(passengers));
+        _contextMock.Setup(c => c.ReservePayments).Returns(GetMockDbSetWithIdentity(reservePayments));
+        _contextMock.Setup(c => c.Customers).Returns(GetMockDbSetWithIdentity(customers));
+        _contextMock.Setup(c => c.Trips).Returns(GetQueryableMockDbSet(trips));
+        _contextMock.Setup(c => c.TenantConfigs).Returns(GetQueryableMockDbSet(new List<Transport.Domain.Tenants.TenantConfig>()));
+        SetupSaveChangesWithOutboxAsync(_contextMock);
+
+        _paymentGatewayMock
+            .Setup(x => x.CreatePaymentAsync(It.IsAny<PaymentCreateRequest>()))
+            .ReturnsAsync(new Payment { Id = 555, Status = "approved", StatusDetail = "accredited" });
+
+        _unitOfWorkMock
+            .Setup(u => u.ExecuteInTransactionAsync(
+                It.IsAny<Func<Task<Result<CreateReserveExternalResult>>>>(),
+                It.IsAny<IsolationLevel>()))
+            .Returns(async (Func<Task<Result<CreateReserveExternalResult>>> func, IsolationLevel _) => await func());
+
+        var passengerList = new List<PassengerBookingExternalDto>
+        {
+            new(
+                CustomerId: null,
+                IsPayment: true,
+                HasTraveled: false,
+                FirstName: "Nuevo",
+                LastName: "Cliente",
+                Email: "nuevo@test.com",
+                Phone1: "1122334455",
+                DocumentNumber: "99999999",
+                Outbound: new LegInfoDto(PickupLocationId: 1, DropoffLocationId: 2, Price: 100m),
+                Return: null
+            )
+        };
+
+        var paymentDto = new CreatePaymentExternalRequestDto(
+            TransactionAmount: 100m,
+            Token: "token",
+            Description: "Reserva de ida",
+            Installments: 1,
+            PaymentMethodId: "visa",
+            PayerEmail: "nuevo@test.com",
+            IdentificationType: "DNI",
+            IdentificationNumber: "99999999");
+
+        var request = new PassengerReserveCreateRequestWrapperExternalDto(
+            ReserveTypeId: (int)ReserveTypeIdEnum.Ida,
+            OutboundReserveId: 1,
+            ReturnReserveId: null,
+            Payment: paymentDto,
+            Passengers: passengerList);
+
+        // Act
+        var result = await _reserveBusiness.CreatePassengerReservesExternal(request);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+
+        customers.Should().HaveCount(1, "el cliente que paga debe quedar dado de alta");
+        var createdCustomer = customers.Single();
+        createdCustomer.DocumentNumber.Should().Be("99999999");
+        createdCustomer.FirstName.Should().Be("Nuevo");
+        createdCustomer.LastName.Should().Be("Cliente");
+        createdCustomer.Email.Should().Be("nuevo@test.com");
+
+        passengers.Should().HaveCount(1);
+        passengers[0].CustomerId.Should().Be(createdCustomer.CustomerId, "el pasajero pagador queda vinculado al cliente creado");
+
+        reservePayments.Should().HaveCount(1);
+        reservePayments[0].CustomerId.Should().Be(createdCustomer.CustomerId, "el pago queda vinculado al cliente creado");
+        passengers[0].ReservePaymentId.Should().Be(reservePayments[0].ReservePaymentId, "el pasajero queda imputado al pago del booking (vínculo al pagador)");
+    }
+
 
     [Fact]
     public async Task CreatePaymentsAsync_ShouldFail_WhenReserveNotFound()
@@ -2410,6 +2525,63 @@ public class ReserveBusinessTests : TestBase
         transactions[0].Type.Should().Be(TransactionType.Refund);
         transactions[0].Amount.Should().Be(-200m);
         transactions[0].RelatedReserveId.Should().Be(50);
+    }
+
+    [Fact]
+    public async Task CancelPassengerAsync_ShouldRefundPayer_WhenPassengerHasNoCustomerButHasReservePayment()
+    {
+        // Acompañante del alta de usuario final: CustomerId = null, pero ReservePaymentId apunta al
+        // pago del booking, cuyo CustomerId es el PAGADOR. El refund se imputa al pagador.
+        var payer = new Customer { CustomerId = 7, CurrentBalance = 0m, FirstName = "Pa", LastName = "Gador", DocumentNumber = "111" };
+        var payment = new ReservePayment { ReservePaymentId = 30, ReserveId = 50, CustomerId = 7, Amount = 200m, Status = StatusPaymentEnum.Paid };
+        var passenger = new Passenger
+        {
+            PassengerId = 1, ReserveId = 50, Reserve = CancelFutureReserve(),
+            CustomerId = null, ReservePaymentId = 30, Price = 200m, Status = PassengerStatusEnum.Confirmed,
+            FirstName = "Acom", LastName = "Pañante", DocumentNumber = "222"
+        };
+        var transactions = new List<CustomerAccountTransaction>();
+
+        _contextMock.Setup(x => x.Passengers).Returns(GetQueryableMockDbSet(new List<Passenger> { passenger }));
+        _contextMock.Setup(x => x.Customers).Returns(GetQueryableMockDbSet(new List<Customer> { payer }));
+        _contextMock.Setup(x => x.ReservePayments).Returns(GetQueryableMockDbSet(new List<ReservePayment> { payment }));
+        _contextMock.Setup(x => x.CustomerAccountTransactions).Returns(GetMockDbSetWithIdentity(transactions));
+        SetupSaveChangesWithOutboxAsync(_contextMock);
+
+        var result = await _reserveBusiness.CancelPassengerAsync(1);
+
+        result.IsSuccess.Should().BeTrue();
+        passenger.Status.Should().Be(PassengerStatusEnum.Cancelled);
+        payer.CurrentBalance.Should().Be(-200m, "se le reintegra el asiento al pagador (saldo a favor)");
+        transactions.Should().HaveCount(1);
+        transactions[0].CustomerId.Should().Be(7);
+        transactions[0].Type.Should().Be(TransactionType.Refund);
+        transactions[0].Amount.Should().Be(-200m);
+        transactions[0].RelatedReserveId.Should().Be(50);
+    }
+
+    [Fact]
+    public async Task CancelPassengerAsync_ShouldNotRefund_WhenNoCustomerAndNoReservePayment()
+    {
+        // Sin Customer propio ni ReservePayment imputado: no hay a quién reintegrar → solo cancela.
+        var passenger = new Passenger
+        {
+            PassengerId = 1, ReserveId = 50, Reserve = CancelFutureReserve(),
+            CustomerId = null, ReservePaymentId = null, Price = 200m, Status = PassengerStatusEnum.Confirmed,
+            FirstName = "x", LastName = "x", DocumentNumber = "x"
+        };
+        var transactions = new List<CustomerAccountTransaction>();
+
+        _contextMock.Setup(x => x.Passengers).Returns(GetQueryableMockDbSet(new List<Passenger> { passenger }));
+        _contextMock.Setup(x => x.Customers).Returns(GetQueryableMockDbSet(new List<Customer>()));
+        _contextMock.Setup(x => x.CustomerAccountTransactions).Returns(GetMockDbSetWithIdentity(transactions));
+        SetupSaveChangesWithOutboxAsync(_contextMock);
+
+        var result = await _reserveBusiness.CancelPassengerAsync(1);
+
+        result.IsSuccess.Should().BeTrue();
+        passenger.Status.Should().Be(PassengerStatusEnum.Cancelled);
+        transactions.Should().BeEmpty("no hay pagador identificable");
     }
 
     [Fact]

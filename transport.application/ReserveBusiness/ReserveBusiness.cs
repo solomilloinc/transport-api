@@ -525,6 +525,29 @@ public class ReserveBusiness : IReserveBusiness
                     ReserveError.VehicleQuantityNotAvailable(existingCount, passengerCount, vehicle?.AvailableQuantity ?? 0));
         }
 
+        // El alta de usuario final solo registra al CLIENTE QUE PAGA (IsPayment); los
+        // acompañantes quedan como Passenger sin Customer. Si el pagador todavía no existe
+        // (compra de un cliente nuevo) se da de alta ACÁ, antes del loop de pasajeros y del
+        // pago: el resto del flujo lo vincula buscándolo por DocumentNumber
+        // (CreatePassengerExternalEntity y CreatePayment/CreatePendingPayment), así que con
+        // crearlo y persistirlo alcanza para que esos lookups lo encuentren.
+        var payerPax = request.Passengers.FirstOrDefault(p => p.IsPayment) ?? request.Passengers.First();
+        var existingPayer = await _context.Customers
+            .SingleOrDefaultAsync(c => c.DocumentNumber == payerPax.DocumentNumber);
+
+        if (existingPayer is null)
+        {
+            _context.Customers.Add(new Customer
+            {
+                FirstName = payerPax.FirstName,
+                LastName = payerPax.LastName,
+                DocumentNumber = payerPax.DocumentNumber,
+                Email = payerPax.Email ?? request.Payment?.PayerEmail ?? string.Empty,
+                Phone1 = payerPax.Phone1,
+            });
+            await _context.SaveChangesWithOutboxAsync();
+        }
+
         decimal totalExpectedAmount = 0m;
         var preferenceItems = new List<PaymentPreferenceItemDto>();
 
@@ -533,6 +556,11 @@ public class ReserveBusiness : IReserveBusiness
         // entre sí antes de existir en la base genera una dependencia circular que EF rechaza
         // ("Unable to save changes because a circular dependency was detected").
         var relatedPassengerPairs = new List<(Passenger Outbound, Passenger Return)>();
+
+        // Pasajeros creados en ESTE booking, para imputarles luego el ReservePayment padre
+        // (vínculo al pagador). No usar reserve.Passengers: una Reserve puede tener pasajeros
+        // de otros bookings/pagadores.
+        var bookingPassengers = new List<Passenger>();
 
         foreach (var pax in request.Passengers)
         {
@@ -578,6 +606,7 @@ public class ReserveBusiness : IReserveBusiness
                 outboundReserve, returnReserve?.ReserveId, pax, pax.Outbound,
                 isPaid: request.Payment is not null);
             if (outboundResult.IsFailure) return Result.Failure<CreateReserveExternalResult>(outboundResult.Error);
+            bookingPassengers.Add(outboundResult.Value);
             preferenceItems.Add(new PaymentPreferenceItemDto(
                 $"Pasaje de {pax.FirstName} {pax.LastName}",
                 pax.Outbound.Price,
@@ -589,6 +618,7 @@ public class ReserveBusiness : IReserveBusiness
                     returnReserve, outboundReserve.ReserveId, pax, pax.Return,
                     isPaid: request.Payment is not null);
                 if (returnResult.IsFailure) return Result.Failure<CreateReserveExternalResult>(returnResult.Error);
+                bookingPassengers.Add(returnResult.Value);
                 preferenceItems.Add(new PaymentPreferenceItemDto(
                     $"Pasaje de {pax.FirstName} {pax.LastName}",
                     pax.Return.Price,
@@ -615,6 +645,8 @@ public class ReserveBusiness : IReserveBusiness
             if (resultPayment.IsFailure)
                 return Result.Failure<CreateReserveExternalResult>(resultPayment.Error);
 
+            LinkPassengersToPayment(bookingPassengers, resultPayment.Value);
+
             string preferenceId = await _paymentGateway.CreatePreferenceAsync(
                 resultPayment.Value.ToString(),
                 totalExpectedAmount,
@@ -635,6 +667,8 @@ public class ReserveBusiness : IReserveBusiness
             var resultPayment = await CreatePayment(request.Payment, reserveList);
             if (resultPayment.IsFailure)
                 return Result.Failure<CreateReserveExternalResult>(resultPayment.Error);
+
+            LinkPassengersToPayment(bookingPassengers, resultPayment.Value);
 
             var mainReserve = reserveList.OrderBy(r => r.ReserveId).First();
             var firstPassenger = request.Passengers.First();
@@ -701,7 +735,7 @@ public class ReserveBusiness : IReserveBusiness
         return Result.Success(newPassenger);
     }
 
-    private async Task<Result<bool>> CreatePayment(CreatePaymentExternalRequestDto paymentData, List<Reserve> reserves)
+    private async Task<Result<int>> CreatePayment(CreatePaymentExternalRequestDto paymentData, List<Reserve> reserves)
     {
         var orderedReserves = reserves
             .OrderBy(r => r.ReserveDate)
@@ -761,7 +795,7 @@ public class ReserveBusiness : IReserveBusiness
         var statusPaymentInternal = GetPaymentStatusFromExternal(result.Status);
         if (statusPaymentInternal is null)
         {
-            return Result.Failure<bool>(
+            return Result.Failure<int>(
                 Error.Validation("Payment.StatusMappingError",
                     $"El estado de pago externo '{result.Status}' no pudo ser interpretado correctamente.")
             );
@@ -791,7 +825,21 @@ public class ReserveBusiness : IReserveBusiness
         }
 
         await _context.SaveChangesWithOutboxAsync();
-        return Result.Success(true);
+        return Result.Success(parentPayment.ReservePaymentId);
+    }
+
+    /// <summary>
+    /// Imputa el ReservePayment (padre) a cada pasajero del booking, dejando el vínculo al pagador
+    /// (ReservePayment.CustomerId). Lo usa el refund del cancel cuando el pasajero no tiene Customer
+    /// propio (acompañante del alta de usuario final).
+    /// </summary>
+    private void LinkPassengersToPayment(IEnumerable<Passenger> passengers, int reservePaymentId)
+    {
+        foreach (var passenger in passengers)
+        {
+            passenger.ReservePaymentId = reservePaymentId;
+            _context.Passengers.Update(passenger);
+        }
     }
 
 
@@ -1077,6 +1125,8 @@ public class ReserveBusiness : IReserveBusiness
     /// Pasa cada Passenger a Cancelled y, si tiene Price > 0, genera un Refund por -Price a la
     /// cuenta corriente del cliente (baja CurrentBalance). No toca la Caja. El cargo apunta a la
     /// Reserve del propio passenger (RelatedReserveId) para que la deuda vencida se atribuya bien.
+    /// Si el pasajero no tiene Customer propio (acompañante del alta de usuario final), el refund
+    /// se imputa al PAGADOR del booking vía ReservePayment.CustomerId.
     /// </summary>
     private async Task CancelPassengersAndRevertDebtAsync(IEnumerable<Passenger> passengers)
     {
@@ -1087,11 +1137,25 @@ public class ReserveBusiness : IReserveBusiness
             passenger.Status = PassengerStatusEnum.Cancelled;
             _context.Passengers.Update(passenger);
 
-            if (passenger.Price <= 0 || passenger.CustomerId is null)
+            if (passenger.Price <= 0)
+                continue;
+
+            // A quién se le reintegra: el cliente del propio pasajero o, si es un acompañante sin
+            // Customer (alta de usuario final), el PAGADOR del booking, que se identifica de forma
+            // unívoca por el ReservePayment imputado al asiento (ReservePayment.CustomerId).
+            var refundCustomerId = passenger.CustomerId;
+            if (refundCustomerId is null && passenger.ReservePaymentId is not null)
+            {
+                var payment = await _context.ReservePayments
+                    .FirstOrDefaultAsync(rp => rp.ReservePaymentId == passenger.ReservePaymentId.Value);
+                refundCustomerId = payment?.CustomerId;
+            }
+
+            if (refundCustomerId is null)
                 continue;
 
             var customer = await _context.Customers
-                .FirstOrDefaultAsync(c => c.CustomerId == passenger.CustomerId.Value);
+                .FirstOrDefaultAsync(c => c.CustomerId == refundCustomerId.Value);
             if (customer is null)
                 continue;
 

@@ -1,4 +1,4 @@
-﻿using System.Linq.Expressions;
+using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
 using Transport.Business.Data;
 using Transport.Domain.Vehicles;
@@ -25,7 +25,7 @@ public class VehicleTypeBusiness : IVehicleTypeBusiness
 
         if (vehicleType != null)
         {
-            return Result.Failure<int>(VehicleError.VehicleAlreadyExists);
+            return Result.Failure<int>(VehicleTypeError.VehicleTypeAlreadyExists);
         }
 
         vehicleType = new VehicleType
@@ -57,7 +57,7 @@ public class VehicleTypeBusiness : IVehicleTypeBusiness
 
         if (vehicleType is null)
         {
-            return Result.Failure<bool>(VehicleError.VehicleNotFound);
+            return Result.Failure<bool>(VehicleTypeError.VehicleTypeNotFound);
         }
 
         var inUse = await _context.Vehicles
@@ -110,7 +110,7 @@ public class VehicleTypeBusiness : IVehicleTypeBusiness
 
         if (vehicleType is null)
         {
-            return Result.Failure<bool>(VehicleError.VehicleNotFound);
+            return Result.Failure<bool>(VehicleTypeError.VehicleTypeNotFound);
         }
 
         vehicleType.Name = dto.Name;
@@ -129,7 +129,7 @@ public class VehicleTypeBusiness : IVehicleTypeBusiness
 
         if (vehicleType is null)
         {
-            return Result.Failure<bool>(VehicleError.VehicleNotFound);
+            return Result.Failure<bool>(VehicleTypeError.VehicleTypeNotFound);
         }
 
         vehicleType.Status = status;

@@ -48,6 +48,15 @@ public class Passenger : Entity, IAuditable, ITenantScoped
     // Relación opcional con Customer (si el pasajero es cliente)
     public int? CustomerId { get; set; }
 
+    /// <summary>
+    /// Pago (padre) del booking que cubrió este asiento. Identifica al PAGADOR vía
+    /// ReservePayment.CustomerId. Necesario en el alta de usuario final, donde solo el pagador
+    /// queda como Customer y los acompañantes tienen CustomerId = null: al cancelar un
+    /// acompañante el refund se imputa al pagador siguiendo este vínculo. Distinto de CustomerId
+    /// (quién ES el pasajero) y de RelatedPassengerId (la otra pierna de la misma persona).
+    /// </summary>
+    public int? ReservePaymentId { get; set; }
+
     // Sólo poblado en Passengers auto-creados por el batch de Pasajeros Frecuentes.
     // Habilita el cascade del cancel de la suscripción.
     public int? FrequentSubscriptionId { get; set; }
@@ -57,6 +66,7 @@ public class Passenger : Entity, IAuditable, ITenantScoped
     public Reserve? ReserveRelated { get; set; }
     public Passenger? RelatedPassenger { get; set; }
     public Customer? Customer { get; set; }
+    public ReservePayment? ReservePayment { get; set; }
     public Direction? PickupLocation { get; set; }
     public Direction? DropoffLocation { get; set; }
     public FrequentSubscription? FrequentSubscription { get; set; }
