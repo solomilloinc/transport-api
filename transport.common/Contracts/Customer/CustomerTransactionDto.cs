@@ -13,5 +13,7 @@ public record CustomerAccountSummaryDto(
     int CustomerId,
     string CustomerFullName,
     decimal CurrentBalance,
+    decimal RangeTotalPagos,
+    decimal RangeTotalCargos,
     PagedReportResponseDto<CustomerTransactionDto> Transactions
 );

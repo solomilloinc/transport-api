@@ -5,10 +5,14 @@ namespace Transport.Domain.Vehicles;
 public static class VehicleTypeError
 {
 
-    public static readonly Error VehicleTypeNotFound = new(
+    public static readonly Error VehicleTypeNotFound = Error.NotFound(
         "VehicleType.NotFound",
-        "El Véhiculo no se encuentra Activo",
-        ErrorType.Validation
+        "El tipo de vehículo que estás buscando no existe"
+    );
+
+    public static readonly Error VehicleTypeAlreadyExists = Error.Validation(
+        "VehicleType.AlreadyExists",
+        "Ya existe un tipo de vehículo con el mismo nombre."
     );
 
     public static readonly Error InUse = Error.Conflict(

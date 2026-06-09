@@ -3073,3 +3073,80 @@ GO
 COMMIT;
 GO
 
+
+BEGIN TRANSACTION;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260609052610_AddPassengerReservePaymentId'
+)
+BEGIN
+    ALTER TABLE [Passenger] ADD [ReservePaymentId] int NULL;
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260609052610_AddPassengerReservePaymentId'
+)
+BEGIN
+    EXEC(N'UPDATE [Role] SET [CreatedDate] = ''2026-06-09T05:26:09.8900978Z''
+    WHERE [RoleId] = 1;
+    SELECT @@ROWCOUNT');
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260609052610_AddPassengerReservePaymentId'
+)
+BEGIN
+    EXEC(N'UPDATE [Role] SET [CreatedDate] = ''2026-06-09T05:26:09.8900982Z''
+    WHERE [RoleId] = 2;
+    SELECT @@ROWCOUNT');
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260609052610_AddPassengerReservePaymentId'
+)
+BEGIN
+    EXEC(N'UPDATE [Role] SET [CreatedDate] = ''2026-06-09T05:26:09.8900983Z''
+    WHERE [RoleId] = 3;
+    SELECT @@ROWCOUNT');
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260609052610_AddPassengerReservePaymentId'
+)
+BEGIN
+    CREATE INDEX [IX_Passenger_ReservePaymentId] ON [Passenger] ([ReservePaymentId]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260609052610_AddPassengerReservePaymentId'
+)
+BEGIN
+    ALTER TABLE [Passenger] ADD CONSTRAINT [FK_Passenger_ReservePayment_ReservePaymentId] FOREIGN KEY ([ReservePaymentId]) REFERENCES [ReservePayment] ([ReservePaymentId]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260609052610_AddPassengerReservePaymentId'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20260609052610_AddPassengerReservePaymentId', N'8.0.14');
+END;
+GO
+
+COMMIT;
+GO
+

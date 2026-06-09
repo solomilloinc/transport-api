@@ -176,6 +176,17 @@ public class CustomerBusiness : ICustomerBusiness
             query = query.Where(t => t.Date <= toDateEndOfDay);
         }
 
+        // Totales del rango calculados ANTES del filtro por tipo.
+        // Refund se suma al haber (Pagos) porque reduce la deuda igual que un Payment.
+        var rangeSummary = await query
+            .GroupBy(_ => 1)
+            .Select(g => new
+            {
+                TotalCargos = g.Where(t => t.Type == TransactionType.Charge).Sum(t => t.Amount),
+                TotalPagos = g.Where(t => t.Type == TransactionType.Payment || t.Type == TransactionType.Refund).Sum(t => t.Amount),
+            })
+            .FirstOrDefaultAsync();
+
         if (requestDto.Filters.TransactionType != null)
         {
             query = query.Where(t => t.Type == (TransactionType)requestDto.Filters.TransactionType);
@@ -206,6 +217,8 @@ public class CustomerBusiness : ICustomerBusiness
             CustomerId: customer.CustomerId,
             CustomerFullName: $"{customer.FirstName} {customer.LastName}",
             CurrentBalance: customer.CurrentBalance,
+            RangeTotalPagos: rangeSummary?.TotalPagos ?? 0,
+            RangeTotalCargos: rangeSummary?.TotalCargos ?? 0,
             Transactions: pagedResult
         );
 

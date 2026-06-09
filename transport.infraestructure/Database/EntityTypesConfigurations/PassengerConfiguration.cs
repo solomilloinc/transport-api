@@ -76,6 +76,14 @@ public class PassengerConfiguration : IEntityTypeConfiguration<Passenger>
                .HasForeignKey(p => p.CustomerId)
                .OnDelete(DeleteBehavior.NoAction);
 
+        // Pago (padre) del booking que cubrió este asiento. Identifica al pagador para el refund
+        // al cancelar acompañantes sin Customer propio (alta de usuario final).
+        builder.HasOne(p => p.ReservePayment)
+               .WithMany()
+               .HasForeignKey(p => p.ReservePaymentId)
+               .IsRequired(false)
+               .OnDelete(DeleteBehavior.NoAction);
+
         builder.HasOne(p => p.PickupLocation)
                .WithMany()
                .HasForeignKey(p => p.PickupLocationId)
@@ -106,6 +114,7 @@ public class PassengerConfiguration : IEntityTypeConfiguration<Passenger>
         builder.HasIndex(p => p.ReserveRelatedId);
         builder.HasIndex(p => p.RelatedPassengerId);
         builder.HasIndex(p => p.CustomerId);
+        builder.HasIndex(p => p.ReservePaymentId);
         builder.HasIndex(p => p.Status);
         builder.HasIndex(p => p.FrequentSubscriptionId);
 

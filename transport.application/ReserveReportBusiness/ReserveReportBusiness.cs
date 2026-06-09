@@ -96,7 +96,7 @@ public class ReserveReportBusiness : IReserveReportBusiness
                 r.OriginName,
                 r.DestinationName,
                 r.Vehicle.AvailableQuantity,
-                r.Passengers.Count,
+                r.Passengers.Count(p => p.Status == PassengerStatusEnum.Confirmed || p.Status == PassengerStatusEnum.PendingPayment),
                 r.DepartureHour.ToString(@"hh\:mm"),
                 r.VehicleId,
                 r.DriverId.GetValueOrDefault(),
