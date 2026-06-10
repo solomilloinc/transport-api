@@ -6,6 +6,7 @@ using Newtonsoft.Json;
 using System.Linq;
 using Transport.Business.Authentication;
 using Transport.Business.Data;
+using Transport.Business.ReservePaymentBusiness;
 using Transport.Business.Services.Payment;
 using Transport.Domain.CashBoxes;
 using Transport.Domain.CashBoxes.Abstraction;
@@ -525,25 +526,32 @@ public class ReserveBusiness : IReserveBusiness
                     ReserveError.VehicleQuantityNotAvailable(existingCount, passengerCount, vehicle?.AvailableQuantity ?? 0));
         }
 
-        // El alta de usuario final solo registra al CLIENTE QUE PAGA (IsPayment); los
-        // acompañantes quedan como Passenger sin Customer. Si el pagador todavía no existe
-        // (compra de un cliente nuevo) se da de alta ACÁ, antes del loop de pasajeros y del
-        // pago: el resto del flujo lo vincula buscándolo por DocumentNumber
-        // (CreatePassengerExternalEntity y CreatePayment/CreatePendingPayment), así que con
-        // crearlo y persistirlo alcanza para que esos lookups lo encuentren.
-        var payerPax = request.Passengers.FirstOrDefault(p => p.IsPayment) ?? request.Passengers.First();
-        var existingPayer = await _context.Customers
-            .SingleOrDefaultAsync(c => c.DocumentNumber == payerPax.DocumentNumber);
+        // Pagador (ADR 0008): en Card lo identifica el pago de MercadoPago (IdentificationNumber),
+        // NO un flag/posición de pasajero. En el ~90% el pagador también viaja, así que su documento
+        // coincide con un pasajero del booking y de ahí tomamos el perfil completo. Se crea ACÁ y se
+        // persiste para que los lookups por documento (CreatePassengerExternalEntity y, sobre todo,
+        // CreatePayment, que busca por IdentificationNumber) lo encuentren y quede seteado el
+        // ReservePayment.CustomerId — cerrando la cadena asiento→pago→pagador para el refund.
+        // En Wallet el pagador todavía no se conoce en el alta (mejor estimación: pasajero IsPayment);
+        // se resolverá fino en el webhook (pendiente, ADR 0008). El tercero que NO viaja se materializa
+        // desde el Payer de MercadoPago en una iteración posterior (ADR 0008): por ahora, si no hay
+        // pasajero con ese documento, no se crea Customer y el pago queda con CustomerId null.
+        var payerDocument = request.Payment?.IdentificationNumber
+            ?? (request.Passengers.FirstOrDefault(p => p.IsPayment) ?? request.Passengers.First()).DocumentNumber;
+        var payerProfilePax = request.Passengers.FirstOrDefault(p => p.DocumentNumber == payerDocument);
 
-        if (existingPayer is null)
+        var existingPayer = await _context.Customers
+            .SingleOrDefaultAsync(c => c.DocumentNumber == payerDocument);
+
+        if (existingPayer is null && payerProfilePax is not null)
         {
             _context.Customers.Add(new Customer
             {
-                FirstName = payerPax.FirstName,
-                LastName = payerPax.LastName,
-                DocumentNumber = payerPax.DocumentNumber,
-                Email = payerPax.Email ?? request.Payment?.PayerEmail ?? string.Empty,
-                Phone1 = payerPax.Phone1,
+                FirstName = payerProfilePax.FirstName,
+                LastName = payerProfilePax.LastName,
+                DocumentNumber = payerDocument,
+                Email = payerProfilePax.Email ?? request.Payment?.PayerEmail ?? string.Empty,
+                Phone1 = payerProfilePax.Phone1,
             });
             await _context.SaveChangesWithOutboxAsync();
         }
@@ -640,8 +648,8 @@ public class ReserveBusiness : IReserveBusiness
 
         if (request.Payment is null)
         {
-            var firstPax = request.Passengers.First();
-            var resultPayment = await CreatePendingPayment(totalExpectedAmount, reserveList, firstPax);
+            var estimatedPayerPax = payerProfilePax ?? request.Passengers.First();
+            var resultPayment = await CreatePendingPayment(totalExpectedAmount, reserveList, estimatedPayerPax);
             if (resultPayment.IsFailure)
                 return Result.Failure<CreateReserveExternalResult>(resultPayment.Error);
 
@@ -824,6 +832,64 @@ public class ReserveBusiness : IReserveBusiness
             _context.Passengers.Update(p);
         }
 
+        // 4.b) Pagador tercero (ADR 0008): si la identificación del pago no corresponde a un
+        // Customer existente (tampoco se creó en el alta porque no coincide con ningún pasajero:
+        // alguien que paga sin viajar), se materializa acá desde el Payer/cardholder que devuelve
+        // MercadoPago, para que el pago y el asiento de cuenta corriente tengan a quién imputarse.
+        if (statusPaymentInternal.Value == StatusPaymentEnum.Paid && payingCustomer is null)
+        {
+            payingCustomer = await PayerCustomerResolver.ResolveOrCreateAsync(
+                _context,
+                new MercadoPagoPayerInfo(
+                    paymentData.IdentificationNumber,
+                    result.Payer?.Email ?? paymentData.PayerEmail,
+                    result.Payer?.FirstName,
+                    result.Payer?.LastName,
+                    result.Card?.Cardholder?.Name),
+                allPassengers);
+
+            if (payingCustomer is not null)
+            {
+                parentPayment.CustomerId = payingCustomer.CustomerId;
+                parentPayment.PayerName = $"{payingCustomer.FirstName} {payingCustomer.LastName}";
+            }
+        }
+
+        // 5) Cuenta corriente (ADR 0009): la compra online se asienta cuando el pago queda
+        // APROBADO — Charge (+total) y Payment (−total) juntos, neto 0 en CurrentBalance. Si el
+        // pago quedó pending/in_process el asiento lo hará el webhook al confirmarse; si fue
+        // rechazado no se asienta nada (la compra no existió). Sin este asiento, el Refund del
+        // cancel (ADR 0007) quedaría como crédito huérfano sin Charge/Pago que lo respalde.
+        if (statusPaymentInternal.Value == StatusPaymentEnum.Paid && payingCustomer is not null)
+        {
+            var description = BuildOnlinePurchaseDescription(orderedReserves);
+            var now = _dateTimeProvider.UtcNow;
+
+            _context.CustomerAccountTransactions.Add(new CustomerAccountTransaction
+            {
+                CustomerId = payingCustomer.CustomerId,
+                Date = now,
+                Type = TransactionType.Charge,
+                Amount = paymentData.TransactionAmount,
+                Description = description,
+                RelatedReserveId = mainReserve.ReserveId
+            });
+            payingCustomer.CurrentBalance += paymentData.TransactionAmount;
+
+            _context.CustomerAccountTransactions.Add(new CustomerAccountTransaction
+            {
+                CustomerId = payingCustomer.CustomerId,
+                Date = now,
+                Type = TransactionType.Payment,
+                Amount = -paymentData.TransactionAmount,
+                Description = $"Pago online aplicado a {description}",
+                RelatedReserveId = mainReserve.ReserveId,
+                ReservePaymentId = parentPayment.ReservePaymentId
+            });
+            payingCustomer.CurrentBalance -= paymentData.TransactionAmount;
+            _context.Customers.Update(payingCustomer);
+        }
+
         await _context.SaveChangesWithOutboxAsync();
         return Result.Success(parentPayment.ReservePaymentId);
     }
@@ -842,11 +908,22 @@ public class ReserveBusiness : IReserveBusiness
         }
     }
 
+    /// <summary>
+    /// Descripción del asiento de cuenta corriente de una compra online (flujo external).
+    /// </summary>
+    private static string BuildOnlinePurchaseDescription(List<Reserve> orderedReserves)
+    {
+        var main = orderedReserves.First();
+        var ids = string.Join(", ", orderedReserves.Select(r => $"#{r.ReserveId}"));
+        var type = orderedReserves.Count > 1 ? "Ida y vuelta" : "Ida";
+        return $"Reserva online: {type} {ids} - {main.OriginName} - {main.DestinationName}";
+    }
+
 
     private async Task<Result<int>> CreatePendingPayment(
       decimal amount,
       List<Reserve> reserves,
-      PassengerBookingExternalDto firstPassenger)
+      PassengerBookingExternalDto estimatedPayerPax)
     {
         // Ordenar reservas para decidir padre/hijos
         var orderedReserves = reserves
@@ -856,25 +933,22 @@ public class ReserveBusiness : IReserveBusiness
 
         var mainReserve = orderedReserves.First();
 
-        // (Opcional) si el primer pasajero es cliente
-        var payingCustomer = await _context.Customers
-            .FirstOrDefaultAsync(c => c.DocumentNumber == firstPassenger.DocumentNumber);
-
         // Obtener CashBox abierta (opcional para pagos online)
         var cashBoxResult = await _cashBoxBusiness.GetOpenCashBoxEntity();
         var cashBoxId = cashBoxResult.IsSuccess ? cashBoxResult.Value.CashBoxId : (int?)null;
 
-        // Padre pending
+        // Padre pending. En Wallet el pagador REAL recién se conoce cuando MercadoPago confirma:
+        // CustomerId queda null y lo resuelve el webhook desde el Payer (ADR 0008), antes del
+        // asiento en cuenta corriente (ADR 0009). Los datos Payer* son provisionales (mejor
+        // estimación: el pasajero IsPayment) y el webhook los pisa con los reales.
         var parentPayment = new ReservePayment
         {
             Amount = amount,
             ReserveId = mainReserve.ReserveId,
-            CustomerId = payingCustomer?.CustomerId,
-            PayerDocumentNumber = firstPassenger.DocumentNumber,
-            PayerName = payingCustomer != null
-                ? $"{payingCustomer.FirstName} {payingCustomer.LastName}"
-                : $"{firstPassenger.FirstName} {firstPassenger.LastName}",
-            PayerEmail = payingCustomer?.Email ?? firstPassenger.Email,
+            CustomerId = null,
+            PayerDocumentNumber = estimatedPayerPax.DocumentNumber,
+            PayerName = $"{estimatedPayerPax.FirstName} {estimatedPayerPax.LastName}",
+            PayerEmail = estimatedPayerPax.Email,
             Method = PaymentMethodEnum.Online,
             Status = StatusPaymentEnum.Pending,
             StatusDetail = "wallet_pending",

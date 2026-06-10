@@ -519,6 +519,8 @@ public class ReserveBusinessTests : TestBase
         _contextMock.Setup(c => c.Customers).Returns(GetMockDbSetWithIdentity(new List<Customer> { customer }));
         _contextMock.Setup(c => c.Trips).Returns(GetQueryableMockDbSet(trips));
         _contextMock.Setup(c => c.TenantConfigs).Returns(GetQueryableMockDbSet(new List<Transport.Domain.Tenants.TenantConfig>()));
+        var accountTransactions = new List<CustomerAccountTransaction>();
+        _contextMock.Setup(c => c.CustomerAccountTransactions).Returns(GetMockDbSetWithIdentity(accountTransactions));
 
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
@@ -637,6 +639,12 @@ public class ReserveBusinessTests : TestBase
         Assert.Equal(987654321, parentPayment.PaymentExternalId);
         Assert.Equal(StatusPaymentEnum.Paid, parentPayment.Status);
 
+        // Cuenta corriente (ADR 0009): la compra aprobada asienta Charge + Pago, neto 0
+        Assert.Equal(2, accountTransactions.Count);
+        Assert.Contains(accountTransactions, t => t.Type == TransactionType.Charge && t.Amount == 100m);
+        Assert.Contains(accountTransactions, t => t.Type == TransactionType.Payment && t.Amount == -100m);
+        Assert.Equal(0m, customer.CurrentBalance);
+
         // Verificar estados de las reservas
         Assert.All(reserve1.Passengers, cr =>
             Assert.Equal(PassengerStatusEnum.Confirmed, cr.Status));
@@ -707,6 +715,10 @@ public class ReserveBusinessTests : TestBase
         // Verificar actualización después de notificación
         Assert.Equal(987654321, walletParentPayment.PaymentExternalId);
         Assert.Equal(StatusPaymentEnum.Paid, walletParentPayment.Status);
+
+        // Cuenta corriente (ADR 0009): la confirmación wallet vía webhook asienta Charge + Pago
+        Assert.Equal(4, accountTransactions.Count); // 2 de la compra card + 2 de la wallet
+        Assert.Equal(0m, customer.CurrentBalance);
     }
 
     [Fact]
@@ -758,6 +770,8 @@ public class ReserveBusinessTests : TestBase
         _contextMock.Setup(c => c.Customers).Returns(GetMockDbSetWithIdentity(customers));
         _contextMock.Setup(c => c.Trips).Returns(GetQueryableMockDbSet(trips));
         _contextMock.Setup(c => c.TenantConfigs).Returns(GetQueryableMockDbSet(new List<Transport.Domain.Tenants.TenantConfig>()));
+        var accountTransactions = new List<CustomerAccountTransaction>();
+        _contextMock.Setup(c => c.CustomerAccountTransactions).Returns(GetMockDbSetWithIdentity(accountTransactions));
         SetupSaveChangesWithOutboxAsync(_contextMock);
 
         _paymentGatewayMock
@@ -822,6 +836,229 @@ public class ReserveBusinessTests : TestBase
         reservePayments.Should().HaveCount(1);
         reservePayments[0].CustomerId.Should().Be(createdCustomer.CustomerId, "el pago queda vinculado al cliente creado");
         passengers[0].ReservePaymentId.Should().Be(reservePayments[0].ReservePaymentId, "el pasajero queda imputado al pago del booking (vínculo al pagador)");
+
+        // Cuenta corriente (ADR 0009): la compra online aprobada asienta Charge + Pago, neto 0
+        accountTransactions.Should().HaveCount(2);
+        accountTransactions.Should().ContainSingle(t => t.Type == TransactionType.Charge && t.Amount == 100m);
+        accountTransactions.Should().ContainSingle(t => t.Type == TransactionType.Payment && t.Amount == -100m);
+        createdCustomer.CurrentBalance.Should().Be(0m, "compró y pagó: la cuenta queda en cero");
+    }
+
+    [Fact]
+    public async Task CreatePassengerReservesExternal_ShouldIdentifyPayerByPaymentIdentification_NotByIsPaymentOrOrder()
+    {
+        // ADR 0008: el pagador lo define la identificación del pago de MercadoPago, NO el flag
+        // IsPayment ni el orden. Acá el primer pasajero tiene IsPayment=true (señuelo), pero el
+        // que paga en MP es el SEGUNDO (Payment.IdentificationNumber = "222"). El Customer y el
+        // pago deben quedar a nombre del segundo.
+        var trip = new Trip
+        {
+            TripId = 1,
+            OriginCityId = 1,
+            DestinationCityId = 2,
+            OriginCity = new City { CityId = 1, Name = "Córdoba" },
+            DestinationCity = new City { CityId = 2, Name = "Rosario" }
+        };
+        var reserve = new Reserve
+        {
+            ReserveId = 1,
+            Status = ReserveStatusEnum.Confirmed,
+            Passengers = new List<Passenger>(),
+            VehicleId = 1,
+            ServiceId = 1,
+            TripId = 1,
+            Trip = trip,
+            Driver = new Driver { FirstName = "Mario", LastName = "Bros" }
+        };
+        var vehicle = new Vehicle { VehicleId = 1, AvailableQuantity = 10 };
+        var service = new Service { ServiceId = 1, Trip = trip };
+        var trips = new List<Trip>
+        {
+            new Trip { TripId = 1, OriginCityId = 1, DestinationCityId = 2, Status = EntityStatusEnum.Active, Prices = new List<TripPrice> {
+                new TripPrice { ReserveTypeId = ReserveTypeIdEnum.Ida, CityId = 2, Price = 100, Status = EntityStatusEnum.Active }
+            }}
+        };
+        var origin = new Direction { DirectionId = 1, Name = "Pickup" };
+        var destination = new Direction { DirectionId = 2, Name = "Dropoff" };
+
+        var customers = new List<Customer>();
+        var passengers = new List<Passenger>();
+        var reservePayments = new List<ReservePayment>();
+
+        _contextMock.Setup(c => c.Reserves).Returns(GetMockDbSetWithIdentity(new List<Reserve> { reserve }));
+        _contextMock.Setup(c => c.Vehicles).Returns(GetQueryableMockDbSet(new List<Vehicle> { vehicle }));
+        _contextMock.Setup(c => c.Services).Returns(GetMockDbSetWithIdentity(new List<Service> { service }));
+        _contextMock.Setup(c => c.Directions).Returns(GetQueryableMockDbSet(new List<Direction> { origin, destination }));
+        _contextMock.Setup(c => c.Passengers).Returns(GetMockDbSetWithIdentity(passengers));
+        _contextMock.Setup(c => c.ReservePayments).Returns(GetMockDbSetWithIdentity(reservePayments));
+        _contextMock.Setup(c => c.Customers).Returns(GetMockDbSetWithIdentity(customers));
+        _contextMock.Setup(c => c.Trips).Returns(GetQueryableMockDbSet(trips));
+        _contextMock.Setup(c => c.TenantConfigs).Returns(GetQueryableMockDbSet(new List<Transport.Domain.Tenants.TenantConfig>()));
+        var accountTransactions = new List<CustomerAccountTransaction>();
+        _contextMock.Setup(c => c.CustomerAccountTransactions).Returns(GetMockDbSetWithIdentity(accountTransactions));
+        SetupSaveChangesWithOutboxAsync(_contextMock);
+
+        _paymentGatewayMock
+            .Setup(x => x.CreatePaymentAsync(It.IsAny<PaymentCreateRequest>()))
+            .ReturnsAsync(new Payment { Id = 777, Status = "approved", StatusDetail = "accredited" });
+
+        _unitOfWorkMock
+            .Setup(u => u.ExecuteInTransactionAsync(
+                It.IsAny<Func<Task<Result<CreateReserveExternalResult>>>>(),
+                It.IsAny<IsolationLevel>()))
+            .Returns(async (Func<Task<Result<CreateReserveExternalResult>>> func, IsolationLevel _) => await func());
+
+        var passengerList = new List<PassengerBookingExternalDto>
+        {
+            new(CustomerId: null, IsPayment: true, HasTraveled: false,   // señuelo: NO es el que paga en MP
+                FirstName: "Acom", LastName: "Pañante", Email: "acom@test.com", Phone1: "111",
+                DocumentNumber: "111",
+                Outbound: new LegInfoDto(PickupLocationId: 1, DropoffLocationId: 2, Price: 100m), Return: null),
+            new(CustomerId: null, IsPayment: false, HasTraveled: false,  // ESTE es el pagador (MP)
+                FirstName: "Paga", LastName: "Dor", Email: "pagador@test.com", Phone1: "222",
+                DocumentNumber: "222",
+                Outbound: new LegInfoDto(PickupLocationId: 1, DropoffLocationId: 2, Price: 100m), Return: null)
+        };
+
+        var paymentDto = new CreatePaymentExternalRequestDto(
+            TransactionAmount: 200m, Token: "token", Description: "Reserva", Installments: 1,
+            PaymentMethodId: "visa", PayerEmail: "pagador@test.com",
+            IdentificationType: "DNI", IdentificationNumber: "222");
+
+        var request = new PassengerReserveCreateRequestWrapperExternalDto(
+            ReserveTypeId: (int)ReserveTypeIdEnum.Ida,
+            OutboundReserveId: 1,
+            ReturnReserveId: null,
+            Payment: paymentDto,
+            Passengers: passengerList);
+
+        // Act
+        var result = await _reserveBusiness.CreatePassengerReservesExternal(request);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+
+        customers.Should().HaveCount(1, "solo se da de alta el pagador identificado por MercadoPago");
+        var payer = customers.Single();
+        payer.DocumentNumber.Should().Be("222", "el pagador es el de la identificación del pago, no el IsPayment");
+        payer.FirstName.Should().Be("Paga");
+
+        reservePayments.Should().HaveCount(1);
+        reservePayments[0].CustomerId.Should().Be(payer.CustomerId, "el pago queda a nombre del pagador real");
+
+        passengers.Should().HaveCount(2);
+        passengers.Single(p => p.DocumentNumber == "222").CustomerId.Should().Be(payer.CustomerId);
+        passengers.Single(p => p.DocumentNumber == "111").CustomerId.Should().BeNull("el acompañante no es cliente");
+        passengers.Should().OnlyContain(p => p.ReservePaymentId == reservePayments[0].ReservePaymentId);
+
+        // Cuenta corriente (ADR 0009): los asientos quedan a nombre del pagador real, neto 0
+        accountTransactions.Should().HaveCount(2);
+        accountTransactions.Should().OnlyContain(t => t.CustomerId == payer.CustomerId);
+        payer.CurrentBalance.Should().Be(0m);
+    }
+
+    [Fact]
+    public async Task ExternalPaidBooking_WhenAdminCancelsPassenger_ShouldLeaveCreditInPayerAccount()
+    {
+        // Escenario crítico de punta a punta: usuario final compra y paga online (card) → la cuenta
+        // corriente asienta Charge + Pago (neto 0) → un admin cancela el pasajero → el Refund
+        // (ADR 0007) deja el pago como saldo a favor del pagador, con extracto que lo respalda.
+        var trip = new Trip
+        {
+            TripId = 1,
+            OriginCityId = 1,
+            DestinationCityId = 2,
+            OriginCity = new City { CityId = 1, Name = "Córdoba" },
+            DestinationCity = new City { CityId = 2, Name = "Rosario" }
+        };
+        var reserve = new Reserve
+        {
+            ReserveId = 1,
+            Status = ReserveStatusEnum.Confirmed,
+            ReserveDate = new DateTime(2026, 5, 25), // futura respecto del LocalNow de test (2020-01-01)
+            DepartureHour = TimeSpan.FromHours(9),
+            Passengers = new List<Passenger>(),
+            VehicleId = 1,
+            ServiceId = 1,
+            TripId = 1,
+            Trip = trip,
+            Driver = new Driver { FirstName = "Mario", LastName = "Bros" }
+        };
+        var vehicle = new Vehicle { VehicleId = 1, AvailableQuantity = 10 };
+        var service = new Service { ServiceId = 1, Trip = trip };
+        var trips = new List<Trip>
+        {
+            new Trip { TripId = 1, OriginCityId = 1, DestinationCityId = 2, Status = EntityStatusEnum.Active, Prices = new List<TripPrice> {
+                new TripPrice { ReserveTypeId = ReserveTypeIdEnum.Ida, CityId = 2, Price = 100, Status = EntityStatusEnum.Active }
+            }}
+        };
+        var origin = new Direction { DirectionId = 1, Name = "Pickup" };
+        var destination = new Direction { DirectionId = 2, Name = "Dropoff" };
+
+        var customers = new List<Customer>();
+        var passengers = new List<Passenger>();
+        var reservePayments = new List<ReservePayment>();
+        var accountTransactions = new List<CustomerAccountTransaction>();
+
+        _contextMock.Setup(c => c.Reserves).Returns(GetMockDbSetWithIdentity(new List<Reserve> { reserve }));
+        _contextMock.Setup(c => c.Vehicles).Returns(GetQueryableMockDbSet(new List<Vehicle> { vehicle }));
+        _contextMock.Setup(c => c.Services).Returns(GetMockDbSetWithIdentity(new List<Service> { service }));
+        _contextMock.Setup(c => c.Directions).Returns(GetQueryableMockDbSet(new List<Direction> { origin, destination }));
+        _contextMock.Setup(c => c.Passengers).Returns(GetMockDbSetWithIdentity(passengers));
+        _contextMock.Setup(c => c.ReservePayments).Returns(GetMockDbSetWithIdentity(reservePayments));
+        _contextMock.Setup(c => c.Customers).Returns(GetMockDbSetWithIdentity(customers));
+        _contextMock.Setup(c => c.Trips).Returns(GetQueryableMockDbSet(trips));
+        _contextMock.Setup(c => c.TenantConfigs).Returns(GetQueryableMockDbSet(new List<Transport.Domain.Tenants.TenantConfig>()));
+        _contextMock.Setup(c => c.CustomerAccountTransactions).Returns(GetMockDbSetWithIdentity(accountTransactions));
+        SetupSaveChangesWithOutboxAsync(_contextMock);
+
+        _paymentGatewayMock
+            .Setup(x => x.CreatePaymentAsync(It.IsAny<PaymentCreateRequest>()))
+            .ReturnsAsync(new Payment { Id = 888, Status = "approved", StatusDetail = "accredited" });
+
+        _unitOfWorkMock
+            .Setup(u => u.ExecuteInTransactionAsync(
+                It.IsAny<Func<Task<Result<CreateReserveExternalResult>>>>(),
+                It.IsAny<IsolationLevel>()))
+            .Returns(async (Func<Task<Result<CreateReserveExternalResult>>> func, IsolationLevel _) => await func());
+
+        var request = new PassengerReserveCreateRequestWrapperExternalDto(
+            ReserveTypeId: (int)ReserveTypeIdEnum.Ida,
+            OutboundReserveId: 1,
+            ReturnReserveId: null,
+            Payment: new CreatePaymentExternalRequestDto(
+                TransactionAmount: 100m, Token: "token", Description: "Reserva", Installments: 1,
+                PaymentMethodId: "visa", PayerEmail: "viaja@test.com",
+                IdentificationType: "DNI", IdentificationNumber: "999"),
+            Passengers: new List<PassengerBookingExternalDto>
+            {
+                new(CustomerId: null, IsPayment: true, HasTraveled: false,
+                    FirstName: "Viaja", LastName: "YPaga", Email: "viaja@test.com", Phone1: "123",
+                    DocumentNumber: "999",
+                    Outbound: new LegInfoDto(PickupLocationId: 1, DropoffLocationId: 2, Price: 100m), Return: null)
+            });
+
+        // Act 1: compra online aprobada
+        var createResult = await _reserveBusiness.CreatePassengerReservesExternal(request);
+
+        createResult.IsSuccess.Should().BeTrue();
+        var payer = customers.Single();
+        payer.CurrentBalance.Should().Be(0m, "compró y pagó: cuenta en cero");
+        accountTransactions.Should().HaveCount(2);
+
+        // Act 2: un admin cancela el pasajero. La navegación Reserve se asigna manualmente porque
+        // el alta no la setea y el Include del cancel no resuelve sobre el TestDbSet.
+        var createdPassenger = passengers.Single();
+        createdPassenger.Reserve = reserve;
+
+        var cancelResult = await _reserveBusiness.CancelPassengerAsync(createdPassenger.PassengerId);
+
+        // Assert: el pago queda a favor en la cuenta corriente, con extracto completo
+        cancelResult.IsSuccess.Should().BeTrue();
+        createdPassenger.Status.Should().Be(PassengerStatusEnum.Cancelled);
+        payer.CurrentBalance.Should().Be(-100m, "el pago online queda como saldo a favor");
+        accountTransactions.Should().HaveCount(3); // Charge, Pago online, Refund
+        accountTransactions.Should().ContainSingle(t => t.Type == TransactionType.Refund && t.Amount == -100m);
     }
 
 
