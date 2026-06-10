@@ -366,6 +366,13 @@ public class ReservePaymentBusiness : IReservePaymentBusiness
             parentPayment.UpdatedDate = DateTime.UtcNow;
             _context.ReservePayments.Update(parentPayment);
 
+            var payerInfo = new MercadoPagoPayerInfo(
+                mpPayment.Payer?.Identification?.Number,
+                mpPayment.Payer?.Email,
+                mpPayment.Payer?.FirstName,
+                mpPayment.Payer?.LastName,
+                mpPayment.Card?.Cardholder?.Name);
+
             var children = await _context.ReservePayments
                 .Where(c => c.ParentReservePaymentId == parentPayment.ReservePaymentId)
                 .ToListAsync();
@@ -396,6 +403,16 @@ public class ReservePaymentBusiness : IReservePaymentBusiness
                     passenger.Status = newPassengerStatus;
                     _context.Passengers.Update(passenger);
                 }
+            }
+
+            if (internalStatus.Value == StatusPaymentEnum.Paid)
+            {
+                // El pagador real lo define MercadoPago; si el pago llegó sin Customer (Wallet, o
+                // Card in_process: ADR 0008) se resuelve acá, ANTES del asiento en cuenta corriente.
+                if (parentPayment.CustomerId is null)
+                    await AttachPayerCustomerAsync(parentPayment, reservesToUpdate, payerInfo);
+
+                await RegisterApprovedOnlinePurchaseAsync(parentPayment, reservesToUpdate);
             }
 
             await _context.SaveChangesWithOutboxAsync();
@@ -433,6 +450,13 @@ public class ReservePaymentBusiness : IReservePaymentBusiness
             parentPayment.UpdatedDate = DateTime.UtcNow;
             _context.ReservePayments.Update(parentPayment);
 
+            var payerInfo = new MercadoPagoPayerInfo(
+                externalPayment.PayerDocumentNumber,
+                externalPayment.PayerEmail,
+                externalPayment.PayerFirstName,
+                externalPayment.PayerLastName,
+                externalPayment.CardholderName);
+
             var children = await _context.ReservePayments
                 .Where(c => c.ParentReservePaymentId == parentPayment.ReservePaymentId)
                 .ToListAsync();
@@ -465,9 +489,89 @@ public class ReservePaymentBusiness : IReservePaymentBusiness
                 }
             }
 
+            if (internalStatus.Value == StatusPaymentEnum.Paid)
+            {
+                // El pagador real lo define MercadoPago; si el pago llegó sin Customer (Wallet, o
+                // Card in_process: ADR 0008) se resuelve acá, ANTES del asiento en cuenta corriente.
+                if (parentPayment.CustomerId is null)
+                    await AttachPayerCustomerAsync(parentPayment, reservesToUpdate, payerInfo);
+
+                await RegisterApprovedOnlinePurchaseAsync(parentPayment, reservesToUpdate);
+            }
+
             await _context.SaveChangesWithOutboxAsync();
             return Result.Success(true);
         });
+    }
+
+    /// <summary>
+    /// Resuelve el Customer del pagador desde el Payer de MercadoPago (ADR 0008) y lo vincula al
+    /// pago. Cadena: cliente existente por documento → pasajero del booking con ese documento →
+    /// tercero materializado desde Payer/cardholder. Si no se puede resolver, el pago queda sin
+    /// Customer y la compra no se asienta (ADR 0009).
+    /// </summary>
+    private async Task AttachPayerCustomerAsync(
+        ReservePayment parentPayment, List<Reserve> reserves, MercadoPagoPayerInfo payerInfo)
+    {
+        var customer = await PayerCustomerResolver.ResolveOrCreateAsync(
+            _context, payerInfo, reserves.SelectMany(r => r.Passengers));
+        if (customer is null)
+            return;
+
+        parentPayment.CustomerId = customer.CustomerId;
+        parentPayment.PayerDocumentNumber = payerInfo.DocumentNumber ?? parentPayment.PayerDocumentNumber;
+        parentPayment.PayerEmail = payerInfo.Email ?? parentPayment.PayerEmail;
+        parentPayment.PayerName = $"{customer.FirstName} {customer.LastName}";
+        _context.ReservePayments.Update(parentPayment);
+    }
+
+    /// <summary>
+    /// Asienta en cuenta corriente una compra online que quedó APROBADA (ADR 0009): Charge (+total)
+    /// y Payment (−total) juntos, neto 0 en CurrentBalance. Corre en el webhook cuando un pago
+    /// Pending (Wallet, o Card in_process) transiciona a Paid; la idempotencia la garantiza el
+    /// guard de entrada (pagos ya no-Pending no se reprocesan). Si el pago no tiene Customer
+    /// vinculado (pagador no resuelto, ADR 0008) no se asienta: sin cliente no hay cuenta.
+    /// </summary>
+    private async Task RegisterApprovedOnlinePurchaseAsync(ReservePayment parentPayment, List<Reserve> reserves)
+    {
+        if (parentPayment.CustomerId is null)
+            return;
+
+        var customer = await _context.Customers
+            .FirstOrDefaultAsync(c => c.CustomerId == parentPayment.CustomerId.Value);
+        if (customer is null)
+            return;
+
+        var ordered = reserves.OrderBy(r => r.ReserveDate).ThenBy(r => r.ReserveId).ToList();
+        var main = ordered.FirstOrDefault(r => r.ReserveId == parentPayment.ReserveId) ?? ordered.First();
+        var ids = string.Join(", ", ordered.Select(r => $"#{r.ReserveId}"));
+        var type = ordered.Count > 1 ? "Ida y vuelta" : "Ida";
+        var description = $"Reserva online: {type} {ids} - {main.OriginName} - {main.DestinationName}";
+        var now = DateTime.UtcNow;
+
+        _context.CustomerAccountTransactions.Add(new CustomerAccountTransaction
+        {
+            CustomerId = customer.CustomerId,
+            Date = now,
+            Type = TransactionType.Charge,
+            Amount = parentPayment.Amount,
+            Description = description,
+            RelatedReserveId = parentPayment.ReserveId
+        });
+        customer.CurrentBalance += parentPayment.Amount;
+
+        _context.CustomerAccountTransactions.Add(new CustomerAccountTransaction
+        {
+            CustomerId = customer.CustomerId,
+            Date = now,
+            Type = TransactionType.Payment,
+            Amount = -parentPayment.Amount,
+            Description = $"Pago online aplicado a {description}",
+            RelatedReserveId = parentPayment.ReserveId,
+            ReservePaymentId = parentPayment.ReservePaymentId
+        });
+        customer.CurrentBalance -= parentPayment.Amount;
+        _context.Customers.Update(customer);
     }
 
     private static StatusPaymentEnum? GetPaymentStatusFromExternal(string externalStatusPayment)

@@ -119,7 +119,12 @@ public class PaymentIntegrationFunction
             ExternalReference: mpPayment.ExternalReference,
             Status: mpPayment.Status,
             StatusDetail: mpPayment.StatusDetail,
-            RawJson: JsonConvert.SerializeObject(mpPayment)
+            RawJson: JsonConvert.SerializeObject(mpPayment),
+            PayerDocumentNumber: mpPayment.Payer?.Identification?.Number,
+            PayerEmail: mpPayment.Payer?.Email,
+            PayerFirstName: mpPayment.Payer?.FirstName,
+            PayerLastName: mpPayment.Payer?.LastName,
+            CardholderName: mpPayment.Card?.Cardholder?.Name
         );
         var result = await _paymentBusiness.ProcessPaymentFromWebhook(externalPayment);
 
