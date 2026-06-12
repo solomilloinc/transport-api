@@ -38,5 +38,21 @@ public class ClaimBuilder
         return this;
     }
 
+    public ClaimBuilder SetCustomerId(int? customerId)
+    {
+        if (customerId.HasValue)
+        {
+            claims.Add(new Claim("customer_id", customerId.Value.ToString()));
+        }
+
+        return this;
+    }
+
+    public ClaimBuilder SetNeedsProfileCompletion(bool needsProfileCompletion)
+    {
+        claims.Add(new Claim("needs_profile_completion", needsProfileCompletion.ToString().ToLowerInvariant()));
+        return this;
+    }
+
     public ICollection<Claim> Build() => claims;
 }

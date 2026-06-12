@@ -20,6 +20,7 @@ namespace Transport.Business.Data;
 
 public interface IApplicationDbContext
 {
+    DbSet<Role> Roles { get; }
     DbSet<User> Users { get; }
     DbSet<Driver> Drivers { get; }
     DbSet<Customer> Customers { get; }

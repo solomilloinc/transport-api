@@ -25,6 +25,7 @@ namespace Transport.Infraestructure.Database;
 public class ApplicationDbContext : DbContext, IApplicationDbContext
 {
     public DbSet<OutboxMessage> OutboxMessages { get; set; }
+    public DbSet<Role> Roles { get; set; }
     public DbSet<User> Users { get; set; }
     public DbSet<Driver> Drivers { get; set; }
 

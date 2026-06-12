@@ -45,7 +45,7 @@ public class TokenFunction : FunctionBase
             return await MatchResultAsync(req, result);
 
         var response = req.CreateResponse(HttpStatusCode.OK);
-        await response.WriteAsJsonAsync(new { token = result.Value.AccessToken });
+        await response.WriteAsJsonAsync(new { token = result.Value.AccessToken, refreshToken = result.Value.RefreshToken });
 
         var encodedToken = WebUtility.UrlEncode(result.Value.RefreshToken);
 

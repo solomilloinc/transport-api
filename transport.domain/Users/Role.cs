@@ -20,4 +20,5 @@ public enum RoleEnum
     Admin = 1,
     User = 2,
     SuperAdmin = 3,
+    Client = 4,
 }

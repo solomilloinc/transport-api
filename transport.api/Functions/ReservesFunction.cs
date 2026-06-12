@@ -43,7 +43,7 @@ public class ReservesFunction : FunctionBase
     }
 
     [Function("CreateReserve")]
-    [Authorize("Admin")]
+    [Authorize("Admin", "User")]
     [OpenApiOperation(
         operationId: "reserve-create",
         tags: new[] { "Reserve" },
@@ -64,7 +64,7 @@ public class ReservesFunction : FunctionBase
     }
 
     [Function("CreatePassengerReserves")]
-    [Authorize("Admin")]
+    [Authorize("Admin", "User")]
     [OpenApiOperation(
     operationId: "passenger-reserves-create",
     tags: new[] { "Reserve" },
@@ -85,7 +85,7 @@ public class ReservesFunction : FunctionBase
     }
 
     [Function("GetReserveReport")]
-    [Authorize("Admin")]
+    [Authorize("Admin", "User")]
     [OpenApiOperation(operationId: "reserve-report", tags: new[] { "Reserve" }, Summary = "Get Reserve Report", Description = "Returns paginated list of reserves for a date (optionally filtered by Trip) plus the distinct Trips that have reserves that day for the Select.", Visibility = OpenApiVisibilityType.Important)]
     [OpenApiRequestBody("application/json", typeof(PagedReportRequestDto<ReserveDayReportFilterDto>), Required = true)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(ReserveDayReportResponseDto), Summary = "Reserve Report")]
@@ -122,7 +122,7 @@ public class ReservesFunction : FunctionBase
 
 
     [Function("GetCustomerReserveReport")]
-    [Authorize("Admin")]
+    [Authorize("Admin", "User")]
     [OpenApiOperation(operationId: "passenger-reserve-report", tags: new[] { "Reserve" }, Summary = "Get passenger Reserves Report", Description = "Returns paginated list of passenger reserves", Visibility = OpenApiVisibilityType.Important)]
     [OpenApiRequestBody("application/json", typeof(PagedReportRequestDto<PassengerReserveReportFilterRequestDto>), Required = true)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(PagedReportResponseDto<PassengerReserveReportResponseDto>), Summary = "passenger Reserve Report")]
@@ -136,7 +136,7 @@ public class ReservesFunction : FunctionBase
     }
 
     [Function("UpdateReserve")]
-    [Authorize("Admin")]
+    [Authorize("Admin", "User")]
     [OpenApiOperation(
     operationId: "reserve-update",
     tags: new[] { "Reserve" },
@@ -160,7 +160,7 @@ public class ReservesFunction : FunctionBase
     }
 
     [Function("CreateReservePayments")]
-    [Authorize("Admin")]
+    [Authorize("Admin", "User")]
     [OpenApiOperation(
     operationId: "reserve-create-payments",
     tags: new[] { "ReservePayments" },
@@ -187,7 +187,7 @@ public class ReservesFunction : FunctionBase
     }
 
     [Function("UpdatePassengerReserve")]
-    [Authorize("Admin")]
+    [Authorize("Admin", "User")]
     [OpenApiOperation(
     operationId: "passenger-reserve-update",
     tags: new[] { "passenger" },
@@ -211,7 +211,7 @@ public class ReservesFunction : FunctionBase
     }
 
     [Function("CancelPassenger")]
-    [Authorize("Admin")]
+    [Authorize("Admin", "User")]
     [OpenApiOperation(
     operationId: "passenger-cancel",
     tags: new[] { "passenger" },
@@ -292,7 +292,7 @@ public class ReservesFunction : FunctionBase
     }
 
     [Function("GetCustomerPendingReserves")]
-    [Authorize("Admin")]
+    [Authorize("Admin", "User")]
     [OpenApiOperation(
         operationId: "customer-pending-reserves",
         tags: new[] { "ReservePayments" },
@@ -310,7 +310,7 @@ public class ReservesFunction : FunctionBase
     }
 
     [Function("SettleCustomerDebt")]
-    [Authorize("Admin")]
+    [Authorize("Admin", "User")]
     [OpenApiOperation(
         operationId: "customer-debt-settle",
         tags: new[] { "ReservePayments" },

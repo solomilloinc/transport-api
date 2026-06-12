@@ -52,7 +52,7 @@ public sealed class CustomerFunction : FunctionBase
     }
 
     [Function("UpdateCustomer")]
-    [Authorize("Admin")]
+    [Authorize("Admin", "User")]
     [OpenApiOperation(operationId: "customer-update", tags: new[] { "Customer" }, Summary = "Update Customer", Description = "Updates an existing customer", Visibility = OpenApiVisibilityType.Important)]
     [OpenApiParameter("customerId", In = ParameterLocation.Path, Required = true, Type = typeof(int), Description = "Customer ID")]
     [OpenApiRequestBody("application/json", typeof(CustomerUpdateRequestDto), Required = true)]
@@ -69,7 +69,7 @@ public sealed class CustomerFunction : FunctionBase
     }
 
     [Function("GetCustomerReport")]
-    [Authorize("Admin")]
+    [Authorize("Admin", "User")]
     [OpenApiOperation(operationId: "customer-report", tags: new[] { "Customer" }, Summary = "Get Customer Report", Description = "Returns paginated list of customers", Visibility = OpenApiVisibilityType.Important)]
     [OpenApiRequestBody("application/json", typeof(PagedReportRequestDto<CustomerReportFilterRequestDto>), Required = true)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, "application/json", typeof(PagedReportResponseDto<CustomerReportResponseDto>), Summary = "Customer Report")]

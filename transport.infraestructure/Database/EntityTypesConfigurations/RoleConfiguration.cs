@@ -14,8 +14,9 @@ public class RoleConfiguration : IEntityTypeConfiguration<Role>
 
         builder.HasData(
         new Role { RoleId = (int)RoleEnum.Admin, Name = "Administrador", CreatedBy = "System", CreatedDate = DateTime.UtcNow },
-        new Role { RoleId = (int)RoleEnum.User, Name = "Cliente", CreatedBy = "System", CreatedDate = DateTime.UtcNow },
-        new Role { RoleId = (int)RoleEnum.SuperAdmin, Name = "SuperAdmin", CreatedBy = "System", CreatedDate = DateTime.UtcNow }
+        new Role { RoleId = (int)RoleEnum.User, Name = "Operativo", CreatedBy = "System", CreatedDate = DateTime.UtcNow },
+        new Role { RoleId = (int)RoleEnum.SuperAdmin, Name = "SuperAdmin", CreatedBy = "System", CreatedDate = DateTime.UtcNow },
+        new Role { RoleId = (int)RoleEnum.Client, Name = "Cliente", CreatedBy = "System", CreatedDate = DateTime.UtcNow }
         );
     }
 }
